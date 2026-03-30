@@ -1,0 +1,1491 @@
+<!DOCTYPE html>
+<html lang="sr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tradey — Finalna analiza troškova</title>
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #f9f8f5;
+            --surface: #ffffff;
+            --surface2: #f2f0eb;
+            --border: rgba(0, 0, 0, 0.10);
+            --border2: rgba(0, 0, 0, 0.18);
+            --text: #1a1a18;
+            --text2: #5c5b56;
+            --text3: #9c9a92;
+            --success: #1a6b3a;
+            --success-bg: #e8f5ee;
+            --warning: #7a4f00;
+            --warning-bg: #fdf3dc;
+            --danger: #8b1f1f;
+            --danger-bg: #fdeaea;
+            --info: #0e4b8a;
+            --info-bg: #e6f0fb;
+            --accent: #2d2d2a;
+            --radius: 10px;
+            --radius-lg: 14px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #181816;
+                --surface: #222220;
+                --surface2: #2c2c2a;
+                --border: rgba(255, 255, 255, 0.10);
+                --border2: rgba(255, 255, 255, 0.18);
+                --text: #e8e6df;
+                --text2: #a8a69e;
+                --text3: #68665e;
+                --success: #5ab87a;
+                --success-bg: #0d2e1c;
+                --warning: #e0a020;
+                --warning-bg: #2a1e00;
+                --danger: #e07070;
+                --danger-bg: #2a0d0d;
+                --info: #6aaee8;
+                --info-bg: #0a1e38;
+                --accent: #d4d2cb;
+            }
+        }
+
+        body {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 0;
+        }
+
+        .page {
+            max-width: 820px;
+            margin: 0 auto;
+            padding: 48px 24px 64px;
+        }
+
+        .header {
+            margin-bottom: 36px;
+        }
+
+        .brand {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text3);
+            margin-bottom: 12px;
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 400;
+            line-height: 1.3;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: var(--text2);
+            font-style: italic;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 28px;
+            border-bottom: 1px solid var(--border2);
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: var(--text2);
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            transition: color 0.15s, border-color 0.15s;
+        }
+
+        .tab:hover { color: var(--text); }
+
+        .tab.active {
+            color: var(--text);
+            border-bottom: 2px solid var(--text);
+            font-weight: 700;
+        }
+
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        h2 {
+            font-size: 18px;
+            font-weight: 400;
+            color: var(--text);
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+
+        h3 {
+            font-size: 14px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            color: var(--text);
+            margin: 24px 0 12px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border2);
+        }
+
+        .header-row {
+            display: flex;
+            gap: 8px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--border2);
+            margin-bottom: 2px;
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+            align-items: flex-start;
+        }
+
+        .row:last-of-type { border-bottom: none; }
+
+        .row-name { flex: 2; }
+
+        .row-name .label {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 2px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .row-name .sub {
+            font-size: 11px;
+            color: var(--text2);
+            font-style: italic;
+        }
+
+        .col {
+            flex: 1;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text);
+        }
+
+        .col-header {
+            flex: 1;
+            text-align: center;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text3);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .row-name-header {
+            flex: 2;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text3);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .col.correct { color: var(--success); font-weight: 700; }
+        .col.wrong { color: var(--danger); text-decoration: line-through; opacity: 0.7; }
+        .col.warn { color: var(--warning); }
+        .col.best { color: var(--info); font-weight: 700; }
+
+        .verdict {
+            display: inline-block;
+            font-size: 10px;
+            font-family: 'Courier New', monospace;
+            padding: 2px 8px;
+            border-radius: 3px;
+            margin-top: 6px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+
+        .verdict.ok { background: var(--success-bg); color: var(--success); }
+        .verdict.partial { background: var(--warning-bg); color: var(--warning); }
+        .verdict.bad { background: var(--danger-bg); color: var(--danger); }
+
+        .ai-verdicts {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .ai-card {
+            flex: 1;
+            background: var(--surface2);
+            border-radius: var(--radius);
+            padding: 14px;
+            border: 1px solid var(--border);
+        }
+
+        .ai-name {
+            font-size: 12px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+
+        .ai-note {
+            font-size: 11px;
+            color: var(--text2);
+            line-height: 1.6;
+        }
+
+        .service-block { margin-bottom: 14px; }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 16px 18px;
+        }
+
+        .warn-card {
+            background: var(--warning-bg);
+            border: 1px solid rgba(180, 120, 0, 0.3);
+            border-radius: var(--radius-lg);
+            padding: 16px 18px;
+        }
+
+        .card-title {
+            font-size: 13px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .warn-card .card-title { color: var(--warning); }
+
+        .card-note {
+            font-size: 12px;
+            color: var(--text2);
+            line-height: 1.7;
+        }
+
+        .warn-card .card-note { color: var(--warning); }
+
+        .price-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+        }
+
+        .price-big {
+            font-size: 22px;
+            font-weight: 400;
+            font-style: italic;
+            color: var(--text);
+        }
+
+        .price-label {
+            font-size: 11px;
+            color: var(--text3);
+        }
+
+        .totals-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .total-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 14px;
+            text-align: center;
+        }
+
+        .total-label {
+            font-size: 10px;
+            font-family: 'Courier New', monospace;
+            color: var(--text3);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+            line-height: 1.5;
+        }
+
+        .total-val {
+            font-size: 24px;
+            font-style: italic;
+            font-weight: 400;
+        }
+
+        .total-val.good { color: var(--success); }
+        .total-val.mid { color: var(--text); }
+        .total-val.bad { color: var(--danger); }
+
+        .total-note {
+            font-size: 10px;
+            color: var(--text3);
+            margin-top: 4px;
+            line-height: 1.5;
+        }
+
+        /* ── OPTIMAL TAB ── */
+        .highlight-card {
+            background: var(--info-bg);
+            border: 1px solid rgba(14, 75, 138, 0.25);
+            border-radius: var(--radius-lg);
+            padding: 16px 18px;
+            margin-bottom: 20px;
+        }
+
+        .highlight-title {
+            font-size: 14px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            color: var(--info);
+            margin-bottom: 6px;
+        }
+
+        .highlight-note {
+            font-size: 12px;
+            color: var(--info);
+            line-height: 1.6;
+        }
+
+        /* Stack cards grid */
+        .stack-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stack-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 14px 16px;
+        }
+
+        .stack-card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .stack-layer {
+            font-size: 9px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text3);
+            margin-bottom: 6px;
+        }
+
+        .stack-name {
+            font-size: 14px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+
+        .stack-desc {
+            font-size: 11px;
+            color: var(--text2);
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .stack-price {
+            font-size: 16px;
+            font-style: italic;
+            font-weight: 400;
+        }
+
+        .stack-price.free { color: var(--success); }
+        .stack-price.paid { color: var(--text); }
+        .stack-price.warn { color: var(--warning); }
+
+        .stack-price-note {
+            font-size: 10px;
+            color: var(--text3);
+            margin-top: 2px;
+        }
+
+        /* Architecture diagram */
+        .arch-diagram {
+            background: var(--surface2);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: var(--text2);
+            line-height: 1.9;
+            overflow-x: auto;
+        }
+
+        .arch-diagram .arch-title {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text3);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 14px;
+        }
+
+        .arch-node {
+            color: var(--text);
+            font-weight: 700;
+        }
+
+        .arch-free { color: var(--success); }
+        .arch-paid { color: var(--warning); }
+
+        /* Bar section */
+        .bar-section {
+            background: var(--surface2);
+            border-radius: var(--radius-lg);
+            padding: 18px;
+            margin: 20px 0;
+        }
+
+        .bar-section-title {
+            font-size: 13px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            color: var(--text);
+            margin-bottom: 14px;
+        }
+
+        .bar-r {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 11px;
+        }
+
+        .bar-lbl { min-width: 210px; color: var(--text2); }
+
+        .bar-track {
+            flex: 1;
+            height: 7px;
+            background: var(--surface);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 4px;
+        }
+
+        .bar-val {
+            min-width: 54px;
+            text-align: right;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            color: var(--text);
+        }
+
+        .bar-total {
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid var(--border2);
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+        }
+
+        .bar-total-label { font-size: 12px; color: var(--text2); }
+        .bar-total-val { font-size: 28px; font-style: italic; color: var(--success); }
+
+        .section-note {
+            font-size: 10px;
+            color: var(--text3);
+            margin-top: 6px;
+            font-style: italic;
+        }
+
+        .rec-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 16px 18px;
+            margin-top: 14px;
+        }
+
+        /* One-time costs */
+        .onetime-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 14px 0 20px;
+        }
+
+        .onetime-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 12px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .onetime-label {
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            color: var(--text);
+            font-weight: 700;
+        }
+
+        .onetime-sub {
+            font-size: 10px;
+            color: var(--text3);
+            margin-top: 2px;
+        }
+
+        .onetime-price {
+            font-size: 16px;
+            font-style: italic;
+            color: var(--text);
+            text-align: right;
+        }
+
+        .onetime-freq {
+            font-size: 10px;
+            color: var(--text3);
+        }
+
+        /* Windows dev section */
+        .dev-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 14px 0;
+        }
+
+        .dev-tool {
+            background: var(--surface2);
+            border-radius: var(--radius);
+            padding: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .dev-tool-name {
+            font-size: 12px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+
+        .dev-tool-desc {
+            font-size: 10px;
+            color: var(--text2);
+            line-height: 1.5;
+        }
+
+        .dev-tool-price {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--success);
+            margin-top: 6px;
+        }
+
+        b { font-weight: 700; }
+
+        /* Per-user costs tab */
+        .cost-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-bottom: 24px;
+        }
+
+        .cost-table th {
+            font-size: 10px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            color: var(--text3);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 10px 8px;
+            text-align: center;
+            border-bottom: 2px solid var(--border2);
+        }
+
+        .cost-table th:first-child { text-align: left; min-width: 160px; }
+
+        .cost-table td {
+            font-size: 12px;
+            padding: 10px 8px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .cost-table td:first-child {
+            text-align: left;
+            font-size: 12px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+
+        .cost-table td.sub-label {
+            font-weight: 400;
+            font-style: italic;
+            font-size: 11px;
+            color: var(--text2);
+            font-family: 'Georgia', serif;
+        }
+
+        .cost-table tr:last-child td { border-bottom: none; }
+
+        .cost-table tr.total-row td {
+            border-top: 2px solid var(--border2);
+            font-weight: 700;
+            font-size: 13px;
+            padding-top: 14px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .cost-free { color: var(--success) !important; font-weight: 700; }
+        .cost-low { color: var(--success) !important; }
+        .cost-mid { color: var(--warning) !important; }
+        .cost-high { color: var(--danger) !important; font-weight: 700; }
+
+        .scenario-title {
+            font-size: 14px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            color: var(--text);
+            margin: 28px 0 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border2);
+        }
+
+        .scenario-title:first-of-type { margin-top: 0; }
+
+        .scenario-badge {
+            display: inline-block;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 3px;
+            margin-left: 8px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            vertical-align: middle;
+        }
+
+        .scenario-badge.warn { background: var(--warning-bg); color: var(--warning); }
+        .scenario-badge.good { background: var(--success-bg); color: var(--success); }
+
+        .removed-badge {
+            display: inline-block;
+            font-size: 9px;
+            padding: 1px 6px;
+            border-radius: 3px;
+            background: var(--danger-bg);
+            color: var(--danger);
+            font-family: 'Courier New', monospace;
+            font-weight: 700;
+            vertical-align: middle;
+            margin-left: 6px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+
+        <div class="header">
+            <div class="brand">Tradey · Infrastructure Report · Mart 2026</div>
+            <h1>Finalna analiza infrastrukturnih troškova</h1>
+            <p class="subtitle">10,000 aktivnih korisnika · Kompletan tech stack · Google-first auth · Expo mobile</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="show('compare', this)">Poređenje analiza</button>
+            <button class="tab" onclick="show('final', this)">Finalni troškovnik</button>
+            <button class="tab" onclick="show('optimal', this)">Optimalni plan</button>
+            <button class="tab" onclick="show('peruser', this)">Troškovi po korisnicima</button>
+        </div>
+
+        <!-- TAB 1: POREĐENJE -->
+        <div id="compare" class="panel active">
+            <h2>Tačnost analiza — ChatGPT vs Gemini vs Claude</h2>
+
+            <div class="header-row">
+                <div class="row-name-header">Stavka</div>
+                <div class="col-header">ChatGPT</div>
+                <div class="col-header">Gemini</div>
+                <div class="col-header">Claude (prethodni)</div>
+                <div class="col-header">Tačno</div>
+            </div>
+
+            <div class="row">
+                <div class="row-name">
+                    <div class="label">Cloudflare Tunnel</div>
+                    <div class="sub">Da li je besplatan?</div>
+                </div>
+                <div class="col correct">$0 ✓</div>
+                <div class="col correct">$0 ✓</div>
+                <div class="col correct">$0 ✓</div>
+                <div class="col best">$0 ✓</div>
+            </div>
+
+            <div class="row">
+                <div class="row-name">
+                    <div class="label">Cloudflare R2</div>
+                    <div class="sub">Storage + Class B operacije čitanja</div>
+                </div>
+                <div class="col wrong">$0.37</div>
+                <div class="col correct">$2.03 ✓</div>
+                <div class="col warn">$0.23</div>
+                <div class="col best">~$2.03</div>
+            </div>
+
+            <div class="row">
+                <div class="row-name">
+                    <div class="label">Firebase Auth — Google/email</div>
+                    <div class="sub">Ispod 50k MAU</div>
+                </div>
+                <div class="col correct">$0 ✓</div>
+                <div class="col correct">$0 ✓</div>
+                <div class="col correct">$0 ✓</div>
+                <div class="col best">$0 ✓</div>
+            </div>
+
+            <div class="row">
+                <div class="row-name">
+                    <div class="label">Firebase SMS OTP</div>
+                    <div class="sub">Status u finalnom planu</div>
+                </div>
+                <div class="col warn">Uključen</div>
+                <div class="col warn">Uključen</div>
+                <div class="col warn">Uključen</div>
+                <div class="col best">UKLONJEN ✓</div>
+            </div>
+
+            <div class="row">
+                <div class="row-name">
+                    <div class="label">MongoDB — preporučeni tier</div>
+                    <div class="sub">Za 10k korisnika + embeddingi</div>
+                </div>
+                <div class="col warn">M10 $60</div>
+                <div class="col correct">Flex $8–30 ✓</div>
+                <div class="col warn">M10 $58</div>
+                <div class="col best">Flex $8–30 ✓</div>
+            </div>
+
+            <div class="row">
+                <div class="row-name">
+                    <div class="label">Vercel cena za 2 osobe</div>
+                    <div class="sub">Vukašin + Teodora</div>
+                </div>
+                <div class="col wrong">$40 ✗</div>
+                <div class="col correct">$20 ✓</div>
+                <div class="col correct">$20 ✓</div>
+                <div class="col best">CF Pages $0 ✓</div>
+            </div>
+
+            <div class="row">
+                <div class="row-name">
+                    <div class="label">Mobilna aplikacija</div>
+                    <div class="sub">Framework i iOS build bez Mac-a</div>
+                </div>
+                <div class="col wrong">Nije razmatrano ✗</div>
+                <div class="col wrong">Nije razmatrano ✗</div>
+                <div class="col wrong">Nije razmatrano ✗</div>
+                <div class="col best">Expo + EAS Build ✓</div>
+            </div>
+
+            <div class="row">
+                <div class="row-name">
+                    <div class="label">Domen + Store nalozi</div>
+                    <div class="sub">Jednokratno/godišnje</div>
+                </div>
+                <div class="col wrong">Ne pominje ✗</div>
+                <div class="col correct">Uključio ✓</div>
+                <div class="col wrong">Ne pominje ✗</div>
+                <div class="col best">Google Play $25 + Apple $99/god</div>
+            </div>
+
+            <div class="row">
+                <div class="row-name">
+                    <div class="label">R2 Class B operacije</div>
+                    <div class="sub">Infinite feed → milioni čitanja</div>
+                </div>
+                <div class="col wrong">Ignorisano ✗</div>
+                <div class="col correct">Uključio ✓</div>
+                <div class="col wrong">Ignorisano ✗</div>
+                <div class="col best">Uključiti ✓</div>
+            </div>
+
+            <div class="ai-verdicts">
+                <div class="ai-card">
+                    <div class="ai-name">ChatGPT</div>
+                    <div class="ai-note">Propustio R2 Class B operacije, pogrešio Vercel ($40 umesto $20), izostavio domen i mobilni stack. Krajnji broj je netačan.</div>
+                    <div class="verdict bad">Delimično tačno</div>
+                </div>
+                <div class="ai-card">
+                    <div class="ai-name">Gemini</div>
+                    <div class="ai-note">Najtačnija analiza troškova: uočio R2 Class B, preporučio Flex tier, uključio domen i Google Play. Nije pokrio mobilni stack.</div>
+                    <div class="verdict partial">Troškovi tačni</div>
+                </div>
+                <div class="ai-card">
+                    <div class="ai-name">Finalni plan (ovaj)</div>
+                    <div class="ai-note">Dodaje kompletan mobilni stack (Expo + EAS), uklanja SMS OTP, zamenjuje Vercel sa CF Pages, dodaje Apple Developer troškove.</div>
+                    <div class="verdict ok">Najkompletnija analiza</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: FINALNI TROŠKOVNIK -->
+        <div id="final" class="panel">
+            <h2>Finalni 100% tačni troškovi — 10,000 korisnika</h2>
+
+            <div class="service-block">
+                <div class="card">
+                    <div class="card-title">Lokalni server — Node.js + Python AI (Ollama/Qwen2.5 7B, CLIP, FAISS)</div>
+                    <div class="card-note">Hardver posedujete. Ollama/Qwen2.5 7B radi bez GPU-a. CLIP embeddinzi se generišu lokalno pri uploadu. Nema cloud AI troška. Jedino: struja (~5–10W idle) i kućni internet.</div>
+                    <div class="price-row"><span class="price-big" style="color:var(--success)">$0</span><span class="price-label">cloud AI trošak</span></div>
+                </div>
+            </div>
+
+            <div class="service-block">
+                <div class="card">
+                    <div class="card-title">Cloudflare Tunnel — HTTPS bez static IP-a</div>
+                    <div class="card-note">Radi bez static IP-a i bez port forwardinga. Automatski HTTPS. Sigurnije od direktnog izlaganja servera. Potpuno besplatno.</div>
+                    <div class="price-row"><span class="price-big" style="color:var(--success)">$0</span><span class="price-label">mesečno</span></div>
+                </div>
+            </div>
+
+            <div class="service-block">
+                <div class="card">
+                    <div class="card-title">Cloudflare R2 — Image Storage + Operacije čitanja</div>
+                    <div class="card-note">
+                        <b>Storage (25GB):</b> Prvih 10GB besplatno → 15GB × $0.015 = $0.23<br>
+                        <b>Upload (Class A):</b> ~50k slika daleko ispod 1M besplatnih = $0<br>
+                        <b>Čitanje (Class B):</b> 10k korisnika × 50 slika/dan × 30 dana = 15M čitanja. Besplatno: 10M. Ekstra 5M × $0.36/milion = $1.80<br>
+                        <b>Egress:</b> $0 — Cloudflare nikad ne naplaćuje izlazni saobraćaj
+                    </div>
+                    <div class="price-row"><span class="price-big">~$2.03</span><span class="price-label">mesečno</span></div>
+                </div>
+            </div>
+
+            <div class="service-block">
+                <div class="card">
+                    <div class="card-title">Firebase Auth — Google Sign-In (PRIMARY) + Email/Password (SECONDARY)</div>
+                    <div class="card-note">
+                        Besplatno do 50,000 MAU. Google Sign-In i email/password login se ne naplaćuju po SMS liniji.<br>
+                        <b>SMS OTP je potpuno uklonjen</b> — $0.06/SMS bez ijednog besplatnog SMS-a za prave korisnike.<br>
+                        Google login: 61.54% tržišnog udela u social login prostoru. ~80% Android udel u Srbiji = skoro svi korisnici imaju Google nalog.
+                    </div>
+                    <div class="price-row"><span class="price-big" style="color:var(--success)">$0</span><span class="price-label">mesečno (do 50k MAU)</span></div>
+                </div>
+            </div>
+
+            <div class="service-block">
+                <div class="card">
+                    <div class="card-title">MongoDB Atlas — Flex Tier</div>
+                    <div class="card-note">
+                        M0 (512MB) je premalo za 10k korisnika sa CLIP embeddingima (512 dim × 50k slika = stotine MB samo za vektore) + chat + lajkovi + itemi.<br><br>
+                        <b>Flex Tier:</b> $8 base + usage, capped na $30/mes. Uključuje Atlas Vector Search — može zameniti deo FAISS logike direktno u bazi.<br>
+                        M10 Dedicated ($57/mes) preporučljiv tek za 50k+ korisnika i garantovanu SLA.
+                    </div>
+                    <div class="price-row"><span class="price-big">$8–$30</span><span class="price-label">Flex tier, capped na $30</span></div>
+                </div>
+            </div>
+
+            <div class="service-block">
+                <div class="card">
+                    <div class="card-title">Cloudflare Pages — React Web Frontend</div>
+                    <div class="card-note">
+                        Potpuno besplatno, unlimited bandwidth, komercijalna upotreba dozvoljena. React SPA radi perfektno.<br>
+                        Alternativa Vercel Pro ($20/mes) — CF Pages pruža istu funkcionalnost bez troška.
+                    </div>
+                    <div class="price-row"><span class="price-big" style="color:var(--success)">$0</span><span class="price-label">mesečno, unlimited</span></div>
+                </div>
+            </div>
+
+            <div class="service-block">
+                <div class="card">
+                    <div class="card-title">React Native + Expo + EAS — Mobilna aplikacija (Android + iOS)</div>
+                    <div class="card-note">
+                        Jedan codebase za Android i iOS. Razvoj 100% na Windows-u.<br><br>
+                        <b>Expo Go:</b> Besplatno — instant testiranje na fizičkom uređaju QR kodom, nema emulatora.<br>
+                        <b>EAS Build Free tier:</b> Buildovi u cloud-u — iOS builds na Expo macOS serverima, bez Xcode-a, bez Mac-a.<br>
+                        <b>EAS Free plan:</b> Uključuje besplatne buildove sa standardnim queue vremenom (dovoljno za development fazu).<br>
+                        <b>Expo Push Notifications:</b> Besplatno — wrapper oko FCM (Android) i APNs (iOS).<br>
+                        <b>OTA Updates:</b> Over-the-air JavaScript update, bez novog App Store review-a.
+                    </div>
+                    <div class="price-row"><span class="price-big" style="color:var(--success)">$0</span><span class="price-label">mesečno (Free tier dovoljan za launch)</span></div>
+                </div>
+            </div>
+
+            <div class="service-block">
+                <div class="card">
+                    <div class="card-title">Domen (.com)</div>
+                    <div class="card-note">.com domen: ~$12–15/godišnje ≈ $1.25/mes</div>
+                    <div class="price-row"><span class="price-big">$1.25</span><span class="price-label">mesečno (~$15/god)</span></div>
+                </div>
+            </div>
+
+            <h3>Jednokratni troškovi</h3>
+
+            <div class="service-block">
+                <div class="warn-card">
+                    <div class="card-title">⚠ Jednokratni troškovi — obavezni za store distribuciju</div>
+                    <div class="card-note">
+                        <b>Google Play Developer nalog:</b> $25 — jednokratno, nikad ponovo. Neophodan za Google Play Store.<br><br>
+                        <b>Apple Developer Program:</b> $99/godišnje — obavezno za distribuciju na App Store i testiranje na pravim iPhone uređajima. Bez ovog naloga, iOS app se ne može staviti na App Store, niti instalirati na iPhone putem TestFlight-a. EAS Build generiše iOS binarni fajl u cloud-u — za potpisivanje i distribuciju potreban je Apple nalog.
+                    </div>
+                    <div class="price-row"><span class="price-big" style="color:var(--warning)">$25 + $99/god</span><span class="price-label">Google Play (jed.) + Apple Developer (godišnje)</span></div>
+                </div>
+            </div>
+
+            <div class="totals-grid">
+                <div class="total-box">
+                    <div class="total-label">Optimistično<br>Flex base, malo korisnika</div>
+                    <div class="total-val good">~$9</div>
+                    <div class="total-note">R2 $2 + Flex $8 base<br>CF Pages, CF Tunnel, Firebase</div>
+                </div>
+                <div class="total-box">
+                    <div class="total-label">Realistično<br>10k korisnika, Flex mid</div>
+                    <div class="total-val mid">~$21</div>
+                    <div class="total-note">R2 $2 + Flex $18 + Domen $1.25<br>sve ostalo besplatno</div>
+                </div>
+                <div class="total-box">
+                    <div class="total-label">Pesimistično<br>Flex cap + veći R2</div>
+                    <div class="total-val bad">~$33</div>
+                    <div class="total-note">R2 $2 + Flex cap $30<br>+ domen $1.25</div>
+                </div>
+            </div>
+            <div class="section-note">+ $25 jednokratno Google Play · + $99/god Apple Developer · + struja i internet za lokalni server</div>
+        </div>
+
+        <!-- TAB 3: OPTIMALNI PLAN (PRERAĐEN) -->
+        <div id="optimal" class="panel">
+            <h2>Optimalni plan — kompletan tech stack za Tradey</h2>
+
+            <div class="highlight-card">
+                <div class="highlight-title">Cilj: Ispod $35/mesečno za 10k korisnika, Android + iOS, Windows razvoj</div>
+                <div class="highlight-note">Kompletan stack bez SMS OTP, bez Vercel, bez Mac-a. Google-first auth. Expo EAS za iOS buildove iz Windows-a. Sve što treba za produkciju.</div>
+            </div>
+
+            <h3>Backend & Infrastruktura</h3>
+
+            <div class="stack-grid">
+                <div class="stack-card">
+                    <div class="stack-layer">Server OS</div>
+                    <div class="stack-name">Ubuntu Server</div>
+                    <div class="stack-desc">Stabilan, open source, idealan za Node.js i Python. Pokreće oba servisa na istom računaru.</div>
+                    <div class="stack-price free">$0</div>
+                    <div class="stack-price-note">self-hosted</div>
+                </div>
+
+                <div class="stack-card">
+                    <div class="stack-layer">API Server</div>
+                    <div class="stack-name">Node.js</div>
+                    <div class="stack-desc">REST API. Komunicira sa MongoDB-om, R2-om, Firebase Auth-om i Python AI serverom (internal HTTP).</div>
+                    <div class="stack-price free">$0</div>
+                    <div class="stack-price-note">self-hosted</div>
+                </div>
+
+                <div class="stack-card">
+                    <div class="stack-layer">Tunnel & HTTPS</div>
+                    <div class="stack-name">Cloudflare Tunnel</div>
+                    <div class="stack-desc">Izlaže lokalni server na internet bez static IP-a. Automatski HTTPS. Sigurnije od port forwardinga.</div>
+                    <div class="stack-price free">$0</div>
+                    <div class="stack-price-note">besplatno zauvek</div>
+                </div>
+
+                <div class="stack-card">
+                    <div class="stack-layer">Baza podataka</div>
+                    <div class="stack-name">MongoDB Atlas Flex</div>
+                    <div class="stack-desc">Fleksibilna šema za fashion podatke + embeddinzi. Atlas Vector Search uključen. Cap $30/mes.</div>
+                    <div class="stack-price paid">$8–$30</div>
+                    <div class="stack-price-note">mesečno, Flex tier</div>
+                </div>
+
+                <div class="stack-card">
+                    <div class="stack-layer">Image Storage</div>
+                    <div class="stack-name">Cloudflare R2</div>
+                    <div class="stack-desc">Jeftin object storage sa CDN-om. Bez egress fee-a. 25GB za 10k korisnika = ~$2.03/mes.</div>
+                    <div class="stack-price paid">~$2.03</div>
+                    <div class="stack-price-note">mesečno (10k korisnika)</div>
+                </div>
+
+                <div class="stack-card">
+                    <div class="stack-layer">Autentikacija</div>
+                    <div class="stack-name">Firebase Auth</div>
+                    <div class="stack-desc"><b>Google Sign-In (PRIMARY)</b> + Email/Password (secondary). SMS OTP uklonjen. Besplatno do 50k MAU. Persistent session.</div>
+                    <div class="stack-price free">$0</div>
+                    <div class="stack-price-note">do 50,000 MAU</div>
+                </div>
+            </div>
+
+            <h3>AI Stack — radi bez GPU-a</h3>
+
+            <div class="stack-grid">
+                <div class="stack-card">
+                    <div class="stack-layer">AI Server</div>
+                    <div class="stack-name">Python Server</div>
+                    <div class="stack-desc">Pokreće sve AI komponente. Komunicira sa Node.js putem internal HTTP API-ja na istom računaru (nema mrežnog kašnjenja).</div>
+                    <div class="stack-price free">$0</div>
+                    <div class="stack-price-note">self-hosted, isti računar</div>
+                </div>
+
+                <div class="stack-card">
+                    <div class="stack-layer">Opis generisanje</div>
+                    <div class="stack-name">Ollama + Qwen2.5 7B</div>
+                    <div class="stack-desc">Multilingual LLM (srpski, engleski, ruski). Generiše title + description iz kategorije, brenda, stanja, boje. Radi bez GPU-a.</div>
+                    <div class="stack-price free">$0</div>
+                    <div class="stack-price-note">endpoint: POST /generate-description</div>
+                </div>
+
+                <div class="stack-card">
+                    <div class="stack-layer">Image Embeddings</div>
+                    <div class="stack-name">CLIP</div>
+                    <div class="stack-desc">Generiše 512-dim vektor za svaku sliku pri uploadu. Jednom izračunato, čuva se u MongoDB. Vizuelna sličnost garderobe.</div>
+                    <div class="stack-price free">$0</div>
+                    <div class="stack-price-note">generisanje pri uploadu, ne real-time</div>
+                </div>
+
+                <div class="stack-card">
+                    <div class="stack-layer">Similarity Search</div>
+                    <div class="stack-name">FAISS</div>
+                    <div class="stack-desc">Vektorska pretraga sličnih itema. Korisnik uploaduje jaknu → FAISS vraća vizuelno slične jakne u feed-u.</div>
+                    <div class="stack-price free">$0</div>
+                    <div class="stack-price-note">buduća optimizacija: Atlas Vector Search</div>
+                </div>
+            </div>
+
+            <h3>Frontend & Mobile</h3>
+
+            <div class="stack-grid">
+                <div class="stack-card">
+                    <div class="stack-layer">Web App</div>
+                    <div class="stack-name">React + CF Pages</div>
+                    <div class="stack-desc">React SPA hostovan na Cloudflare Pages. Unlimited bandwidth, komercijalna upotreba, custom domain. Besplatno zauvek.</div>
+                    <div class="stack-price free">$0</div>
+                    <div class="stack-price-note">zamena za Vercel Pro ($20/mes)</div>
+                </div>
+
+                <div class="stack-card">
+                    <div class="stack-layer">Mobile Framework</div>
+                    <div class="stack-name">React Native + Expo</div>
+                    <div class="stack-desc">Jedan codebase za Android i iOS. Razvoj potpuno na Windows-u. Expo Go za instant testiranje QR kodom.</div>
+                    <div class="stack-price free">$0</div>
+                    <div class="stack-price-note">open source framework</div>
+                </div>
+
+                <div class="stack-card">
+                    <div class="stack-layer">Cloud Builds (iOS + Android)</div>
+                    <div class="stack-name">EAS Build</div>
+                    <div class="stack-desc">Builduje iOS app u cloud-u na Expo macOS serverima — bez Xcode-a, bez Mac-a. Android buildovi na Linux-u. Free tier dovoljan za razvoj.</div>
+                    <div class="stack-price free">$0</div>
+                    <div class="stack-price-note">Free tier · Starter $19/mes za prioritet</div>
+                </div>
+
+                <div class="stack-card">
+                    <div class="stack-layer">Push Notifikacije</div>
+                    <div class="stack-name">Expo Push Notifications</div>
+                    <div class="stack-desc">Wrapper oko FCM (Android) i APNs (iOS). Jedno API, oba sistema. Trade requests, like, poruke — sve notifikacije.</div>
+                    <div class="stack-price free">$0</div>
+                    <div class="stack-price-note">besplatno zauvek</div>
+                </div>
+            </div>
+
+            <h3>Kako razvijati iOS aplikaciju na Windows — toolset</h3>
+
+            <div class="dev-grid">
+                <div class="dev-tool">
+                    <div class="dev-tool-name">VS Code</div>
+                    <div class="dev-tool-desc">Primarni editor. React Native Tools extension za debugging i IntelliSense.</div>
+                    <div class="dev-tool-price">$0 — besplatno</div>
+                </div>
+                <div class="dev-tool">
+                    <div class="dev-tool-name">Expo Go App</div>
+                    <div class="dev-tool-desc">Na iPhone i Android uređaju. Scan QR koda → app se odmah otvara. Live reload pri svakoj izmeni.</div>
+                    <div class="dev-tool-price">$0 — besplatno</div>
+                </div>
+                <div class="dev-tool">
+                    <div class="dev-tool-name">EAS CLI</div>
+                    <div class="dev-tool-desc">Komanda: eas build --platform ios. Šalje kod na Expo cloud, vrši iOS build bez Xcode-a.</div>
+                    <div class="dev-tool-price">$0 — besplatno</div>
+                </div>
+                <div class="dev-tool">
+                    <div class="dev-tool-name">Expo Orbit</div>
+                    <div class="dev-tool-desc">Desktop app za Windows. Instalacija buildova na uređaj bez kablova i komplikacija.</div>
+                    <div class="dev-tool-price">$0 — besplatno</div>
+                </div>
+                <div class="dev-tool">
+                    <div class="dev-tool-name">Android Studio</div>
+                    <div class="dev-tool-desc">Opciono — samo ako treba Android emulator. Za testiranje na fizičkom uređaju nije potreban.</div>
+                    <div class="dev-tool-price">$0 — besplatno</div>
+                </div>
+                <div class="dev-tool">
+                    <div class="dev-tool-name">TestFlight</div>
+                    <div class="dev-tool-desc">Apple-ov beta testing alat. Nakon EAS Build-a, upload IPA na TestFlight za iOS testiranje na uređajima.</div>
+                    <div class="dev-tool-price">$0 — uz Apple Developer nalog</div>
+                </div>
+            </div>
+
+            <h3>Jednokratni troškovi (obavezni)</h3>
+
+            <div class="onetime-grid">
+                <div class="onetime-box">
+                    <div>
+                        <div class="onetime-label">Google Play Developer</div>
+                        <div class="onetime-sub">Android distribucija. Plaća se jednom, nikad ponovo.</div>
+                    </div>
+                    <div>
+                        <div class="onetime-price">$25</div>
+                        <div class="onetime-freq">jednokratno</div>
+                    </div>
+                </div>
+                <div class="onetime-box">
+                    <div>
+                        <div class="onetime-label">Apple Developer Program</div>
+                        <div class="onetime-sub">iOS App Store + TestFlight + code signing. Obavezno.</div>
+                    </div>
+                    <div>
+                        <div class="onetime-price">$99</div>
+                        <div class="onetime-freq">godišnje</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bar-section">
+                <div class="bar-section-title">Optimalni stack — mesečni troškovi pri 10k korisnika</div>
+
+                <div class="bar-r">
+                    <span class="bar-lbl">MongoDB Atlas Flex (mid usage)</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:75%;background:#7F77DD"></div>
+                    </div>
+                    <span class="bar-val">$18</span>
+                </div>
+                <div class="bar-r">
+                    <span class="bar-lbl">Cloudflare R2 (storage + operacije)</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:9%;background:#185FA5"></div>
+                    </div>
+                    <span class="bar-val">$2.03</span>
+                </div>
+                <div class="bar-r">
+                    <span class="bar-lbl">Domen (.com)</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:5%;background:#888780"></div>
+                    </div>
+                    <span class="bar-val">$1.25</span>
+                </div>
+                <div class="bar-r">
+                    <span class="bar-lbl">Firebase Auth (Google + Email)</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:0.5%;background:#1a6b3a"></div>
+                    </div>
+                    <span class="bar-val">$0</span>
+                </div>
+                <div class="bar-r">
+                    <span class="bar-lbl">Cloudflare Pages (web hosting)</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:0.5%;background:#1a6b3a"></div>
+                    </div>
+                    <span class="bar-val">$0</span>
+                </div>
+                <div class="bar-r">
+                    <span class="bar-lbl">Cloudflare Tunnel (HTTPS)</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:0.5%;background:#1a6b3a"></div>
+                    </div>
+                    <span class="bar-val">$0</span>
+                </div>
+                <div class="bar-r">
+                    <span class="bar-lbl">Expo + EAS Build (Free tier)</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:0.5%;background:#1a6b3a"></div>
+                    </div>
+                    <span class="bar-val">$0</span>
+                </div>
+                <div class="bar-r">
+                    <span class="bar-lbl">Expo Push Notifications</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:0.5%;background:#1a6b3a"></div>
+                    </div>
+                    <span class="bar-val">$0</span>
+                </div>
+                <div class="bar-r">
+                    <span class="bar-lbl">Ollama / CLIP / FAISS (AI, lokalno)</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:0.5%;background:#1a6b3a"></div>
+                    </div>
+                    <span class="bar-val">$0</span>
+                </div>
+                <div class="bar-r">
+                    <span class="bar-lbl">Node.js + Python server (Ubuntu)</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:0.5%;background:#1a6b3a"></div>
+                    </div>
+                    <span class="bar-val">$0</span>
+                </div>
+                <div class="bar-total">
+                    <span class="bar-total-label">Ukupno mesečno — optimalni plan (10k korisnika)</span>
+                    <span class="bar-total-val">~$21/mes</span>
+                </div>
+                <div class="section-note">+ $25 jednokratno Google Play · + $99/god Apple Developer ($8.25/mes) · + struja i internet lokalnog servera</div>
+            </div>
+
+            <div class="rec-card">
+                <div class="card-title">Arhitektura podataka — kako sve komunicira</div>
+                <div class="card-note">
+                    <b>Korisnik (Expo app / Web)</b><br>
+                    &nbsp;&nbsp;↓ Firebase Auth token<br>
+                    <b>Node.js API (Ubuntu + Cloudflare Tunnel)</b><br>
+                    &nbsp;&nbsp;↓ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br>
+                    <b>MongoDB Atlas</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>Cloudflare R2</b><br>
+                    (itemi, korisnici, embeddinzi) &nbsp;&nbsp;&nbsp;&nbsp; (slike)<br>
+                    &nbsp;&nbsp;↓<br>
+                    <b>Python AI Server (isti računar, internal HTTP)</b><br>
+                    &nbsp;&nbsp;├── Ollama/Qwen2.5 → POST /generate-description<br>
+                    &nbsp;&nbsp;├── CLIP → embedding pri svakom uploadu<br>
+                    &nbsp;&nbsp;└── FAISS → similarity search za feed preporuke<br><br>
+
+                    <b>Push notifikacije:</b> Node.js → Expo Push API → FCM (Android) / APNs (iOS)
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: PO KORISNICIMA -->
+        <div id="peruser" class="panel">
+            <h2>Troškovi po broju korisnika — Google-first (bez SMS OTP)</h2>
+
+            <div class="highlight-card">
+                <div class="highlight-title">Finalni stack: bez SMS OTP, Cloudflare Pages umesto Vercel</div>
+                <div class="highlight-note">
+                    Uklanjanjem SMS OTP-a i prelaskom na Cloudflare Pages, celokupna infrastruktura košta ispod $35/mesečno za 10k korisnika — uključujući AI server, image storage, bazu, hosting i domen. Apple Developer ($99/god) je jedini godišnji fiksni trošak.
+                </div>
+            </div>
+
+            <div class="scenario-title">
+                Scenario: Google PRIMARY + Email SECONDARY
+                <span class="scenario-badge good">Finalni plan</span>
+                <span class="removed-badge">SMS OTP REMOVED</span>
+            </div>
+
+            <table class="cost-table">
+                <thead>
+                    <tr>
+                        <th>Servis</th>
+                        <th>500</th>
+                        <th>1,000</th>
+                        <th>5,000</th>
+                        <th>10,000</th>
+                        <th>50,000</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Cloudflare R2</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-low">$0.04</td>
+                        <td class="cost-low">$2.03</td>
+                        <td class="cost-mid">$25.13</td>
+                    </tr>
+                    <tr>
+                        <td class="sub-label" colspan="6">
+                            Storage: 5 slika/korisnik × 500KB. Prvih 10GB besplatno. Class B čitanja: 50/korisnik/dan × 30 dana. Prvih 10M besplatno.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>MongoDB Atlas</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-low">$8</td>
+                        <td class="cost-low">$8–$15</td>
+                        <td class="cost-low">$15–$30</td>
+                        <td class="cost-high">$57+</td>
+                    </tr>
+                    <tr>
+                        <td class="sub-label" colspan="6">
+                            M0 free do 512MB → Flex $8 base, cap $30/mes (10k korisnika) → M10 $57+ (50k+ korisnika, garantovan SLA)
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Firebase Auth</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                    </tr>
+                    <tr>
+                        <td class="sub-label" colspan="6">
+                            Google Sign-In + Email/Password. Besplatno do 50k MAU. Persistent session — korisnik se loguje jednom.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>SMS OTP <span class="removed-badge">REMOVED</span></td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                    </tr>
+                    <tr>
+                        <td class="sub-label" colspan="6">
+                            Uklonjen. Bio bi $0.06/SMS bez ijednog besplatnog SMS-a za prave korisnike. Google login zamenjuje bez troška.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Cloudflare Pages</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                    </tr>
+                    <tr>
+                        <td class="sub-label" colspan="6">
+                            Zamena za Vercel Pro ($20/mes). Unlimited bandwidth, komercijalna upotreba dozvoljena. React SPA.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Expo + EAS Build</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                    </tr>
+                    <tr>
+                        <td class="sub-label" colspan="6">
+                            Free tier dovoljan tokom razvoja i launcha. iOS buildovi u cloud-u bez Mac-a. Expo Push Notifications besplatno.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Cloudflare Tunnel</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                    </tr>
+                    <tr>
+                        <td>AI stack (Ollama/CLIP/FAISS)</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                        <td class="cost-free">$0</td>
+                    </tr>
+                    <tr>
+                        <td class="sub-label" colspan="6">
+                            Self-hosted na Ubuntu serveru. Bez GPU-a. Embeddinzi se računaju pri uploadu, jednom. Jedino: struja i internet.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Domen (.com)</td>
+                        <td class="cost-low">$1.25</td>
+                        <td class="cost-low">$1.25</td>
+                        <td class="cost-low">$1.25</td>
+                        <td class="cost-low">$1.25</td>
+                        <td class="cost-low">$1.25</td>
+                    </tr>
+                    <tr class="total-row">
+                        <td>UKUPNO / mesec</td>
+                        <td class="cost-free">$1.25</td>
+                        <td class="cost-low">$9.25</td>
+                        <td class="cost-low">$9–$16</td>
+                        <td class="cost-low">$18–$33</td>
+                        <td class="cost-mid">$83+</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="totals-grid" style="grid-template-columns: repeat(5, 1fr);">
+                <div class="total-box">
+                    <div class="total-label">500 korisnika</div>
+                    <div class="total-val good">$1.25</div>
+                    <div class="total-note">samo domen</div>
+                </div>
+                <div class="total-box">
+                    <div class="total-label">1,000 korisnika</div>
+                    <div class="total-val good">$9.25</div>
+                    <div class="total-note">Flex + domen</div>
+                </div>
+                <div class="total-box">
+                    <div class="total-label">5,000 korisnika</div>
+                    <div class="total-val good">~$13</div>
+                    <div class="total-note">Flex mid + R2 + domen</div>
+                </div>
+                <div class="total-box">
+                    <div class="total-label">10,000 korisnika</div>
+                    <div class="total-val mid">~$26</div>
+                    <div class="total-note">Flex cap + R2 + domen</div>
+                </div>
+                <div class="total-box">
+                    <div class="total-label">50,000 korisnika</div>
+                    <div class="total-val bad">$83+</div>
+                    <div class="total-note">M10 DB + R2 + domen</div>
+                </div>
+            </div>
+
+            <div class="rec-card">
+                <div class="card-title">Zaključak — zašto je ovaj stack optimalan za Tradey</div>
+                <div class="card-note">
+                    <b>Nula mesečnih troškova za auth, hosting, AI, notifikacije i buildove</b> — sve to je besplatno u ovom stacku. Plaćaš samo za ono što neizbežno košta: bazu podataka i storage.<br><br>
+                    <b>iOS bez Mac-a je rešen</b> — Expo EAS Build generiše iOS binarni fajl na Expo cloud macOS serverima. Razvijaš na Windows, EAS šalje na App Store. Jedini uslov je Apple Developer Program ($99/god).<br><br>
+                    <b>Google-first login eliminiše najveći varijabilni trošak</b> — SMS OTP bi koštao $60–$300/mes pri 10k korisnika. Google login je besplatan, brži i ima 80%+ pokrivenost na Android uređajima u Srbiji.<br><br>
+                    <b>Skalabilnost je planirana od početka</b> — MongoDB Flex raste sa volumenom (cap $30/mes), a pri 50k+ korisnika se prelazi na M10 dedicated. AI stack (CLIP + FAISS → Atlas Vector Search) evoluira paralelno.
+                </div>
+            </div>
+
+            <div class="section-note" style="margin-top:14px;">
+                Svi troškovi su u USD. + $25 jednokratno za Google Play Developer nalog. + $99/godišnje Apple Developer Program (obavezno za iOS App Store). + struja i internet za lokalni server. Cene R2 i MongoDB su prema zvaničnom cenovniku iz 2026.
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function show(id, btn) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            btn.classList.add('active');
+        }
+    </script>
+</body>
+</html>

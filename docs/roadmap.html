@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tradey — 30-Day Visual Roadmap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080b10;
+  --bg2: #0d1117;
+  --bg3: #111820;
+  --bg4: #161e2a;
+  --border: rgba(255,255,255,0.06);
+  --border2: rgba(255,255,255,0.12);
+  --border3: rgba(255,255,255,0.2);
+  --text: #e2e8f0;
+  --text2: #7a8fa6;
+  --text3: #3d5068;
+
+  --v: #f4a261;        /* Vukašin — amber */
+  --v-dim: rgba(244,162,97,0.12);
+  --v-mid: rgba(244,162,97,0.25);
+  --v-border: rgba(244,162,97,0.35);
+
+  --t: #52c5a0;        /* Teodora — emerald */
+  --t-dim: rgba(82,197,160,0.12);
+  --t-mid: rgba(82,197,160,0.25);
+  --t-border: rgba(82,197,160,0.35);
+
+  --sync: #7c9cff;     /* Integration / sync */
+  --sync-dim: rgba(124,156,255,0.12);
+  --sync-border: rgba(124,156,255,0.35);
+
+  --ai: #e879a5;       /* AI agent */
+  --ai-dim: rgba(232,121,165,0.1);
+  --ai-border: rgba(232,121,165,0.3);
+
+  --deploy: #a78bfa;   /* Deploy/milestone */
+  --deploy-dim: rgba(167,139,250,0.1);
+  --deploy-border: rgba(167,139,250,0.3);
+
+  --warn: #fbbf24;
+  --danger: #f87171;
+
+  --mono: 'Space Mono', monospace;
+  --sans: 'Syne', sans-serif;
+  --r: 8px;
+  --r-lg: 14px;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+
+body {
+  font-family: var(--mono);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ===== GRAIN ===== */
+body::after {
+  content:'';
+  position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:999;opacity:0.7;
+}
+
+/* ===== PAGE ===== */
+.page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 60px 32px 100px;
+}
+
+/* ===== HEADER ===== */
+.hdr {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 24px;
+  margin-bottom: 52px;
+  animation: fadeUp 0.6s ease both;
+}
+
+.hdr-left h1 {
+  font-family: var(--sans);
+  font-size: 52px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #e2e8f0 30%, #52c5a0 60%, #f4a261);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 10px;
+}
+
+.hdr-sub {
+  font-size: 11px;
+  color: var(--text3);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  line-height: 2;
+}
+
+.hdr-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid;
+}
+
+.badge.v { background: var(--v-dim); color: var(--v); border-color: var(--v-border); }
+.badge.t { background: var(--t-dim); color: var(--t); border-color: var(--t-border); }
+.badge.ai { background: var(--ai-dim); color: var(--ai); border-color: var(--ai-border); }
+.badge.sync { background: var(--sync-dim); color: var(--sync); border-color: var(--sync-border); }
+.badge.deploy { background: var(--deploy-dim); color: var(--deploy); border-color: var(--deploy-border); }
+
+/* ===== LEGEND ===== */
+.legend {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+  animation: fadeUp 0.6s 0.1s ease both;
+}
+
+/* ===== SECTION LABEL ===== */
+.sec-label {
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 16px;
+}
+
+/* ===== PREREQS ===== */
+.prereq-section {
+  margin-bottom: 52px;
+  animation: fadeUp 0.6s 0.15s ease both;
+}
+
+.prereq-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 2px;
+  background: var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  border: 1px solid var(--border2);
+}
+
+.prereq-card {
+  background: var(--bg2);
+  padding: 18px 20px;
+  transition: background 0.2s;
+}
+.prereq-card:hover { background: var(--bg3); }
+
+.prereq-icon { font-size: 18px; margin-bottom: 8px; }
+.prereq-title {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.prereq-body {
+  font-size: 10px;
+  color: var(--text2);
+  line-height: 1.7;
+}
+.prereq-tag {
+  display: inline-block;
+  font-size: 9px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  margin-top: 6px;
+  font-weight: 700;
+}
+
+/* ===== MAIN DIAGRAM ===== */
+.diagram-wrap {
+  animation: fadeUp 0.6s 0.2s ease both;
+}
+
+/* Timeline rails */
+.diagram {
+  position: relative;
+  padding: 0 0 40px;
+}
+
+/* ─── Header row: swimlane labels ─── */
+.swim-header {
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr 60px;
+  gap: 2px;
+  margin-bottom: 2px;
+}
+
+.swim-label {
+  padding: 12px 20px;
+  border-radius: var(--r) var(--r) 0 0;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.swim-label.days { background: var(--bg3); color: var(--text3); text-align: center; }
+.swim-label.v { background: var(--v-dim); color: var(--v); border: 1px solid var(--v-border); border-bottom: none; }
+.swim-label.t { background: var(--t-dim); color: var(--t); border: 1px solid var(--t-border); border-bottom: none; }
+.swim-label.shared { background: var(--sync-dim); color: var(--sync); border: 1px solid var(--sync-border); border-bottom: none; font-size: 9px; text-align: center; }
+
+/* ─── Week blocks ─── */
+.week {
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr 60px;
+  gap: 2px;
+  margin-bottom: 2px;
+}
+
+.week-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  padding: 16px 8px;
+  gap: 4px;
+}
+
+.week-n {
+  font-family: var(--sans);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text3);
+  line-height: 1;
+}
+
+.week-days-label {
+  font-size: 8px;
+  color: var(--text3);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  writing-mode: horizontal-tb;
+}
+
+/* Lane cells */
+.lane {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 16px;
+  position: relative;
+}
+
+.lane.v-lane { border-left-color: var(--v-border); }
+.lane.t-lane { border-left-color: var(--t-border); }
+.lane.sync-lane {
+  background: var(--sync-dim);
+  border-color: var(--sync-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 8px;
+}
+
+/* Task nodes */
+.task-node {
+  position: relative;
+  padding: 10px 12px;
+  border-radius: var(--r);
+  margin-bottom: 8px;
+  border: 1px solid;
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--text2);
+  transition: transform 0.15s, border-color 0.15s;
+  cursor: default;
+}
+
+.task-node:last-child { margin-bottom: 0; }
+.task-node:hover { transform: translateX(2px); }
+
+.task-node.v { background: var(--v-dim); border-color: var(--v-border); }
+.task-node.v:hover { border-color: var(--v); }
+.task-node.t { background: var(--t-dim); border-color: var(--t-border); }
+.task-node.t:hover { border-color: var(--t); }
+.task-node.ai-node { background: var(--ai-dim); border-color: var(--ai-border); }
+.task-node.ai-node:hover { border-color: var(--ai); }
+
+.task-title {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-title .dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot-v { background: var(--v); box-shadow: 0 0 6px var(--v); }
+.dot-t { background: var(--t); box-shadow: 0 0 6px var(--t); }
+.dot-ai { background: var(--ai); box-shadow: 0 0 6px var(--ai); }
+
+.task-body { font-size: 10px; color: var(--text2); line-height: 1.6; padding-left: 11px; }
+
+.ai-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 8px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: var(--ai-dim);
+  color: var(--ai);
+  border: 1px solid var(--ai-border);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-top: 5px;
+}
+
+/* Sync node */
+.sync-node {
+  background: var(--sync-dim);
+  border: 1px solid var(--sync-border);
+  border-radius: var(--r);
+  padding: 8px 10px;
+  font-size: 9px;
+  color: var(--sync);
+  line-height: 1.5;
+  text-align: center;
+  width: 100%;
+}
+
+.sync-node strong { display: block; font-family: var(--sans); font-size: 10px; margin-bottom: 2px; }
+
+.sync-arrow {
+  color: var(--sync);
+  font-size: 16px;
+  opacity: 0.5;
+}
+
+/* Milestone banner */
+.milestone-row {
+  background: linear-gradient(90deg, var(--deploy-dim), var(--deploy-dim));
+  border: 1px solid var(--deploy-border);
+  border-radius: var(--r);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
+.milestone-row .ms-icon { font-size: 18px; }
+.milestone-row .ms-text {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--deploy);
+}
+.milestone-row .ms-sub {
+  font-size: 10px;
+  color: var(--text2);
+  margin-top: 1px;
+}
+
+/* Last row radius */
+.week:last-of-type .lane { border-radius: 0 0 var(--r) var(--r); }
+.week:last-of-type .week-tag { border-radius: 0 0 0 var(--r); }
+
+/* ===== SEQUENCE DIAGRAM ===== */
+.seq-section {
+  margin-top: 52px;
+  animation: fadeUp 0.6s 0.3s ease both;
+}
+
+.seq-diagram {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-lg);
+  padding: 32px;
+  overflow-x: auto;
+}
+
+.seq-inner {
+  min-width: 700px;
+}
+
+/* Participant headers */
+.seq-participants {
+  display: grid;
+  grid-template-columns: 120px 1fr 1fr 1fr 1fr;
+  gap: 0;
+  margin-bottom: 0;
+}
+
+.participant {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.participant-box {
+  padding: 8px 14px;
+  border-radius: var(--r);
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  border: 1px solid;
+  min-width: 100px;
+}
+
+.participant-box.v { background: var(--v-dim); color: var(--v); border-color: var(--v-border); }
+.participant-box.t { background: var(--t-dim); color: var(--t); border-color: var(--t-border); }
+.participant-box.ai { background: var(--ai-dim); color: var(--ai); border-color: var(--ai-border); }
+.participant-box.db { background: var(--bg3); color: var(--text2); border-color: var(--border2); }
+.participant-box.infra { background: var(--deploy-dim); color: var(--deploy); border-color: var(--deploy-border); }
+
+.p-lifeline {
+  width: 1px;
+  background: linear-gradient(180deg, var(--border2), transparent);
+  height: 20px;
+}
+
+/* Sequence events */
+.seq-events {
+  display: grid;
+  grid-template-columns: 120px 1fr 1fr 1fr 1fr;
+  gap: 0;
+}
+
+.seq-time {
+  display: flex;
+  align-items: center;
+  padding: 6px 0;
+  border-right: 1px solid var(--border);
+}
+
+.seq-time-label {
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0.1em;
+  padding-right: 12px;
+  white-space: nowrap;
+}
+
+.seq-col {
+  position: relative;
+  border-right: 1px dashed var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 4px;
+}
+
+.seq-col:last-child { border-right: none; }
+
+.seq-col::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%;
+  width: 1px;
+  height: 100%;
+  background: var(--border);
+  transform: translateX(-50%);
+}
+
+.seq-event {
+  position: relative;
+  z-index: 1;
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-size: 9px;
+  line-height: 1.4;
+  text-align: center;
+  max-width: 140px;
+  border: 1px solid;
+}
+
+.seq-event.v { background: var(--v-dim); color: var(--v); border-color: var(--v-border); }
+.seq-event.t { background: var(--t-dim); color: var(--t); border-color: var(--t-border); }
+.seq-event.ai { background: var(--ai-dim); color: var(--ai); border-color: var(--ai-border); }
+.seq-event.db { background: var(--bg3); color: var(--text2); border-color: var(--border2); }
+.seq-event.sync { background: var(--sync-dim); color: var(--sync); border-color: var(--sync-border); }
+.seq-event.deploy { background: var(--deploy-dim); color: var(--deploy); border-color: var(--deploy-border); }
+
+/* Arrow between seq cols */
+.seq-arrow-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  padding: 0 0 0 120px;
+  min-height: 24px;
+}
+
+.arrow-line {
+  height: 1px;
+  background: linear-gradient(90deg, var(--border2), var(--sync));
+  flex: 1;
+  position: relative;
+}
+
+.arrow-line::after {
+  content: '▶';
+  position: absolute;
+  right: -6px;
+  top: -7px;
+  font-size: 10px;
+  color: var(--sync);
+}
+
+.arrow-label {
+  font-size: 8px;
+  color: var(--sync);
+  margin-left: 8px;
+  letter-spacing: 0.08em;
+}
+
+/* ===== ARCHITECTURE DIAGRAM ===== */
+.arch-section {
+  margin-top: 52px;
+  animation: fadeUp 0.6s 0.35s ease both;
+}
+
+.arch-diagram {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-lg);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.arch-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.arch-box {
+  padding: 12px 20px;
+  border-radius: var(--r);
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  border: 1px solid;
+  min-width: 120px;
+  position: relative;
+}
+
+.arch-box small {
+  display: block;
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 400;
+  margin-top: 3px;
+  opacity: 0.6;
+}
+
+.arch-box.user { background: var(--bg3); color: var(--text); border-color: var(--border2); }
+.arch-box.v { background: var(--v-dim); color: var(--v); border-color: var(--v-border); }
+.arch-box.t { background: var(--t-dim); color: var(--t); border-color: var(--t-border); }
+.arch-box.ai { background: var(--ai-dim); color: var(--ai); border-color: var(--ai-border); }
+.arch-box.db { background: var(--bg4); color: var(--text2); border-color: var(--border2); }
+.arch-box.infra { background: var(--deploy-dim); color: var(--deploy); border-color: var(--deploy-border); }
+.arch-box.sync { background: var(--sync-dim); color: var(--sync); border-color: var(--sync-border); }
+
+.arch-connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  position: relative;
+}
+
+.arch-vert {
+  width: 1px;
+  height: 28px;
+  background: var(--border2);
+  position: relative;
+}
+
+.arch-vert::after {
+  content: '▼';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  color: var(--text3);
+}
+
+.arch-horiz-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  justify-content: center;
+}
+
+.arch-branch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.arch-label {
+  font-size: 8px;
+  color: var(--text3);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 10px 0 6px;
+}
+
+/* ===== CHECKLIST ===== */
+.checklist-section {
+  margin-top: 52px;
+  animation: fadeUp 0.6s 0.4s ease both;
+}
+
+.checklist-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.check-group {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-lg);
+  padding: 20px;
+}
+
+.check-group-title {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  color: var(--text2);
+  line-height: 1.6;
+}
+
+.check-item:last-child { border-bottom: none; }
+
+.check-box-el {
+  width: 16px; height: 16px;
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  background: var(--bg3);
+}
+
+.check-item strong { color: var(--text); font-family: var(--sans); font-size: 10px; font-weight: 700; }
+
+/* ===== SUMMARY STATS ===== */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 2px;
+  margin-top: 40px;
+  background: var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  border: 1px solid var(--border2);
+  animation: fadeUp 0.6s 0.45s ease both;
+}
+
+.stat {
+  background: var(--bg2);
+  padding: 20px 16px;
+  text-align: center;
+  transition: background 0.2s;
+}
+
+.stat:hover { background: var(--bg3); }
+
+.stat-val {
+  font-family: var(--sans);
+  font-size: 28px;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--text), var(--text2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.stat-label {
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1.5;
+}
+
+/* ===== FLOW SECTION ===== */
+.flow-section {
+  margin-top: 52px;
+  animation: fadeUp 0.6s 0.28s ease both;
+}
+
+.flow-wrap {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-lg);
+  padding: 32px;
+  overflow-x: auto;
+}
+
+.flow-canvas {
+  min-width: 800px;
+  position: relative;
+}
+
+/* SVG-based flow diagram */
+.flow-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* ===== ANIM ===== */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.pulse { animation: pulse 2.5s ease-in-out infinite; }
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+
+hr { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+
+code {
+  font-family: var(--mono);
+  font-size: 9px;
+  background: var(--bg3);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--ai);
+  border: 1px solid var(--border);
+}
+
+.w-full { width: 100%; }
+
+/* ===== INTEGRATION POINT ===== */
+.integration {
+  grid-column: 1 / -1;
+  background: linear-gradient(90deg, var(--v-dim), var(--sync-dim), var(--t-dim));
+  border: 1px solid var(--sync-border);
+  border-radius: var(--r);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 2px 0;
+}
+
+.integration-icon { font-size: 20px; }
+.integration-title { font-family: var(--sans); font-size: 12px; font-weight: 700; color: var(--sync); }
+.integration-desc { font-size: 10px; color: var(--text2); margin-top: 1px; }
+
+/* Week container with rounded corners on first/last */
+.week-block-wrap {
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.week-block-wrap:first-of-type .week { }
+.week-block-wrap:first-of-type .week .week-tag { border-radius: var(--r) 0 0 0; }
+.week-block-wrap:first-of-type .week .lane:last-child { border-radius: 0 var(--r) 0 0; }
+
+.week-header-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr 60px;
+  gap: 2px;
+  background: var(--border);
+}
+
+.week-header-cell {
+  padding: 10px 16px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.week-header-cell.wk { background: var(--bg4); color: var(--text3); text-align: center; font-size: 9px; }
+.week-header-cell.v { background: rgba(244,162,97,0.15); color: var(--v); }
+.week-header-cell.t { background: rgba(82,197,160,0.15); color: var(--t); }
+.week-header-cell.sh { background: rgba(124,156,255,0.1); color: var(--sync); text-align: center; font-size: 9px; }
+
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ===== HEADER ===== -->
+<div class="hdr">
+  <div class="hdr-left">
+    <h1>Tradey Roadmap</h1>
+    <div class="hdr-sub">
+      30-dnevni sprint · Mart–April 2026<br>
+      Vukašin (Backend + AI) &nbsp;×&nbsp; Teodora (Mobile + Frontend)<br>
+      AI-assisted development · Claude Code agents
+    </div>
+  </div>
+  <div class="hdr-meta">
+    <div class="badge v">● Vukašin — Backend &amp; AI</div>
+    <div class="badge t">● Teodora — Mobile &amp; Web</div>
+    <div class="badge ai">✦ Claude Code Agent</div>
+    <div class="badge sync">⟳ Integration Point</div>
+    <div class="badge deploy">🚀 Deploy / Milestone</div>
+  </div>
+</div>
+
+<!-- ===== PRE-DEV PREREQS ===== -->
+<div class="prereq-section">
+  <div class="sec-label">§ 0 — Pre-development setup · Dan 0 (1–2 dana ručno)</div>
+  <div class="prereq-grid">
+    <div class="prereq-card">
+      <div class="prereq-icon">📁</div>
+      <div class="prereq-title">Monorepo setup</div>
+      <div class="prereq-body">
+        GitHub repo <code>tradey/</code> sa strukturom:<br>
+        <code>apps/api</code> · <code>apps/ai-server</code><br>
+        <code>apps/mobile</code> · <code>apps/web</code><br>
+        <code>packages/shared</code> · <code>CLAUDE.md</code>
+      </div>
+      <span class="prereq-tag badge sync">Oba</span>
+    </div>
+    <div class="prereq-card">
+      <div class="prereq-icon">☁️</div>
+      <div class="prereq-title">Cloud servisi</div>
+      <div class="prereq-body">
+        MongoDB Atlas Flex · Cloudflare R2 bucket<br>
+        Firebase project (Google Sign-In)<br>
+        Cloudflare Tunnel (cloudflared)<br>
+        Expo + EAS CLI setup
+      </div>
+      <span class="prereq-tag badge sync">Oba</span>
+    </div>
+    <div class="prereq-card">
+      <div class="prereq-icon">🤖</div>
+      <div class="prereq-title">CLAUDE.md + Agenti</div>
+      <div class="prereq-body">
+        Root CLAUDE.md: stack, folder struktura,<br>
+        .env varijable, zabrane, coding stil.<br>
+        4 agent definicije u <code>.claude/agents/</code><br>
+        AI piše ovaj fajl na osnovu PRD-a.
+      </div>
+      <span class="prereq-tag badge ai">AI Task</span>
+    </div>
+    <div class="prereq-card">
+      <div class="prereq-icon">🖥️</div>
+      <div class="prereq-title">Ubuntu server</div>
+      <div class="prereq-body">
+        Node.js 20+ · Python 3.11+<br>
+        Ollama install + <code>ollama pull qwen2.5:7b</code><br>
+        CLIP dependencies · PM2 install<br>
+        Cloudflare Tunnel → Node API port
+      </div>
+      <span class="prereq-tag badge v">Vukašin</span>
+    </div>
+    <div class="prereq-card">
+      <div class="prereq-icon">📱</div>
+      <div class="prereq-title">Expo + Apple/Google</div>
+      <div class="prereq-body">
+        Expo Go na iPhone + Android<br>
+        EAS Build configure · Hello world test<br>
+        Apple Developer Program ($99/god)<br>
+        Google Play Console ($25 jednokratno)
+      </div>
+      <span class="prereq-tag badge t">Teodora</span>
+    </div>
+    <div class="prereq-card">
+      <div class="prereq-icon">🔐</div>
+      <div class="prereq-title">Git branching + .env</div>
+      <div class="prereq-body">
+        <code>main</code> (prod) · <code>dev</code> (integracija)<br>
+        <code>vukasin/feature</code> · <code>teodora/feature</code><br>
+        <code>.env.example</code> u root, branch protection<br>
+        PR review obavezan pre merge-a na dev
+      </div>
+      <span class="prereq-tag badge sync">Oba</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MAIN SWIMLANE DIAGRAM ===== -->
+<div class="diagram-wrap">
+  <div class="sec-label">§ 1 — Swimlane dijagram · Nedelja po nedelja</div>
+
+  <!-- Header -->
+  <div style="display:grid;grid-template-columns:80px 1fr 1fr 60px;gap:2px;margin-bottom:2px;">
+    <div class="swim-label days">Dan</div>
+    <div class="swim-label v">Vukašin — Backend &amp; AI</div>
+    <div class="swim-label t">Teodora — Mobile &amp; Web</div>
+    <div class="swim-label shared">Sync</div>
+  </div>
+
+  <!-- ──── WEEK 1 ──── -->
+  <div class="integration" style="margin:0 0 2px 0;border-radius:0;">
+    <div class="integration-icon">📦</div>
+    <div>
+      <div class="integration-title">NEDELJA 1 — Dan 1–7 · Temelji: Auth, DB, AI server, Expo hello world</div>
+      <div class="integration-desc">Milestone: svaki servis je up, API ping radi, Expo Go radi na fizičkom uređaju</div>
+    </div>
+  </div>
+
+  <div class="week">
+    <div class="week-tag">
+      <div class="week-n">01</div>
+      <div class="week-days-label">D 1–3</div>
+    </div>
+    <div class="lane v-lane">
+      <div class="task-node v">
+        <div class="task-title"><span class="dot dot-v"></span>Node.js API scaffold</div>
+        <div class="task-body">Express/Fastify setup · middleware (auth, cors, rate limit) · <code>GET /ping</code> health check · folder struktura</div>
+        <div class="ai-chip">✦ Claude Code → generiše kompletan scaffold iz CLAUDE.md</div>
+      </div>
+      <div class="task-node v">
+        <div class="task-title"><span class="dot dot-v"></span>MongoDB Atlas + Mongoose</div>
+        <div class="task-body">User, Item, Chat, Like, Follow modeli · embedding polje · indeksi · CRUD test</div>
+        <div class="ai-chip">✦ Agent generiše sve Mongoose schema-e</div>
+      </div>
+      <div class="task-node v">
+        <div class="task-title"><span class="dot dot-v"></span>Firebase Auth middleware</div>
+        <div class="task-body">JWT verifikacija na svakim protected endpoint-u · Google Sign-In + Email/Password · Postman test</div>
+      </div>
+    </div>
+    <div class="lane t-lane">
+      <div class="task-node t">
+        <div class="task-title"><span class="dot dot-t"></span>Expo monorepo setup</div>
+        <div class="task-body"><code>apps/mobile/</code> Expo app · TypeScript · ESLint/Prettier · test na fizičkom uređaju via Expo Go QR</div>
+        <div class="ai-chip">✦ Agent setup navigation struktura</div>
+      </div>
+      <div class="task-node t">
+        <div class="task-title"><span class="dot dot-t"></span>React web + deploy</div>
+        <div class="task-body"><code>apps/web/</code> Vite React · Tailwind CSS · deploy na Cloudflare Pages · potvrdi produkcija radi</div>
+      </div>
+      <div class="task-node t">
+        <div class="task-title"><span class="dot dot-t"></span>Firebase Auth u Expo</div>
+        <div class="task-body">Google Sign-In · Email/Password · AsyncStorage persistent session · logout/login flow test</div>
+      </div>
+    </div>
+    <div class="lane sync-lane">
+      <div class="sync-node"><strong>Dan 3</strong>CLAUDE.md review zajednički</div>
+    </div>
+  </div>
+
+  <div class="week">
+    <div class="week-tag">
+      <div class="week-n">01</div>
+      <div class="week-days-label">D 4–7</div>
+    </div>
+    <div class="lane v-lane">
+      <div class="task-node v">
+        <div class="task-title"><span class="dot dot-v"></span>Python AI server (FastAPI)</div>
+        <div class="task-body">FastAPI bootstrap · Ollama health check · <code>POST /generate-description</code> vraća title+desc · ručni test</div>
+        <div class="ai-chip">✦ Agent: FastAPI setup + Ollama integracija</div>
+      </div>
+      <div class="task-node v">
+        <div class="task-title"><span class="dot dot-v"></span>Cloudflare Tunnel setup</div>
+        <div class="task-body">cloudflared na Ubuntu · tunnel → Node API port · HTTPS javna URL · Postman test sa javnog interneta</div>
+      </div>
+    </div>
+    <div class="lane t-lane">
+      <div class="task-node t">
+        <div class="task-title"><span class="dot dot-t"></span>Navigation struktura</div>
+        <div class="task-body">React Navigation: Auth stack (Login, Register) · Main stack (Feed, Profile, Chat, Upload) · placeholder screens</div>
+      </div>
+      <div class="task-node t">
+        <div class="task-title"><span class="dot dot-t"></span>Axios API client</div>
+        <div class="task-body">Axios instance · base URL iz .env · interceptor dodaje Firebase token · error handling · test sa Vukašin API</div>
+      </div>
+    </div>
+    <div class="lane sync-lane">
+      <div class="sync-node"><strong>Dan 7</strong>API handshake</div>
+      <div class="sync-arrow">⟳</div>
+      <div class="sync-node" style="font-size:8px;">Expo pinga<br>GET /ping<br>✅ ako radi</div>
+    </div>
+  </div>
+
+  <!-- ──── WEEK 2 ──── -->
+  <div class="integration" style="margin:8px 0 2px 0;border-radius:0;">
+    <div class="integration-icon">⚙️</div>
+    <div>
+      <div class="integration-title">NEDELJA 2 — Dan 8–14 · Core features: Upload, Feed API, CLIP embeddinzi, UI</div>
+      <div class="integration-desc">Milestone: korisnik može postovati item — AI generiše opis, drugi korisnici vide u feed-u</div>
+    </div>
+  </div>
+
+  <div class="week">
+    <div class="week-tag">
+      <div class="week-n">02</div>
+      <div class="week-days-label">D 8–11</div>
+    </div>
+    <div class="lane v-lane">
+      <div class="task-node v">
+        <div class="task-title"><span class="dot dot-v"></span>Cloudflare R2 upload pipeline</div>
+        <div class="task-body">Presigned URL generisanje · item image upload · thumbnail · upload triggeruje CLIP embedding async</div>
+      </div>
+      <div class="task-node ai-node">
+        <div class="task-title"><span class="dot dot-ai"></span>CLIP embedding pipeline (Agent)</div>
+        <div class="task-body">Python: svaki upload → CLIP generiše 512-dim vektor → čuva u MongoDB item.embedding · FAISS index build</div>
+        <div class="ai-chip">✦ AI/ML Agent — specijalizovan za CLIP+FAISS</div>
+      </div>
+      <div class="task-node v">
+        <div class="task-title"><span class="dot dot-v"></span>AI description endpoint</div>
+        <div class="task-body"><code>POST /ai/generate-description</code> → Qwen2.5 7B → title + description (srpski/engleski)</div>
+      </div>
+    </div>
+    <div class="lane t-lane">
+      <div class="task-node t">
+        <div class="task-title"><span class="dot dot-t"></span>Upload screen — mobile</div>
+        <div class="task-body">expo-image-picker · preview · forma: kategorija, brend, veličina, stanje, boja · "AI generiši opis" dugme</div>
+        <div class="ai-chip">✦ Mobile UI Agent — poliran UI iz wireframe-a</div>
+      </div>
+      <div class="task-node t">
+        <div class="task-title"><span class="dot dot-t"></span>Feed screen — infinite scroll</div>
+        <div class="task-body">FlatList · pull-to-refresh · infinite scroll (cursor paginacija) · item kartica: slika, title, brend, like</div>
+      </div>
+    </div>
+    <div class="lane sync-lane">
+      <div class="sync-node"><strong>Dan 11</strong>API kontrakt</div>
+      <div class="sync-arrow">⟳</div>
+      <div class="sync-node" style="font-size:8px;">TypeScript tipovi u <code>packages/shared/types.ts</code></div>
+      <div class="sync-arrow" style="font-size:10px;">↓</div>
+      <div class="sync-node" style="font-size:8px;background:var(--ai-dim);border-color:var(--ai-border);color:var(--ai);">✦ Agent generiše types.ts iz Mongoose schema</div>
+    </div>
+  </div>
+
+  <div class="week">
+    <div class="week-tag">
+      <div class="week-n">02</div>
+      <div class="week-days-label">D 12–14</div>
+    </div>
+    <div class="lane v-lane">
+      <div class="task-node v">
+        <div class="task-title"><span class="dot dot-v"></span>Feed API — faza 1 algoritam</div>
+        <div class="task-body"><code>GET /feed</code> · ranking = 60% recency + 40% engagement score (likes + trade requests) · cursor paginacija</div>
+        <div class="ai-chip">✦ Feed Algoritam Agent — hibridni ranking formula</div>
+      </div>
+      <div class="task-node v">
+        <div class="task-title"><span class="dot dot-v"></span>Item CRUD endpoints</div>
+        <div class="task-body">POST/GET/PUT/DELETE /items · validacija · auth middleware · R2 cleanup pri brisanju · unit testovi</div>
+        <div class="ai-chip">✦ Backend API Agent piše + testira sve</div>
+      </div>
+    </div>
+    <div class="lane t-lane">
+      <div class="task-node t">
+        <div class="task-title"><span class="dot dot-t"></span>Item detail screen</div>
+        <div class="task-body">Full-screen prikaz · swipe kroz slike · opis · profil link · "Request Trade" CTA dugme</div>
+      </div>
+      <div class="task-node t">
+        <div class="task-title"><span class="dot dot-t"></span>Profile screen + web feed</div>
+        <div class="task-body">Avatar · bio · grid sopstvenih itema · web: responsive grid prikaz, item modal, header navigacija</div>
+      </div>
+    </div>
+    <div class="lane sync-lane">
+      <div class="sync-node"><strong>Dan 14</strong>Feed E2E test</div>
+      <div class="sync-arrow">⟳</div>
+      <div class="sync-node" style="font-size:8px;">Upload item → vidi u feed-u ✅</div>
+    </div>
+  </div>
+
+  <!-- ──── WEEK 3 ──── -->
+  <div class="integration" style="margin:8px 0 2px 0;border-radius:0;">
+    <div class="integration-icon">💬</div>
+    <div>
+      <div class="integration-title">NEDELJA 3 — Dan 15–21 · Social layer: Chat, Trade, Push notifikacije, AI personalizacija</div>
+      <div class="integration-desc">Milestone: korisnik može inicirati i prihvatiti trade request · push notifikacije rade</div>
+    </div>
+  </div>
+
+  <div class="week">
+    <div class="week-tag">
+      <div class="week-n">03</div>
+      <div class="week-days-label">D 15–18</div>
+    </div>
+    <div class="lane v-lane">
+      <div class="task-node v">
+        <div class="task-title"><span class="dot dot-v"></span>WebSocket Chat backend</div>
+        <div class="task-body">Socket.io · Message model (senderId, receiverId, itemId, text, ts) · conversation threading · read receipts · MongoDB index</div>
+        <div class="ai-chip">✦ Backend Agent: WebSocket + chat endpoints</div>
+      </div>
+      <div class="task-node v">
+        <div class="task-title"><span class="dot dot-v"></span>Trade request sistem</div>
+        <div class="task-body"><code>POST /trade-requests</code> · status flow: pending→accepted/rejected · item "blokiran" dok trade pending · notif trigger</div>
+      </div>
+      <div class="task-node v">
+        <div class="task-title"><span class="dot dot-v"></span>Like + Follow backend</div>
+        <div class="task-body">Atomic $inc operacije · like/unlike toggle · follow/unfollow · following feed logika</div>
+      </div>
+    </div>
+    <div class="lane t-lane">
+      <div class="task-node t">
+        <div class="task-title"><span class="dot dot-t"></span>Chat screen — mobile</div>
+        <div class="task-body">Lista konverzacija · chat thread · WebSocket real-time poruke · item preview u trade chat · keyboard avoiding</div>
+        <div class="ai-chip">✦ Chat UI Agent — WebSocket integracija u Expo</div>
+      </div>
+      <div class="task-node t">
+        <div class="task-title"><span class="dot dot-t"></span>Trade request UI flow</div>
+        <div class="task-body">"Request Trade" modal · korisnik bira šta nudi · preview · potvrda · status badge (pending/accepted/rejected)</div>
+      </div>
+    </div>
+    <div class="lane sync-lane">
+      <div class="sync-node"><strong>Dan 17</strong>WebSocket test</div>
+      <div class="sync-arrow">⟳</div>
+      <div class="sync-node" style="font-size:8px;">Chat radi između 2 uređaja real-time ✅</div>
+    </div>
+  </div>
+
+  <div class="week">
+    <div class="week-tag">
+      <div class="week-n">03</div>
+      <div class="week-days-label">D 19–21</div>
+    </div>
+    <div class="lane v-lane">
+      <div class="task-node v">
+        <div class="task-title"><span class="dot dot-v"></span>Expo Push Notifications (backend)</div>
+        <div class="task-body">Expo Push API integracija · trigger za: trade request, like, nova poruka, accepted/rejected</div>
+      </div>
+      <div class="task-node ai-node">
+        <div class="task-title"><span class="dot dot-ai"></span>AI Feed personalizacija faza 2 (Agent)</div>
+        <div class="task-body">Engagement signal API: view, like, hide · FAISS similarity search na korisnikovoj like istoriji · onboarding kategorije → filter</div>
+        <div class="ai-chip">✦ Feed Algoritam Agent — hibridni ranking + FAISS</div>
+      </div>
+    </div>
+    <div class="lane t-lane">
+      <div class="task-node t">
+        <div class="task-title"><span class="dot dot-t"></span>Like/save animacije</div>
+        <div class="task-body">Reanimated 2 · animated like heart · bookmark · double-tap to like · hide swipe left · 60fps smooth</div>
+      </div>
+      <div class="task-node t">
+        <div class="task-title"><span class="dot dot-t"></span>Push notif + Onboarding</div>
+        <div class="task-body">expo-notifications · iOS permisija · FCM Android · redirect na screen po tap-u · onboarding kategorije pri prvom login-u</div>
+      </div>
+    </div>
+    <div class="lane sync-lane">
+      <div class="sync-node"><strong>Dan 21</strong>E2E Flow Test</div>
+      <div class="sync-arrow">⟳</div>
+      <div class="sync-node" style="font-size:8px;">Upload→Feed→Trade →Chat→Push ✅</div>
+    </div>
+  </div>
+
+  <!-- ──── WEEK 4 ──── -->
+  <div class="integration" style="margin:8px 0 2px 0;border-radius:0;">
+    <div class="integration-icon">🚀</div>
+    <div>
+      <div class="integration-title">NEDELJA 4 — Dan 22–30 · Polish, EAS Build, security, TestFlight launch</div>
+      <div class="integration-desc">Milestone: iOS TestFlight link aktivan + Android Internal Testing · prvih 10–20 test korisnika</div>
+    </div>
+  </div>
+
+  <div class="week">
+    <div class="week-tag">
+      <div class="week-n">04</div>
+      <div class="week-days-label">D 22–26</div>
+    </div>
+    <div class="lane v-lane">
+      <div class="task-node ai-node">
+        <div class="task-title"><span class="dot dot-ai"></span>Security Audit (Agent)</div>
+        <div class="task-body">QA + Security Agent proverava sve endpoints: missing auth, NoSQL injection, rate limiting, exposed data · auto-fix</div>
+        <div class="ai-chip">✦ Security Agent — audit + fix</div>
+      </div>
+      <div class="task-node v">
+        <div class="task-title"><span class="dot dot-v"></span>Rate limiting + logging</div>
+        <div class="task-body">express-rate-limit · Zod validacija · Winston logging · PM2 process management · auto-restart · monitoring</div>
+      </div>
+      <div class="task-node v">
+        <div class="task-title"><span class="dot dot-v"></span>Feed algoritam tuning + Swagger</div>
+        <div class="task-body">Adjustuj weights na osnovu testiranja · MongoDB query explain + index opt · Swagger/OpenAPI dokumentacija</div>
+      </div>
+    </div>
+    <div class="lane t-lane">
+      <div class="task-node t">
+        <div class="task-title"><span class="dot dot-t"></span>Performance optimization</div>
+        <div class="task-body">FlatList windowSize · memo-ization · expo-image lazy load · optimistički UI updates za like · getItemLayout</div>
+      </div>
+      <div class="task-node t">
+        <div class="task-title"><span class="dot dot-t"></span>Offline + error states</div>
+        <div class="task-body">Loading skeleton-i · error boundary-ji · no-connection state · retry dugme · app ne smije crashati na loš network</div>
+      </div>
+      <div class="task-node ai-node">
+        <div class="task-title"><span class="dot dot-ai"></span>QA Polish Agent</div>
+        <div class="task-body">Prolazi sve screens: accessibility labels, missing error states, hardcoded strings, spacing/color konzistentnost</div>
+        <div class="ai-chip">✦ QA Agent generiše TODO polish listu</div>
+      </div>
+    </div>
+    <div class="lane sync-lane">
+      <div class="sync-node"><strong>Dan 25</strong>Bug bash</div>
+      <div class="sync-arrow">⟳</div>
+      <div class="sync-node" style="font-size:8px;">Oboje testiraju sve flows zajednički</div>
+    </div>
+  </div>
+
+  <div class="week">
+    <div class="week-tag" style="border-radius:0 0 0 var(--r-lg);">
+      <div class="week-n">04</div>
+      <div class="week-days-label">D 27–30</div>
+    </div>
+    <div class="lane v-lane" style="border-radius:0 0 0 0;">
+      <div class="task-node v">
+        <div class="task-title"><span class="dot dot-v"></span>Finalna server stabilizacija</div>
+        <div class="task-body">Cloudflare cache config · PM2 ecosystem file · server restart test · alert setup za Ollama crash · final API smoke test</div>
+      </div>
+    </div>
+    <div class="lane t-lane" style="border-radius:0 0 var(--r-lg) 0;">
+      <div class="task-node t">
+        <div class="task-title"><span class="dot dot-t"></span>EAS Build Android + iOS</div>
+        <div class="task-body"><code>eas build --platform android</code> → Google Play Internal Testing<br><code>eas build --platform ios</code> → TestFlight upload · invite testeri</div>
+      </div>
+      <div class="task-node t">
+        <div class="task-title"><span class="dot dot-t"></span>App Store assets</div>
+        <div class="task-body">Screenshots za App Store + Google Play · app icon finalizacija · splash screen animacija · store description (SR + EN)</div>
+      </div>
+    </div>
+    <div class="lane sync-lane" style="border-radius:0 0 var(--r-lg) 0;">
+      <div class="sync-node" style="background:var(--deploy-dim);border-color:var(--deploy-border);color:var(--deploy);">
+        <strong>Dan 30 🚀</strong>LAUNCH
+      </div>
+      <div class="sync-arrow">⟳</div>
+      <div class="sync-node" style="font-size:8px;background:var(--deploy-dim);border-color:var(--deploy-border);color:var(--deploy);">TestFlight ✅<br>Play Internal ✅<br>10–20 testeri ✅</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SYSTEM ARCHITECTURE ===== -->
+<hr>
+<div class="arch-section">
+  <div class="sec-label">§ 2 — Arhitektura sistema</div>
+  <div class="arch-diagram">
+    <!-- Row 1: Users -->
+    <div class="arch-row">
+      <div class="arch-box t" style="min-width:150px;">📱 Mobile App<small>React Native + Expo</small></div>
+      <div style="width:60px;height:1px;background:var(--border2);position:relative;">
+        <span style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--text3);">HTTPS</span>
+      </div>
+      <div class="arch-box t">🌐 Web App<small>React + Vite<br>Cloudflare Pages</small></div>
+    </div>
+
+    <!-- Arrow down -->
+    <div style="display:flex;flex-direction:column;align-items:center;padding:8px 0;">
+      <div style="width:1px;height:20px;background:var(--border2);"></div>
+      <div style="font-size:8px;color:var(--text3);letter-spacing:0.1em;">FIREBASE AUTH (Google / Email)</div>
+      <div style="width:1px;height:20px;background:var(--border2);position:relative;">
+        <span style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);">▼</span>
+      </div>
+    </div>
+
+    <!-- Row 2: API -->
+    <div class="arch-row">
+      <div class="arch-box v" style="min-width:280px;">⚡ Node.js API Server<small>Express · Ubuntu · PM2<br>Cloudflare Tunnel (HTTPS)</small></div>
+    </div>
+
+    <!-- Arrows down -->
+    <div style="display:flex;gap:80px;padding:8px 0;align-items:flex-start;justify-content:center;">
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div style="width:1px;height:24px;background:var(--border2);"></div>
+        <div style="font-size:9px;color:var(--text3);">▼</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div style="width:1px;height:24px;background:var(--border2);"></div>
+        <div style="font-size:9px;color:var(--text3);">▼</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div style="width:1px;height:24px;background:var(--border2);"></div>
+        <div style="font-size:9px;color:var(--text3);">▼</div>
+      </div>
+    </div>
+
+    <!-- Row 3: Services -->
+    <div class="arch-row">
+      <div class="arch-box db">🍃 MongoDB Atlas<small>Flex Tier · $8–$30/mes<br>data + CLIP vektori</small></div>
+      <div class="arch-box infra">☁️ Cloudflare R2<small>Image storage + CDN<br>~$2/mes</small></div>
+      <div class="arch-box ai">🧠 Python AI Server<small>isti računar · internal HTTP</small></div>
+    </div>
+
+    <!-- Arrow under AI -->
+    <div style="display:flex;justify-content:flex-end;padding:8px 0;padding-right:calc(50% - 200px);">
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div style="width:1px;height:16px;background:var(--ai-border);"></div>
+        <div style="font-size:9px;color:var(--ai);">▼</div>
+      </div>
+    </div>
+
+    <!-- Row 4: AI components -->
+    <div class="arch-row" style="justify-content:flex-end;padding-right:calc(50% - 290px);">
+      <div class="arch-box ai" style="min-width:100px;font-size:10px;padding:8px 12px;">Ollama<br><small>Qwen2.5 7B<br>text gen</small></div>
+      <div style="width:8px;height:1px;background:var(--ai-border);"></div>
+      <div class="arch-box ai" style="min-width:100px;font-size:10px;padding:8px 12px;">CLIP<br><small>image<br>embeddings</small></div>
+      <div style="width:8px;height:1px;background:var(--ai-border);"></div>
+      <div class="arch-box ai" style="min-width:100px;font-size:10px;padding:8px 12px;">FAISS<br><small>similarity<br>search</small></div>
+    </div>
+
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+      <div class="badge sync">Socket.io — Real-time chat</div>
+      <div class="badge deploy">Expo Push — FCM + APNs</div>
+      <div class="badge ai">EAS Build — Cloud iOS/Android</div>
+      <div class="badge v">Cloudflare Tunnel — $0</div>
+      <div class="badge t">OTA Updates — bez App Store review</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SEQUENCE: Trade flow ===== -->
+<hr>
+<div class="seq-section">
+  <div class="sec-label">§ 3 — Sequence dijagram: Kompletan trade flow (end-to-end)</div>
+  <div class="seq-diagram">
+    <div class="seq-inner">
+
+      <!-- Participants -->
+      <div class="seq-participants">
+        <div></div>
+        <div class="participant">
+          <div class="participant-box v">Vukašin<br><span style="font-size:8px;font-weight:400;">Backend + AI</span></div>
+          <div class="p-lifeline"></div>
+        </div>
+        <div class="participant">
+          <div class="participant-box t">Teodora<br><span style="font-size:8px;font-weight:400;">Mobile + Web</span></div>
+          <div class="p-lifeline"></div>
+        </div>
+        <div class="participant">
+          <div class="participant-box ai">Claude Code<br><span style="font-size:8px;font-weight:400;">Agents</span></div>
+          <div class="p-lifeline"></div>
+        </div>
+        <div class="participant">
+          <div class="participant-box infra">Infra<br><span style="font-size:8px;font-weight:400;">DB · R2 · Push</span></div>
+          <div class="p-lifeline"></div>
+        </div>
+      </div>
+
+      <!-- Events -->
+      <div class="seq-events">
+
+        <!-- W1 -->
+        <div class="seq-time"><div class="seq-time-label">W1 · Setup</div></div>
+        <div class="seq-col"><div class="seq-event v">API scaffold<br>MongoDB setup<br>Firebase middleware</div></div>
+        <div class="seq-col"><div class="seq-event t">Expo setup<br>Navigation<br>Auth screens</div></div>
+        <div class="seq-col"><div class="seq-event ai">Generiše<br>Node scaffold<br>+ Mongoose schema</div></div>
+        <div class="seq-col"><div class="seq-event db">Atlas Flex<br>R2 bucket<br>Firebase Auth</div></div>
+
+        <!-- W2 -->
+        <div class="seq-time"><div class="seq-time-label">W2 · Upload</div></div>
+        <div class="seq-col"><div class="seq-event v">R2 presign URL<br>CLIP embedding<br>Feed API faza 1</div></div>
+        <div class="seq-col"><div class="seq-event t">Upload screen<br>AI opis dugme<br>Feed scroll</div></div>
+        <div class="seq-col"><div class="seq-event ai">CLIP+FAISS<br>pipeline<br>types.ts generiše</div></div>
+        <div class="seq-col"><div class="seq-event db">Čuva embedding<br>FAISS index<br>Item CRUD</div></div>
+
+        <!-- W3 -->
+        <div class="seq-time"><div class="seq-time-label">W3 · Social</div></div>
+        <div class="seq-col"><div class="seq-event v">WebSocket<br>Trade requests<br>Push API trigger</div></div>
+        <div class="seq-col"><div class="seq-event t">Chat screen<br>Trade modal<br>Like animacije</div></div>
+        <div class="seq-col"><div class="seq-event ai">Chat UI Agent<br>Feed personalizacija<br>algoritam</div></div>
+        <div class="seq-col"><div class="seq-event deploy">Expo Push<br>FCM Android<br>APNs iOS</div></div>
+
+        <!-- W4 -->
+        <div class="seq-time"><div class="seq-time-label">W4 · Launch</div></div>
+        <div class="seq-col"><div class="seq-event v">Security audit<br>Rate limiting<br>PM2 monitoring</div></div>
+        <div class="seq-col"><div class="seq-event t">EAS Build iOS<br>EAS Build Android<br>App Store assets</div></div>
+        <div class="seq-col"><div class="seq-event ai">QA Agent audit<br>Security Agent<br>Polish TODO</div></div>
+        <div class="seq-col"><div class="seq-event deploy">TestFlight ✅<br>Play Internal ✅<br>10–20 testeri</div></div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CLAUDE CODE AGENTS ===== -->
+<hr>
+<div class="prereq-section">
+  <div class="sec-label">§ 4 — Claude Code Subagenti · Definicije i scope</div>
+  <div class="prereq-grid" style="grid-template-columns:1fr 1fr;">
+    <div class="prereq-card">
+      <div class="prereq-icon">🔧</div>
+      <div class="prereq-title">Backend API Agent</div>
+      <div class="prereq-body">
+        <code>.claude/agents/backend-api.md</code> · model: opus<br><br>
+        Scope: samo <code>apps/api/</code><br>
+        Generiše Express endpoints, Mongoose modele, Firebase middleware, rate limiting, unit testove za svaki endpoint, MongoDB index optimizaciju.
+      </div>
+      <span class="prereq-tag badge v">Vukašin koristi</span>
+    </div>
+    <div class="prereq-card">
+      <div class="prereq-icon">🧠</div>
+      <div class="prereq-title">AI/ML Agent</div>
+      <div class="prereq-body">
+        <code>.claude/agents/ai-ml.md</code> · model: opus<br><br>
+        Scope: samo <code>apps/ai-server/</code><br>
+        CLIP embedding pipeline, FAISS index management, similarity search, Ollama prompt engineering, feed ranking formula, engagement signal processing.
+      </div>
+      <span class="prereq-tag badge ai">AI task</span>
+    </div>
+    <div class="prereq-card">
+      <div class="prereq-icon">📱</div>
+      <div class="prereq-title">Mobile UI Agent</div>
+      <div class="prereq-body">
+        <code>.claude/agents/mobile-ui.md</code> · model: sonnet<br><br>
+        Scope: samo <code>apps/mobile/</code><br>
+        Gradi Expo screens, Reanimated 2 animacije, FlatList performanse, WebSocket integracija u chat, EAS Build troubleshooting. Ima frontend-design skill učitan.
+      </div>
+      <span class="prereq-tag badge t">Teodora koristi</span>
+    </div>
+    <div class="prereq-card">
+      <div class="prereq-icon">🔒</div>
+      <div class="prereq-title">QA + Security Agent</div>
+      <div class="prereq-body">
+        <code>.claude/agents/qa-security.md</code> · model: opus<br><br>
+        Scope: ceo codebase (read-only + fix)<br>
+        Auth middleware audit, input validacija check, accessibility audit, hardcoded strings, missing error states, performance bottleneck detekcija.
+      </div>
+      <span class="prereq-tag badge ai">W4 review</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CHECKLIST ===== -->
+<hr>
+<div class="checklist-section">
+  <div class="sec-label">§ 5 — Ready for testing checklist · Dan 30</div>
+  <div class="checklist-grid">
+    <div class="check-group">
+      <div class="check-group-title"><span style="color:var(--v);">⬡</span> Backend &amp; AI (Vukašin)</div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>GET /ping</strong> odgovara sa statusom 200 sa javne HTTPS URL-e</div></div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>Firebase Auth</strong> — JWT verifikacija blokira neautorizovane requeste</div></div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>Upload pipeline</strong> — slika ide u R2, CLIP embedding u MongoDB, Qwen generiše opis</div></div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>Feed API</strong> — cursor paginacija radi, ranking algoritam vraća relevantne iteme</div></div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>WebSocket chat</strong> — real-time poruke između 2 uređaja bez kašnjenja</div></div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>Trade requests</strong> — status flow pending→accepted/rejected radi</div></div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>Push notifikacije backend</strong> — Expo Push API šalje notif za sve triggere</div></div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>Rate limiting</strong> — stress test ne srušava server</div></div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>PM2</strong> — Node + Python auto-restart pri crashu, monitoring aktivan</div></div>
+    </div>
+    <div class="check-group">
+      <div class="check-group-title"><span style="color:var(--t);">⬡</span> Mobile &amp; Web (Teodora)</div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>Google Sign-In</strong> — login radi na iOS i Android bez greške</div></div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>Upload item</strong> — korisnik može uploadovati sliku, AI generiše opis, item se pojavljuje u feed-u</div></div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>Feed infinite scroll</strong> — smooth scroll, pull-to-refresh, paginacija radi</div></div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>Chat</strong> — real-time poruke, WebSocket, trade request flow u chat-u</div></div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>Like animacija</strong> — heart animacija 60fps, double-tap, optimistički update</div></div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>Push notifikacije</strong> — primaju se na iOS i Android, tap otvara pravi screen</div></div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>Offline state</strong> — app ne crasha bez mreže, skeleton loader vidljiv</div></div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>EAS Build Android</strong> — APK na Google Play Internal Testing, testiran na uređaju</div></div>
+      <div class="check-item"><div class="check-box-el"></div><div><strong>EAS Build iOS</strong> — IPA na TestFlight, invite link aktivan za testera</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STATS ===== -->
+<div class="stats-row">
+  <div class="stat">
+    <div class="stat-val">1</div>
+    <div class="stat-label">Monorepo<br>4 paketa</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val">4</div>
+    <div class="stat-label">Claude Code<br>Subagenti</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val">30</div>
+    <div class="stat-label">Dana do<br>TestFlight-a</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val">~$21</div>
+    <div class="stat-label">Mesečni<br>cloud trošak</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val">iOS+<br>APK</div>
+    <div class="stat-label">Oba builda<br>Dan 30</div>
+  </div>
+</div>
+
+<div style="margin-top:32px;padding:20px 24px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r-lg);font-size:10px;color:var(--text2);line-height:1.8;animation:fadeUp 0.6s 0.5s ease both;">
+  <span style="font-family:var(--sans);font-size:12px;font-weight:700;color:var(--text);">🏁 Dan 30 — krajnji cilj:</span><br>
+  Funkcionalna iOS + Android aplikacija dostupna na TestFlight i Google Play Internal Testing. Korisnici mogu: registrovati se Google login-om · postovati garderobu · videti AI-generisane opise · scrollovati vizuelni feed · lajkovati · slati trade request-ove · čatovati real-time · primati push notifikacije. AI feed počinje da personalizuje na osnovu engagement signala. Mesečni cloud trošak: ~$21.
+</div>
+
+</div><!-- /page -->
+</body>
+</html>
