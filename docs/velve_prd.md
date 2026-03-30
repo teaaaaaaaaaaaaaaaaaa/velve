@@ -1,5 +1,5 @@
-# Tradey — Product Requirements Document (PRD)
-**Verzija:** v1.1  
+# Velve — Product Requirements Document (PRD)
+**Verzija:** v1.2  
 **Datum:** Mart 2026  
 **Tim:** Vukašin, Teodora  
 **Status:** U razvoju — rok 1 mesec
@@ -8,7 +8,7 @@
 
 ## 1. Pregled platforme
 
-Tradey je AI-powered platforma za razmenu garderobe (clothing trading). Korisnici mogu da postavljaju svoju garderobu, otkrivaju tuđu putem vizuelnog feed-a i dogovaraju direktnu razmenu. Platforma je dizajnirana sa fokusom na engagement, vizuelno otkrivanje i community-driven trading.
+Velve je AI-powered platforma za razmenu garderobe (clothing trading). Korisnici mogu da postavljaju svoju garderobu, otkrivaju tuđu putem vizuelnog feed-a i dogovaraju direktnu razmenu. Platforma je dizajnirana sa fokusom na engagement, vizuelno otkrivanje i community-driven trading.
 
 **Misija:** Napraviti najprijatnije i najinteligentnijie mesto za razmenu garderobe na Balkanu i šire.
 
@@ -19,7 +19,7 @@ Tradey je AI-powered platforma za razmenu garderobe (clothing trading). Korisnic
 ## 2. Ciljano tržište i korisnici
 
 - **Primarna ciljna grupa:** Mladi od 16–30 godina zainteresovani za modu i održivost
-- **Geographija faza 1:** Beograd
+- **Geografija faza 1:** Beograd
 - **Geografija faza 2:** Zagreb
 - **Podržani jezici:** Srpski (latinica), Engleski, Ruski
 - **Platforma:** Android i iOS (React Native), Web (React)
@@ -27,8 +27,6 @@ Tradey je AI-powered platforma za razmenu garderobe (clothing trading). Korisnic
 ---
 
 ## 3. Funkcionalnosti koje već postoje
-
-Sledeće funkcionalnosti su implementirane i rade:
 
 | Funkcionalnost | Status |
 |---|---|
@@ -136,8 +134,8 @@ Buduća optimizacija: Kada se pređe na MongoDB Atlas Flex, **Atlas Vector Searc
 **Zašto Expo:**
 - Jedan codebase za Android i iOS
 - Nema potrebe za Mac-om za razvoj — sve se radi na Windows
-- EAS Build: iOS i Android buildovi u cloudu (Expo server-i pokreću Xcode na macOS infrastrukturi)
-- Expo Go app: instant testiranje na fizičkom uređaju skeniranjem QR koda — nema emulatora, nema čekanja
+- EAS Build: iOS i Android buildovi u cloudu
+- Expo Go app: instant testiranje na fizičkom uređaju skeniranjem QR koda
 - OTA (Over-the-Air) updates: deploy JavaScript izmena bez ponovnog prolaska kroz App Store review
 
 **Razvoj na Windows — toolset:**
@@ -150,7 +148,6 @@ Buduća optimizacija: Kada se pređe na MongoDB Atlas Flex, **Atlas Vector Searc
 **Deployment:**
 - Android: Google Play Store ($25 jednokratno)
 - iOS: Apple App Store ($99/god — Apple Developer Program obavezan za iOS distribuciju)
-- Testiranje iOS bez Xcode-a: EAS Build generiše `.ipa`, testiranje putem TestFlight ili Expo Go
 
 **Push notifikacije:** Expo Push Notifications (besplatno, wrapper oko FCM i APNs)
 
@@ -160,24 +157,16 @@ Buduća optimizacija: Kada se pređe na MongoDB Atlas Flex, **Atlas Vector Searc
 
 Feed je dizajniran po uzoru na **TikTok + Instagram**: vertikalni infinite scroll, fullscreen kartice garderobe.
 
-**Feed algoritam — preporučeni hibridni pristup (na osnovu industrijskih praksi):**
-
-U ranoj fazi (0–1k korisnika) nema dovoljno podataka za pravu personalizaciju. Preporučen pristup:
+**Feed algoritam — hibridni pristup:**
 
 **Faza 1 — Cold start (0–2k korisnika):**
-- Feed sortiran po kombinaciji: freshness (novo = bolje) + engagement score (likes + trade requests)
+- Feed sortiran po kombinaciji: freshness + engagement score (likes + trade requests)
 - Vizuelna sličnost (CLIP/FAISS): korisnik vidi iteme slične onima sa kojima je interagovao
-- Novi korisnik: kratki onboarding gde bira kategorije (Streetwear, Vintage, Sportswear...) — odmah filtrira feed
+- Novi korisnik: kratki onboarding gde bira kategorije → odmah filtrira feed
 
 **Faza 2 — Personalizacija (2k+ korisnika):**
 - Engagement signali se akumuliraju: view, like, save, trade request, hide
 - Feed ranking uzima u obzir: vizuelnu sličnost + korisnikovu istoriju interakcija
-- Korisnici koji lajkuju Nike dobijaju više Nike, korisnici koji skrivaju formalnu odeću dobijaju manje
-
-**Zašto ovako:**
-- TikTok i Instagram su godinama refinirali da je engagement-based ranking superioran od čistog chronological feed-a
-- Vizuelna sličnost (CLIP) je Tradey-jev diferencijator — nema ga na Vinted ili Depop na isti način
-- Cold start se rešava onboardingom kategorija, ne čekanjem na podatke
 
 **Korisničke interakcije u feed-u:**
 - 👍 Like
@@ -189,8 +178,6 @@ U ranoj fazi (0–1k korisnika) nema dovoljno podataka za pravu personalizaciju.
 
 ## 5. Trade sistem
 
-Razmena funkcioniše kao direktan barter između korisnika:
-
 1. Korisnik A vidi item korisnika B u feed-u
 2. Šalje "trade request" — poruka + ponuda sopstvenog itema
 3. Korisnik B prihvata ili odbija
@@ -200,8 +187,6 @@ Razmena funkcioniše kao direktan barter između korisnika:
 ---
 
 ## 6. Moderacija i sigurnost
-
-**Trenutni pristup:** Korisnici prijavljuju loš sadržaj, admin reaguje.
 
 - Report dugme na svakom itemu i profilu
 - Admin panel (planiran): pregled prijavljenih itema, mogućnost uklanjanja
@@ -214,13 +199,8 @@ Razmena funkcioniše kao direktan barter između korisnika:
 
 Monetizacija se uvodi **tek kada platforma dostigne 10,000 aktivnih korisnika**.
 
-Pre tog broja:
-- Reklame narušavaju UX
-- Prihod bi bio zanemarljiv
-- Fokus mora biti na rastu korisnika
-
 **Planirani modeli monetizacije (budućnost):**
-- **Native fashion ads**: Brendovi promovišu garderobu kao item u feed-u (označeno kao "promoted"). Primer: Nike promoted jacket, Zara promoted sneakers. Relevantniji od banner reklama, bolji CPM.
+- **Native fashion ads**: Brendovi promovišu garderobu kao item u feed-u (označeno kao "promoted")
 - **Promoted listings**: Korisnici plaćaju za veću vidljivost svojih itema
 - **Brand collaborations**
 
@@ -234,7 +214,7 @@ Pre tog broja:
 | Tehnologija | Svrha |
 |---|---|
 | React | Web aplikacija |
-| Vercel / Cloudflare Pages | Hosting (CF Pages besplatno) |
+| Cloudflare Pages | Hosting (besplatno) |
 
 ### Mobile
 | Tehnologija | Svrha |
@@ -273,7 +253,68 @@ Pre tog broja:
 
 ---
 
-## 9. Arhitektura sistema
+## 9. Server infrastruktura (Self-hosted)
+
+### 9.1 Hardware specifikacije
+
+Server je uspešno upaljen i spreman za konfiguraciju.
+
+| Komponenta | Specifikacija |
+|---|---|
+| CPU | Intel Xeon E3-1270 |
+| RAM | 16GB ECC DDR4 |
+| Storage | 2× 2TB SAS diskovi |
+
+**Napomena o CPU:** Xeon E3-1270 nema integrisanu grafiku i nema GPU — AI stack (Ollama + CLIP) je biran upravo da radi na CPU-only, što ovaj server podržava.
+
+---
+
+### 9.2 RAID konfiguracija — odluka
+
+#### Kontekst
+
+Server hostuje: Node.js API, Python AI server (Ollama, CLIP, FAISS), OS i zavisnosti.
+
+Kritični podaci su **van servera**:
+- Slike korisnika → Cloudflare R2
+- Baza podataka → MongoDB Atlas Flex
+- Kod → GitHub
+
+#### Analiza opcija
+
+| RAID tip | Kapacitet | Zaštita | Preporuka |
+|---|---|---|---|
+| **RAID 1 (Mirror)** | 2TB | ✅ Jedan disk može crknuti, server nastavlja | ✅ **Preporučeno** |
+| No RAID (JBOD) | 2× 2TB odvojeno | ❌ Nema zaštite | ⚠️ Rizično |
+| RAID 0 (Stripe) | 4TB | ❌ Jedan disk crkne = sve izgubljeno | ❌ Nije za produkciju |
+
+#### Odluka: RAID 1 (Mirror)
+
+**Razlog:** Server je kritična infrastruktura — ako disk crkne bez RAID zaštite, Velve je kompletno down dok se ne reinstalira OS, Node.js, Python, Ollama modeli i sve AI zavisnosti (~4–8 sati downtime-a). Sa RAID 1, server nastavlja da radi bez prekida dok se disk mirno zameni.
+
+**Zašto ne RAID 0:** Brži write je relevantan za storage-heavy workloade, ali ovaj server primarno čita modele i procesira API requeste. 4TB kapaciteta nije potrebno — Qwen2.5 7B (~5GB) + CLIP (~1GB) + OS + kod ostaju daleko ispod 2TB.
+
+**Zašto ne No RAID:** Nema jasne prednosti. Slike su na R2, baza na Atlas — jedino što se gubi su sati reinstalacije.
+
+#### Kapacitet pri RAID 1
+
+| Stavka | Veličina |
+|---|---|
+| Ubuntu Server OS | ~5GB |
+| Node.js + zavisnosti | ~1GB |
+| Python + zavisnosti (CLIP, FAISS) | ~3GB |
+| Ollama + Qwen2.5 7B model | ~5GB |
+| CLIP model | ~1GB |
+| FAISS indeks (50k itema) | ~100MB |
+| Logs + temp fajlovi | ~10GB |
+| **Ukupno (procena)** | **~25GB** |
+| **Slobodno od 2TB** | **~1.975TB** |
+
+2TB je više nego dovoljno za sve planirane workloade u fazi 1 i fazi 2.
+
+---
+
+## 10. Arhitektura sistema
 
 ```
 Korisnik (Mobile/Web)
@@ -282,7 +323,9 @@ Korisnik (Mobile/Web)
 Firebase Auth (Google / Email)
         │
         ▼
-Node.js API Server (Ubuntu, Cloudflare Tunnel)
+Node.js API Server
+Ubuntu · Xeon E3-1270 · 16GB ECC · RAID 1
+Cloudflare Tunnel (HTTPS)
    │                    │
    ▼                    ▼
 MongoDB Atlas      Cloudflare R2
@@ -295,38 +338,38 @@ Python AI Server (isti računar)
    └── FAISS → similarity search
 ```
 
-Komunikacija između Node.js i Python servera: internal HTTP API (isti računar, bez mrežnog kašnjenja).
-
 ---
 
-## 10. Timeline — 1 mesec
+## 11. Timeline — 1 mesec
 
 | Nedelja | Cilj |
 |---|---|
-| 1 | Google login integracija, MongoDB migracija na Flex |
+| 1 | Google login integracija, MongoDB migracija na Flex, RAID 1 konfiguracija + Ubuntu setup |
 | 2 | AI server setup (Ollama + CLIP + FAISS) |
 | 3 | React Native + Expo setup, prvi Android build putem EAS |
 | 4 | Swipe/feed UI, iOS build putem EAS, testiranje |
 
 ---
 
-## 11. Šta se ne radi (scope out)
+## 12. Šta se ne radi (scope out)
 
 - ❌ SMS OTP login — uklonjen, preskup
-- ❌ Apple login — nema iOS fokusa u fazi 1 (ali iOS app postoji)
+- ❌ Apple login — nema iOS fokusa u fazi 1
 - ❌ Credit/coin sistem — nije u planu
 - ❌ In-app plaćanje — nije u planu za fazu 1
 - ❌ Admin panel — planiran ali nije u prvih mesec dana
 - ❌ GPU server — AI stack je biran specifično da radi bez GPU-a
+- ❌ RAID 0 / No RAID — odbačeno, rizik od gubitka podataka neprihvatljiv
 
 ---
 
-## 12. Ključni rizici
+## 13. Ključni rizici
 
 | Rizik | Verovatnoća | Mitigacija |
 |---|---|---|
-| Server downtime (lokalni računar) | Srednja | Cloudflare Tunnel cache, monitoring |
+| Server downtime (lokalni računar) | Srednja | RAID 1 štiti od disk failure, Cloudflare Tunnel cache, PM2 auto-restart, monitoring |
+| Disk failure (SAS) | Srednja | RAID 1 — server nastavlja sa jednim diskom, zamena diska bez downtime-a |
 | EAS Build iOS zahteva Apple Developer ($99/god) | Visoka — obavezno | Planirati u budžet od početka |
 | CLIP sporiji bez GPU-a | Srednja | Embeddingi se generišu jednom pri uploadu, ne real-time |
-| MongoDB Flex cena raste sa volumenom | Niska do 10k | Cap je $30/mes, M10 tek za 50k+ |
+| MongoDB Flex cena raste sa volumenom | Niska do 10k | Cap je $30/mes |
 | Bot abuse na trade requestovima | Niska | Rate limiting, Firebase Auth zaštita |

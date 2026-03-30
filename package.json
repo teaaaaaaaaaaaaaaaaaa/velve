@@ -1,0 +1,14 @@
+{
+  "name": "velve",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:mobile": "npm run start --workspace=apps/mobile",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:ai": "npm run dev --workspace=apps/ai-server"
+  }
+}

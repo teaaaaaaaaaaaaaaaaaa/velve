@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Velve",
+    "slug": "velve",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "velve",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#431A43"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.velve.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#431A43"
+      },
+      "package": "com.velve.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-auth-session"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
