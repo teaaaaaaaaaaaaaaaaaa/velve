@@ -3,6 +3,7 @@ const mongoose = require('mongoose')
 const router = express.Router()
 const { requireAuth } = require('../middleware/auth')
 const Chat = require('../models/Chat')
+const Message = require('../models/Message')
 const { sendPushToUser } = require('../lib/pushNotifications')
 
 // GET /api/chat — lista chat soba korisnika
@@ -14,18 +15,26 @@ router.get('/', requireAuth, async (req, res) => {
       .populate('tradeRequestId', 'status offeredItemId requestedItemId')
       .lean()
 
-    // Return chats with last message preview
-    const data = chats.map((chat) => {
-      const lastMessage = chat.messages.length > 0 ? chat.messages[chat.messages.length - 1] : null
-      return {
-        _id: chat._id,
-        participants: chat.participants,
-        tradeRequestId: chat.tradeRequestId,
-        lastMessage,
-        messageCount: chat.messages.length,
-        updatedAt: chat.updatedAt,
-      }
-    })
+    // Fetch last message for each chat
+    const data = await Promise.all(
+      chats.map(async (chat) => {
+        const lastMessage = await Message.findOne({ chatId: chat._id })
+          .sort({ createdAt: -1 })
+          .populate('senderId', 'displayName')
+          .lean()
+
+        const messageCount = await Message.countDocuments({ chatId: chat._id })
+
+        return {
+          _id: chat._id,
+          participants: chat.participants,
+          tradeRequestId: chat.tradeRequestId,
+          lastMessage,
+          messageCount,
+          updatedAt: chat.updatedAt,
+        }
+      })
+    )
 
     res.json({ ok: true, data })
   } catch (err) {
@@ -53,7 +62,28 @@ router.get('/:id', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Not a participant of this chat' })
     }
 
-    res.json({ ok: true, data: chat })
+    // Fetch messages separately with pagination support
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100)
+    const before = req.query.before // Optional message ID to fetch messages before
+
+    const messageQuery = { chatId: chat._id }
+    if (before && mongoose.Types.ObjectId.isValid(before)) {
+      const beforeMsg = await Message.findById(before)
+      if (beforeMsg) {
+        messageQuery.createdAt = { $lt: beforeMsg.createdAt }
+      }
+    }
+
+    const messages = await Message.find(messageQuery)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate('senderId', 'displayName photoURL')
+      .lean()
+
+    // Reverse to chronological order
+    messages.reverse()
+
+    res.json({ ok: true, data: { ...chat, messages } })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -79,21 +109,25 @@ router.post('/:id/message', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Not a participant of this chat' })
     }
 
-    const message = {
+    // Create Message document
+    const message = await Message.create({
+      chatId: req.params.id,
       senderId: req.dbUser._id,
       text: text.trim().slice(0, 1000),
-      createdAt: new Date(),
-    }
+    })
 
-    chat.messages.push(message)
-    await chat.save()
+    // Update chat's lastMessageAt
+    await Chat.findByIdAndUpdate(req.params.id, { lastMessageAt: message.createdAt })
+
+    // Populate sender info for response
+    await message.populate('senderId', 'displayName photoURL')
 
     // Emit via socket.io if available
     const io = req.app.get('io')
     if (io) {
       io.to(`chat:${req.params.id}`).emit('new_message', {
         chatId: req.params.id,
-        message: { ...message, senderId: { _id: req.dbUser._id, displayName: req.dbUser.displayName } },
+        message,
       })
     }
 

@@ -15,8 +15,25 @@ const itemSchema = new mongoose.Schema(
     },
     images: [{ type: String }],         // Cloudflare R2 URL-ovi
     embedding: [{ type: Number }],      // CLIP vektor (512 dim)
+    engagementScore: { type: Number, default: 0 },  // Pre-computed feed ranking score
+    lastScoreUpdate: { type: Date },    // When score was last calculated
+    status: {
+      type: String,
+      enum: ['available', 'pending_trade', 'traded'],
+      default: 'available',
+    },
+    isDeleted: { type: Boolean, default: false },   // Soft delete flag
+    deletedAt: { type: Date },          // When item was deleted
   },
   { timestamps: true }
 )
+
+// Indexes for query performance
+itemSchema.index({ userId: 1, createdAt: -1 })      // user's items sorted by date
+itemSchema.index({ category: 1, createdAt: -1 })   // category filtering + sorting
+itemSchema.index({ createdAt: -1 })                // general feed sorting
+itemSchema.index({ engagementScore: -1 })          // feed ranking by score
+itemSchema.index({ status: 1 })                    // filter by availability status
+itemSchema.index({ isDeleted: 1 })                 // filter deleted items
 
 module.exports = mongoose.model('Item', itemSchema)

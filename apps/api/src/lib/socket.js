@@ -1,12 +1,21 @@
 const { Server } = require('socket.io')
+const mongoose = require('mongoose')
 const admin = require('firebase-admin')
 const User = require('../models/User')
 const Chat = require('../models/Chat')
+const Message = require('../models/Message')
 const { sendPushToUser } = require('./pushNotifications')
 
 function initSocket(httpServer) {
   const io = new Server(httpServer, {
-    cors: { origin: '*' },
+    cors: {
+      origin: [
+        'exp://localhost:8081',
+        'http://localhost:8081',
+        'https://velve.app',
+      ],
+      credentials: true,
+    },
   })
 
   // Auth middleware: verify Firebase token on connection
@@ -37,6 +46,11 @@ function initSocket(httpServer) {
     // Join a chat room
     socket.on('join_chat', async (chatId) => {
       try {
+        // Validate ObjectId
+        if (!mongoose.Types.ObjectId.isValid(chatId)) {
+          return
+        }
+
         const chat = await Chat.findById(chatId).lean()
         if (!chat) return
 
@@ -65,21 +79,25 @@ function initSocket(httpServer) {
         const isParticipant = chat.participants.some((p) => p.toString() === socket.userId)
         if (!isParticipant) return
 
-        const message = {
+        // Create Message document
+        const message = await Message.create({
+          chatId,
           senderId: socket.dbUser._id,
           text: text.trim().slice(0, 1000),
-          createdAt: new Date(),
-        }
+        })
 
-        chat.messages.push(message)
-        await chat.save()
+        // Update chat's lastMessageAt
+        await Chat.findByIdAndUpdate(chatId, { lastMessageAt: message.createdAt })
 
-        // Broadcast to all in the chat room
+        // Broadcast to all in the chat room with populated sender info
         io.to(`chat:${chatId}`).emit('new_message', {
           chatId,
           message: {
-            ...message,
-            senderId: { _id: socket.dbUser._id, displayName: socket.dbUser.displayName },
+            _id: message._id,
+            chatId: message.chatId,
+            senderId: { _id: socket.dbUser._id, displayName: socket.dbUser.displayName, photoURL: socket.dbUser.photoURL },
+            text: message.text,
+            createdAt: message.createdAt,
           },
         })
 

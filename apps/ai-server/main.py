@@ -7,12 +7,17 @@ import numpy as np
 import faiss
 import threading
 import io
+import pickle
 
 load_dotenv()
 
 app = FastAPI(title="Velve AI Server")
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+
+# FAISS persistence paths
+FAISS_INDEX_PATH = "data/faiss_index.bin"
+FAISS_IDS_PATH = "data/faiss_ids.pkl"
 
 # ---------------------------------------------------------------------------
 # CLIP model (loaded lazily on first request)
@@ -36,11 +41,51 @@ def get_clip():
 
 
 # ---------------------------------------------------------------------------
-# FAISS index (in-memory, rebuilt from /index endpoint)
+# FAISS index (persisted to disk)
 # ---------------------------------------------------------------------------
 faiss_index = None
 faiss_ids = []  # maps FAISS position -> item_id string
 faiss_lock = threading.Lock()
+
+
+def load_faiss_index():
+    """Load FAISS index and IDs from disk if they exist"""
+    global faiss_index, faiss_ids
+    try:
+        if os.path.exists(FAISS_INDEX_PATH) and os.path.exists(FAISS_IDS_PATH):
+            with faiss_lock:
+                faiss_index = faiss.read_index(FAISS_INDEX_PATH)
+                with open(FAISS_IDS_PATH, "rb") as f:
+                    faiss_ids = pickle.load(f)
+            print(f"[FAISS] Loaded index with {len(faiss_ids)} items from disk")
+        else:
+            print("[FAISS] No persisted index found, starting fresh")
+    except Exception as e:
+        print(f"[FAISS] Failed to load index from disk: {e}")
+
+
+def save_faiss_index():
+    """Save FAISS index and IDs to disk"""
+    try:
+        os.makedirs("data", exist_ok=True)
+        with faiss_lock:
+            if faiss_index is not None:
+                faiss.write_index(faiss_index, FAISS_INDEX_PATH)
+                with open(FAISS_IDS_PATH, "wb") as f:
+                    pickle.dump(faiss_ids, f)
+        print(f"[FAISS] Saved index with {len(faiss_ids)} items to disk")
+    except Exception as e:
+        print(f"[FAISS] Failed to save index to disk: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Startup event - load FAISS index from disk
+# ---------------------------------------------------------------------------
+@app.on_event("startup")
+def startup_event():
+    print("[AI Server] Starting up...")
+    load_faiss_index()
+    print("[AI Server] Ready")
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +209,7 @@ def rebuild_index(req: IndexRequest):
         with faiss_lock:
             faiss_index = None
             faiss_ids = []
+        save_faiss_index()
         return {"ok": True, "indexed": 0}
 
     dim = len(req.items[0].embedding)
@@ -176,6 +222,9 @@ def rebuild_index(req: IndexRequest):
     with faiss_lock:
         faiss_index = index
         faiss_ids = ids
+
+    # Persist to disk
+    save_faiss_index()
 
     return {"ok": True, "indexed": len(ids)}
 

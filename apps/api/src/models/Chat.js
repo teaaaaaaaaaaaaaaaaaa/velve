@@ -1,18 +1,15 @@
 const mongoose = require('mongoose')
 
-const messageSchema = new mongoose.Schema({
-  senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  text: { type: String, required: true },
-  createdAt: { type: Date, default: Date.now },
-})
-
 const chatSchema = new mongoose.Schema(
   {
     participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    messages: [messageSchema],
     tradeRequestId: { type: mongoose.Schema.Types.ObjectId, ref: 'TradeRequest' },
+    lastMessageAt: { type: Date }, // Track last message time for sorting
   },
   { timestamps: true }
 )
+
+// Index for fetching user's chats sorted by recent activity
+chatSchema.index({ participants: 1, updatedAt: -1 })
 
 module.exports = mongoose.model('Chat', chatSchema)

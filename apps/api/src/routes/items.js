@@ -27,7 +27,7 @@ function generateEmbeddingAsync(itemId, imageUrl) {
 router.get('/', async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 20, 50)
-    const query = {}
+    const query = { status: 'available', isDeleted: false }
 
     // Cursor-based pagination: items older than cursor
     if (req.query.cursor) {
@@ -66,7 +66,7 @@ router.get('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid item ID' })
     }
 
-    const item = await Item.findById(req.params.id)
+    const item = await Item.findOne({ _id: req.params.id, isDeleted: false })
       .populate('userId', 'displayName photoURL')
       .lean()
 
@@ -144,7 +144,7 @@ router.get('/:id/similar', async (req, res) => {
     const result = await response.json()
 
     const similarIds = (result.results || []).map((r) => r.item_id)
-    const similarItems = await Item.find({ _id: { $in: similarIds } })
+    const similarItems = await Item.find({ _id: { $in: similarIds }, status: 'available', isDeleted: false })
       .populate('userId', 'displayName photoURL')
       .lean()
 
@@ -197,14 +197,14 @@ router.put('/:id', requireAuth, async (req, res) => {
   }
 })
 
-// DELETE /api/items/:id — brisanje itema (samo vlasnik)
+// DELETE /api/items/:id — soft delete itema (samo vlasnik)
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ error: 'Invalid item ID' })
     }
 
-    const item = await Item.findById(req.params.id)
+    const item = await Item.findOne({ _id: req.params.id, isDeleted: false })
     if (!item) {
       return res.status(404).json({ error: 'Item not found' })
     }
@@ -213,7 +213,12 @@ router.delete('/:id', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to delete this item' })
     }
 
-    await Item.findByIdAndDelete(req.params.id)
+    // Soft delete: mark as deleted instead of removing from DB
+    await Item.findByIdAndUpdate(req.params.id, {
+      isDeleted: true,
+      deletedAt: new Date(),
+    })
+
     res.json({ ok: true, message: 'Item deleted' })
   } catch (err) {
     res.status(500).json({ error: err.message })
