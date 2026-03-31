@@ -3,6 +3,7 @@ const mongoose = require('mongoose')
 const router = express.Router()
 const { requireAuth } = require('../middleware/auth')
 const Item = require('../models/Item')
+const { sanitizeInput } = require('../lib/sanitize')
 
 const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:8000'
 
@@ -36,9 +37,9 @@ router.get('/', async (req, res) => {
       query._id = { $lt: req.query.cursor }
     }
 
-    // Optional category filter
+    // Optional category filter (sanitized against NoSQL injection)
     if (req.query.category) {
-      query.category = req.query.category
+      query.category = sanitizeInput(req.query.category)
     }
 
     const items = await Item.find(query)
@@ -84,8 +85,8 @@ router.post('/', requireAuth, async (req, res) => {
   try {
     const { title, description, category, brand, size, condition, images } = req.body
 
-    if (!title || !category || !condition) {
-      return res.status(400).json({ error: 'title, category, and condition are required' })
+    if (!title || typeof title !== 'string' || !category || typeof category !== 'string' || !condition || typeof condition !== 'string') {
+      return res.status(400).json({ error: 'title, category, and condition are required (strings)' })
     }
 
     const validConditions = ['new', 'like_new', 'good', 'fair']
@@ -93,15 +94,18 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(400).json({ error: `condition must be one of: ${validConditions.join(', ')}` })
     }
 
+    // Validate images array
+    const imageList = Array.isArray(images) ? images.filter((u) => typeof u === 'string').slice(0, 5) : []
+
     const item = await Item.create({
       userId: req.dbUser._id,
-      title: title.slice(0, 100),
-      description: (description || '').slice(0, 500),
-      category,
-      brand: brand || '',
-      size: size || '',
+      title: String(title).slice(0, 100),
+      description: String(description || '').slice(0, 500),
+      category: String(category).slice(0, 50),
+      brand: String(brand || '').slice(0, 50),
+      size: String(size || '').slice(0, 20),
       condition,
-      images: images || [],
+      images: imageList,
     })
 
     // Generate CLIP embedding in background (non-blocking)
@@ -166,17 +170,18 @@ router.put('/:id', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to edit this item' })
     }
 
-    const allowed = ['title', 'description', 'category', 'brand', 'size', 'condition', 'images']
+    const allowed = { title: 100, description: 500, category: 50, brand: 50, size: 20 }
     const updates = {}
-    for (const key of allowed) {
+    for (const [key, maxLen] of Object.entries(allowed)) {
       if (req.body[key] !== undefined) {
-        updates[key] = req.body[key]
+        updates[key] = String(req.body[key]).slice(0, maxLen)
       }
     }
-
-    // Enforce length limits
-    if (updates.title) updates.title = updates.title.slice(0, 100)
-    if (updates.description) updates.description = updates.description.slice(0, 500)
+    if (req.body.images !== undefined) {
+      updates.images = Array.isArray(req.body.images)
+        ? req.body.images.filter((u) => typeof u === 'string').slice(0, 5)
+        : []
+    }
 
     if (updates.condition) {
       const validConditions = ['new', 'like_new', 'good', 'fair']

@@ -48,6 +48,21 @@ router.put('/me', requireAuth, async (req, res) => {
   }
 })
 
+// PUT /api/users/me/push-token — registruj Expo push token
+router.put('/me/push-token', requireAuth, async (req, res) => {
+  try {
+    const { token } = req.body
+    if (!token) {
+      return res.status(400).json({ error: 'token is required' })
+    }
+
+    await User.findByIdAndUpdate(req.dbUser._id, { expoPushToken: token })
+    res.json({ ok: true, message: 'Push token saved' })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // GET /api/users/:id — javni profil korisnika
 router.get('/:id', async (req, res) => {
   try {

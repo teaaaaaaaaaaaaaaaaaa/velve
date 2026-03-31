@@ -4,6 +4,7 @@ const path = require('path')
 const multer = require('multer')
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
 const { requireAuth } = require('../middleware/auth')
+const { uploadLimiter } = require('../middleware/rateLimit')
 
 const router = express.Router()
 
@@ -32,7 +33,7 @@ const s3 = new S3Client({
 })
 
 // POST /api/upload — upload image to Cloudflare R2
-router.post('/', requireAuth, upload.single('image'), async (req, res) => {
+router.post('/', uploadLimiter, requireAuth, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file provided' })
