@@ -8,6 +8,11 @@ const itemsRouter = require('./routes/items')
 const feedRouter = require('./routes/feed')
 const chatRouter = require('./routes/chat')
 const tradesRouter = require('./routes/trades')
+const uploadRouter = require('./routes/upload')
+const usersRouter = require('./routes/users')
+const likesRouter = require('./routes/likes')
+const followsRouter = require('./routes/follows')
+const aiRouter = require('./routes/ai')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -24,9 +29,14 @@ app.get('/ping', (req, res) => {
 
 // Routes
 app.use('/api/items', itemsRouter)
+app.use('/api/items', likesRouter)      // /api/items/:id/like
 app.use('/api/feed', feedRouter)
 app.use('/api/chat', chatRouter)
 app.use('/api/trades', tradesRouter)
+app.use('/api/upload', uploadRouter)
+app.use('/api/users', usersRouter)
+app.use('/api/users', followsRouter)    // /api/users/:id/follow
+app.use('/api/ai', aiRouter)
 
 // MongoDB connection
 mongoose
