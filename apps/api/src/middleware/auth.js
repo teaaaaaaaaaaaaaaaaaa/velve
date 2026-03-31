@@ -1,4 +1,5 @@
 const admin = require('firebase-admin')
+const User = require('../models/User')
 
 // Initialize Firebase Admin SDK once
 if (!admin.apps.length) {
@@ -14,6 +15,8 @@ if (!admin.apps.length) {
 /**
  * Middleware: verifikuje Firebase ID token iz Authorization headera.
  * Attachuje dekodovani token na req.user.
+ * Auto-kreira MongoDB User dokument pri prvom loginu (ensureUser).
+ * Attachuje MongoDB user na req.dbUser.
  */
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization
@@ -25,6 +28,19 @@ async function requireAuth(req, res, next) {
   try {
     const decoded = await admin.auth().verifyIdToken(token)
     req.user = decoded
+
+    // ensureUser: find or create MongoDB user from Firebase UID
+    let dbUser = await User.findOne({ firebaseUid: decoded.uid })
+    if (!dbUser) {
+      dbUser = await User.create({
+        firebaseUid: decoded.uid,
+        email: decoded.email || '',
+        displayName: decoded.name || '',
+        photoURL: decoded.picture || '',
+      })
+    }
+    req.dbUser = dbUser
+
     next()
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired token' })

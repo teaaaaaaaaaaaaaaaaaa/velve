@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema(
     displayName: { type: String, default: '' },
     photoURL: { type: String, default: '' },
     bio: { type: String, default: '' },
+    expoPushToken: { type: String, default: '' },
   },
   { timestamps: true }
 )

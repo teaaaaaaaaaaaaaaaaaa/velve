@@ -77,7 +77,7 @@ curl -fsSL https://ollama.com/install.sh | sh
 # Preuzmi model (~5GB, samo jednom)
 ollama pull qwen2.5:7b
 ```
-
+ 
 Provjeri da radi:
 ```bash
 ollama run qwen2.5:7b "Zdravo"
