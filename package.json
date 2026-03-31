@@ -10,5 +10,8 @@
     "dev:mobile": "npm run start --workspace=apps/mobile",
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:ai": "npm run dev --workspace=apps/ai-server"
+  },
+  "devDependencies": {
+    "expo": "~54.0.0"
   }
 }

@@ -4,7 +4,6 @@
     "slug": "velve",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "scheme": "velve",
     "userInterfaceStyle": "light",
     "splash": {
@@ -15,10 +14,6 @@
       "bundleIdentifier": "com.velve.app"
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#431A43"
-      },
       "package": "com.velve.app"
     },
     "web": {
@@ -27,7 +22,7 @@
     },
     "plugins": [
       "expo-router",
-      "expo-auth-session"
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

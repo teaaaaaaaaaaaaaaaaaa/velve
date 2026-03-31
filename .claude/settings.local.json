@@ -2,7 +2,23 @@
   "permissions": {
     "allow": [
       "Bash(cd:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(test:*)",
+      "Bash(npx expo start --clear)",
+      "Bash(npm remove:*)",
+      "Bash(npx expo install:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(powershell.exe -Command:*)",
+      "Bash(ipconfig:*)",
+      "Bash(npx expo start:*)",
+      "Bash(npx expo-doctor:*)",
+      "Bash(npx expo --version)",
+      "Bash(dir:*)",
+      "Bash(Test-Path \"c:\\\\Users\\\\Vukasin\\\\Documents\\\\git projekti\\\\velve\\\\apps\\\\mobile\\\\node_modules\")",
+      "Bash(Test-Path \"c:\\\\Users\\\\Vukasin\\\\Documents\\\\git projekti\\\\velve\\\\apps\\\\mobile\\\\node_modules\\\\expo\")",
+      "Bash(npm run dev:mobile:*)"
     ]
   }
 }
