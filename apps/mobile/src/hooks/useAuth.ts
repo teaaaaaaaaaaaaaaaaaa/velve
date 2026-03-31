@@ -3,6 +3,7 @@ import {
   getAuth,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut,
   GoogleAuthProvider,
   signInWithCredential,
@@ -39,9 +40,13 @@ export function useAuth() {
     return signInWithEmailAndPassword(auth, email, password)
   }
 
+  async function registerWithEmail(email: string, password: string) {
+    return createUserWithEmailAndPassword(auth, email, password)
+  }
+
   async function logout() {
     return signOut(auth)
   }
 
-  return { currentUser, loading, signInWithGoogle, signInWithEmail, logout }
+  return { currentUser, loading, signInWithGoogle, signInWithEmail, registerWithEmail, logout }
 }
