@@ -1,12 +1,13 @@
 import { Tabs } from 'expo-router'
 
 export default function TabsLayout() {
+  console.log('[TabsLayout] Rendering tabs')
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          // Glassmorphism — biće dorađeno u Nedelji 1
           backgroundColor: 'rgba(246, 248, 237, 0.85)',
           borderTopColor: 'rgba(246, 248, 237, 0.2)',
           elevation: 0,
@@ -31,9 +32,14 @@ export default function TabsLayout() {
         name="profile"
         options={{ title: 'Profil', tabBarIcon: () => null }}
       />
+      {/* Sakrij chat rute iz tab bar-a */}
       <Tabs.Screen
-        name="chat"
-        options={{ title: 'Chat', tabBarIcon: () => null }}
+        name="chat/index"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="chat/[id]"
+        options={{ href: null }}
       />
     </Tabs>
   )

@@ -18,7 +18,10 @@
       "Bash(dir:*)",
       "Bash(Test-Path \"c:\\\\Users\\\\Vukasin\\\\Documents\\\\git projekti\\\\velve\\\\apps\\\\mobile\\\\node_modules\")",
       "Bash(Test-Path \"c:\\\\Users\\\\Vukasin\\\\Documents\\\\git projekti\\\\velve\\\\apps\\\\mobile\\\\node_modules\\\\expo\")",
-      "Bash(npm run dev:mobile:*)"
+      "Bash(npm run dev:mobile:*)",
+      "Bash(timeout /t:*)",
+      "Bash(ping:*)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }

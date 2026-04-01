@@ -43,6 +43,7 @@ interface Item {
 }
 
 export default function ProfileScreen() {
+  console.log('[ProfileScreen] Rendering')
   const router = useRouter()
   const { currentUser, logout } = useAuth()
 
@@ -59,8 +60,10 @@ export default function ProfileScreen() {
   const [editPhotoURL, setEditPhotoURL] = useState('')
 
   const fetchProfile = async () => {
+    console.log('[ProfileScreen] fetchProfile called')
     try {
       const response = await client.get('/api/users/me')
+      console.log('[ProfileScreen] fetchProfile response:', response.data.ok)
       if (response.data.ok) {
         setProfile(response.data.data)
         setEditDisplayName(response.data.data.displayName)
@@ -68,11 +71,13 @@ export default function ProfileScreen() {
         setEditPhotoURL(response.data.data.photoURL)
       }
     } catch (error: any) {
+      console.log('[ProfileScreen] fetchProfile error:', error.message, error.response?.status)
       Alert.alert('Greška', error.response?.data?.message || 'Nije moguće učitati profil')
     }
   }
 
   const fetchItems = async () => {
+    console.log('[ProfileScreen] fetchItems called')
     try {
       const response = await client.get('/api/items', {
         params: { userId: profile?._id },

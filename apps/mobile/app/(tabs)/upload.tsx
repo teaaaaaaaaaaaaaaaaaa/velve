@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
-import client from '../../api/client'
+import client from '@/api/client'
 import axios from 'axios'
 
 type Condition = 'new' | 'like_new' | 'good' | 'fair'
@@ -33,6 +33,7 @@ const CONDITIONS: { value: Condition; label: string }[] = [
 ]
 
 export default function UploadScreen() {
+  console.log('[UploadScreen] Rendering')
   const router = useRouter()
 
   // Image state

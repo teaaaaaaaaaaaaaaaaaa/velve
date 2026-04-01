@@ -15,8 +15,8 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../../hooks/useAuth';
-import client from '../../api/client';
+import { useAuth } from '@/hooks/useAuth';
+import client from '@/api/client';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -64,6 +64,7 @@ const CONDITION_COLORS = {
 
 export default function ItemDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  console.log('[ItemDetailsScreen] Rendering, id:', id);
   const router = useRouter();
   const { currentUser } = useAuth();
 
@@ -88,6 +89,7 @@ export default function ItemDetailsScreen() {
   }, [id]);
 
   const fetchItemDetails = async () => {
+    console.log('[ItemDetailsScreen] fetchItemDetails called, id:', id);
     try {
       setLoading(true);
       const response = await client.get(`/api/items/${id}`);

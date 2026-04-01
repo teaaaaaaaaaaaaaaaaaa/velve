@@ -8,6 +8,7 @@ function validateEmail(email: string) {
 }
 
 export default function RegisterScreen() {
+  console.log('[RegisterScreen] Rendering')
   const router = useRouter()
   const { registerWithEmail } = useAuth()
 
@@ -17,6 +18,7 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false)
 
   async function handleRegister() {
+    console.log('[RegisterScreen] handleRegister called with:', email)
     setError('')
 
     if (!validateEmail(email)) {
@@ -31,8 +33,10 @@ export default function RegisterScreen() {
     setLoading(true)
     try {
       await registerWithEmail(email, password)
+      console.log('[RegisterScreen] Registration successful')
       // Root layout automatski redirectuje na /(tabs)/feed nakon uspešnog login-a
     } catch (e: any) {
+      console.log('[RegisterScreen] Registration error:', e.code, e.message)
       if (e.code === 'auth/email-already-in-use') {
         setError('Ovaj email je već registrovan.')
       } else if (e.code === 'auth/invalid-email') {

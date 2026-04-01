@@ -17,7 +17,7 @@ import Animated, {
   withSpring,
   withSequence,
 } from 'react-native-reanimated'
-import client from '../../api/client'
+import client from '@/api/client'
 
 type Item = {
   _id: string
@@ -46,6 +46,7 @@ type FeedResponse = {
 }
 
 export default function FeedScreen() {
+  console.log('[FeedScreen] Rendering')
   const router = useRouter()
   const [items, setItems] = useState<Item[]>([])
   const [page, setPage] = useState(0)
@@ -55,6 +56,7 @@ export default function FeedScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   const fetchFeed = async (pageNum: number, isRefresh = false) => {
+    console.log('[FeedScreen] fetchFeed called, page:', pageNum, 'isRefresh:', isRefresh)
     try {
       if (isRefresh) {
         setIsRefreshing(true)
@@ -78,6 +80,7 @@ export default function FeedScreen() {
         setPage(response.data.page)
       }
     } catch (error: any) {
+      console.log('[FeedScreen] fetchFeed error:', error.message, error.response?.status)
       Alert.alert(
         'Greška',
         error.response?.data?.message || 'Nije moguće učitati feed.'
