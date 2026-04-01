@@ -63,6 +63,54 @@ router.put('/me/push-token', requireAuth, async (req, res) => {
   }
 })
 
+// PUT /api/users/me/onboarding — završi onboarding proces
+router.put('/me/onboarding', requireAuth, async (req, res) => {
+  try {
+    const {
+      stylePreferences,
+      favoriteBrands,
+      categories,
+      sizes,
+      location,
+    } = req.body
+
+    const updates = {
+      onboardingCompleted: true,
+    }
+
+    if (Array.isArray(stylePreferences)) {
+      updates.stylePreferences = stylePreferences.slice(0, 20)
+    }
+
+    if (Array.isArray(favoriteBrands)) {
+      updates.favoriteBrands = favoriteBrands.slice(0, 20)
+    }
+
+    if (Array.isArray(categories)) {
+      updates.categories = categories.slice(0, 20)
+    }
+
+    if (sizes && typeof sizes === 'object') {
+      updates.sizes = {
+        clothing: sizes.clothing ? String(sizes.clothing).slice(0, 10) : '',
+        shoes: sizes.shoes ? String(sizes.shoes).slice(0, 10) : '',
+      }
+    }
+
+    if (location && typeof location === 'object') {
+      updates.location = {
+        city: location.city ? String(location.city).slice(0, 100) : '',
+        region: location.region ? String(location.region).slice(0, 100) : '',
+      }
+    }
+
+    const updated = await User.findByIdAndUpdate(req.dbUser._id, updates, { new: true })
+    res.json({ ok: true, data: updated })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // GET /api/users/:id — javni profil korisnika
 router.get('/:id', async (req, res) => {
   try {

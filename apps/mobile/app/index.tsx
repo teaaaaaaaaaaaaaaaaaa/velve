@@ -1,28 +1,58 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { View, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '@/hooks/useAuth'
+import client from '@/api/client'
 
 export default function Index() {
   console.log('[Index] Rendering')
-  const { currentUser, loading } = useAuth()
+  const { currentUser, loading: authLoading } = useAuth()
   const router = useRouter()
+  const [checkingOnboarding, setCheckingOnboarding] = useState(false)
 
   useEffect(() => {
-    console.log('[Index] Auth check:', { user: !!currentUser, loading })
-    if (loading) return
+    async function checkOnboardingStatus() {
+      console.log('[Index] Auth check:', { user: !!currentUser, loading: authLoading })
+      if (authLoading) return
 
-    if (currentUser) {
-      console.log('[Index] User logged in, redirecting to feed')
-      router.replace('/(tabs)/feed')
-    } else {
-      console.log('[Index] No user, redirecting to login')
-      router.replace('/(auth)/login')
+      if (currentUser) {
+        try {
+          setCheckingOnboarding(true)
+          console.log('[Index] Checking onboarding status...')
+
+          // Fetch user profile to check onboarding status
+          const response = await client.get('/api/users/me')
+          const userData = response.data?.data || response.data
+          const onboardingCompleted = userData?.onboardingCompleted || false
+
+          console.log('[Index] Onboarding completed:', onboardingCompleted)
+
+          if (onboardingCompleted) {
+            console.log('[Index] User logged in, redirecting to feed')
+            router.replace('/(tabs)/feed')
+          } else {
+            console.log('[Index] Onboarding not completed, redirecting to onboarding')
+            router.replace('/onboarding/welcome')
+          }
+        } catch (error) {
+          console.error('[Index] Error checking onboarding:', error)
+          // If error, assume onboarding needed
+          console.log('[Index] Error occurred, redirecting to onboarding')
+          router.replace('/onboarding/welcome')
+        } finally {
+          setCheckingOnboarding(false)
+        }
+      } else {
+        console.log('[Index] No user, redirecting to login')
+        router.replace('/(auth)/login')
+      }
     }
-  }, [currentUser, loading])
+
+    checkOnboardingStatus()
+  }, [currentUser, authLoading])
 
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F6F8ED' }}>
+    <View className="flex-1 items-center justify-center bg-base-canvas">
       <ActivityIndicator size="large" color="#431A43" />
     </View>
   )

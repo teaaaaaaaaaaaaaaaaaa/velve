@@ -159,6 +159,17 @@ export default function ItemDetailsScreen() {
     }
   };
 
+  // Check if the current user owns this item
+  const isOwnItem = () => {
+    if (!currentUser || !item) return false;
+
+    if (typeof item.userId === 'object' && item.userId !== null) {
+      return item.userId._id === currentUser.uid;
+    }
+
+    return item.userId === currentUser.uid;
+  };
+
   const handleOpenTradeModal = async () => {
     setShowTradeModal(true);
     await fetchUserItems();
@@ -295,7 +306,7 @@ export default function ItemDetailsScreen() {
           </Text>
 
           {/* Owner Info */}
-          {item.userId && typeof item.userId === 'object' && (
+          {typeof item.userId === 'object' && item.userId && (
             <TouchableOpacity
               className="flex-row items-center mb-6"
               activeOpacity={0.7}
@@ -379,18 +390,20 @@ export default function ItemDetailsScreen() {
             />
           </TouchableOpacity>
 
-          {/* Wishlist Button */}
-          <TouchableOpacity
-            onPress={handleWishlist}
-            className="border border-ink-dark rounded-full p-3 mr-3"
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={isWishlisted ? 'bookmark' : 'bookmark-outline'}
-              size={24}
-              color={isWishlisted ? '#431A43' : '#2B2A2B'}
-            />
-          </TouchableOpacity>
+          {/* Wishlist Button - Hidden for own items */}
+          {!isOwnItem() && (
+            <TouchableOpacity
+              onPress={handleWishlist}
+              className="border border-ink-dark rounded-full p-3 mr-3"
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={isWishlisted ? 'bookmark' : 'bookmark-outline'}
+                size={24}
+                color={isWishlisted ? '#431A43' : '#2B2A2B'}
+              />
+            </TouchableOpacity>
+          )}
 
           {/* Trade Button */}
           <TouchableOpacity

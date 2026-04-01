@@ -14,6 +14,20 @@ const userSchema = new mongoose.Schema(
     averageRating: { type: Number, default: 0, min: 0, max: 5 },
     totalRatings: { type: Number, default: 0 },
     completedTrades: { type: Number, default: 0 },
+
+    // Onboarding fields
+    onboardingCompleted: { type: Boolean, default: false },
+    stylePreferences: { type: [String], default: [] },
+    favoriteBrands: { type: [String], default: [] },
+    categories: { type: [String], default: [] },
+    sizes: {
+      clothing: { type: String, default: '' },
+      shoes: { type: String, default: '' },
+    },
+    location: {
+      city: { type: String, default: '' },
+      region: { type: String, default: '' },
+    },
   },
   { timestamps: true }
 )
