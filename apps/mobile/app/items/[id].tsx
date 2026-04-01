@@ -35,7 +35,7 @@ interface Item {
   size: string;
   condition: 'new' | 'like_new' | 'good' | 'fair';
   images: string[];
-  currentUserId: ItemOwner;
+  userId: ItemOwner | string;
   createdAt: string;
   isLiked?: boolean;
   isWishlisted?: boolean;
@@ -295,19 +295,20 @@ export default function ItemDetailsScreen() {
           </Text>
 
           {/* Owner Info */}
-          <TouchableOpacity
-            className="flex-row items-center mb-6"
-            activeOpacity={0.7}
-            // Placeholder - profile navigation will be implemented later
-          >
-            <Image
-              source={{ uri: item.currentUserId.photoURL || 'https://via.placeholder.com/40' }}
-              className="w-10 h-10 rounded-full mr-3"
-            />
-            <Text className="font-sans text-base text-ink-dark">
-              {item.currentUserId.displayName}
-            </Text>
-          </TouchableOpacity>
+          {item.userId && typeof item.userId === 'object' && (
+            <TouchableOpacity
+              className="flex-row items-center mb-6"
+              activeOpacity={0.7}
+            >
+              <Image
+                source={{ uri: item.userId.photoURL || 'https://via.placeholder.com/40' }}
+                className="w-10 h-10 rounded-full mr-3"
+              />
+              <Text className="font-sans text-base text-ink-dark">
+                {item.userId.displayName}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           {/* Details Row */}
           <View className="flex-row flex-wrap mb-6">

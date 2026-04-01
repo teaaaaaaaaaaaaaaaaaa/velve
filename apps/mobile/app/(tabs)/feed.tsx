@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   View,
   Text,
@@ -8,15 +8,10 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
+  Animated,
 } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { useRouter } from 'expo-router'
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withSequence,
-} from 'react-native-reanimated'
 import client from '@/api/client'
 
 type Item = {
@@ -46,7 +41,6 @@ type FeedResponse = {
 }
 
 export default function FeedScreen() {
-  console.log('[FeedScreen] Rendering')
   const router = useRouter()
   const [items, setItems] = useState<Item[]>([])
   const [page, setPage] = useState(0)
@@ -56,7 +50,6 @@ export default function FeedScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   const fetchFeed = async (pageNum: number, isRefresh = false) => {
-    console.log('[FeedScreen] fetchFeed called, page:', pageNum, 'isRefresh:', isRefresh)
     try {
       if (isRefresh) {
         setIsRefreshing(true)
@@ -80,10 +73,9 @@ export default function FeedScreen() {
         setPage(response.data.page)
       }
     } catch (error: any) {
-      console.log('[FeedScreen] fetchFeed error:', error.message, error.response?.status)
       Alert.alert(
-        'Greška',
-        error.response?.data?.message || 'Nije moguće učitati feed.'
+        'Greska',
+        error.response?.data?.message || 'Nije moguce ucitati feed.'
       )
     } finally {
       setIsLoading(false)
@@ -109,7 +101,6 @@ export default function FeedScreen() {
   const handleLike = async (itemId: string) => {
     try {
       await client.post(`/api/items/${itemId}/like`)
-      // Ažuriraj lokalni state
       setItems((prev) =>
         prev.map((item) =>
           item._id === itemId
@@ -124,7 +115,7 @@ export default function FeedScreen() {
         )
       )
     } catch (error: any) {
-      Alert.alert('Greška', 'Nije moguće lajkovati item.')
+      Alert.alert('Greska', 'Nije moguce lajkovati item.')
     }
   }
 
@@ -169,6 +160,23 @@ export default function FeedScreen() {
     return renderSkeleton()
   }
 
+  if (items.length === 0) {
+    return (
+      <View className="flex-1 bg-base-canvas justify-center items-center px-6">
+        <Text className="font-display text-ink-dark text-2xl mb-2">Feed je prazan</Text>
+        <Text className="font-sans text-ink-dark opacity-60 text-center mb-6">
+          Budi prvi koji ce dodati garderobu!
+        </Text>
+        <TouchableOpacity
+          onPress={handleRefresh}
+          className="bg-brand-accent-deep rounded-full py-4 px-8"
+        >
+          <Text className="font-sans text-base-canvas font-semibold">Osvezi</Text>
+        </TouchableOpacity>
+      </View>
+    )
+  }
+
   return (
     <View className="flex-1 bg-base-canvas">
       <FlashList
@@ -198,52 +206,41 @@ type ItemCardProps = {
 }
 
 function ItemCard({ item, onLike, onPress }: ItemCardProps) {
-  const scale = useSharedValue(1)
-  const heartScale = useSharedValue(0)
+  const scale = useRef(new Animated.Value(1)).current
+  const heartScale = useRef(new Animated.Value(0)).current
   const [lastTap, setLastTap] = useState(0)
 
   const handleDoubleTap = () => {
     const now = Date.now()
     if (now - lastTap < 300) {
-      // Dupli tap
       onLike()
-      // Animacija srca
-      heartScale.value = withSequence(
-        withSpring(1.2, { damping: 10 }),
-        withSpring(0, { damping: 10 })
-      )
+      Animated.sequence([
+        Animated.spring(heartScale, { toValue: 1.2, useNativeDriver: true }),
+        Animated.spring(heartScale, { toValue: 0, useNativeDriver: true }),
+      ]).start()
     }
     setLastTap(now)
   }
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.98)
+    Animated.spring(scale, { toValue: 0.98, useNativeDriver: true }).start()
   }
 
   const handlePressOut = () => {
-    scale.value = withSpring(1)
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start()
   }
-
-  const cardStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }))
-
-  const heartStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: heartScale.value }],
-    opacity: heartScale.value,
-  }))
 
   const heroImage = item.images[0] || 'https://via.placeholder.com/400'
 
   return (
-    <Animated.View style={cardStyle}>
+    <Animated.View style={{ transform: [{ scale }] }}>
       <Pressable
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         className="bg-white rounded-2xl mb-4 overflow-hidden shadow-sm"
       >
-        {/* Hero slika sa dupli-tapDetektorom */}
+        {/* Hero slika sa dupli-tap detektorom */}
         <Pressable onPress={handleDoubleTap} className="relative">
           <Image
             source={{ uri: heroImage }}
@@ -252,8 +249,15 @@ function ItemCard({ item, onLike, onPress }: ItemCardProps) {
           />
           {/* Animirano srce za dupli tap */}
           <Animated.View
-            style={heartStyle}
-            className="absolute inset-0 justify-center items-center pointer-events-none"
+            style={{
+              transform: [{ scale: heartScale }],
+              opacity: heartScale,
+              position: 'absolute',
+              top: 0, left: 0, right: 0, bottom: 0,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+            pointerEvents="none"
           >
             <View className="w-24 h-24 bg-white rounded-full justify-center items-center opacity-90">
               <Text className="text-6xl">❤️</Text>
@@ -263,33 +267,27 @@ function ItemCard({ item, onLike, onPress }: ItemCardProps) {
 
         {/* Item Info */}
         <View className="p-4">
-          {/* Naslov */}
           <Text className="font-display text-ink-dark text-lg mb-1" numberOfLines={1}>
             {item.title}
           </Text>
 
-          {/* Brend i veličina */}
           <Text className="font-sans text-ink-dark opacity-60 text-sm mb-3">
             {item.brand} • {item.size.toUpperCase()}
           </Text>
 
-          {/* Avatar, ime, like dugme */}
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center flex-1">
-              {/* Avatar */}
               <Image
                 source={{
                   uri: item.userId.photoURL || 'https://via.placeholder.com/30',
                 }}
                 className="w-8 h-8 rounded-full mr-2"
               />
-              {/* Ime */}
               <Text className="font-sans text-ink-dark text-sm" numberOfLines={1}>
                 {item.userId.displayName}
               </Text>
             </View>
 
-            {/* Like dugme */}
             <TouchableOpacity
               onPress={onLike}
               className={`flex-row items-center px-3 py-2 rounded-full ${

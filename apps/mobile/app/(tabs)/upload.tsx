@@ -8,11 +8,12 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
 import client from '@/api/client'
-import axios from 'axios'
 
 type Condition = 'new' | 'like_new' | 'good' | 'fair'
 
@@ -21,7 +22,7 @@ const CATEGORIES = [
   'Majice',
   'Pantalone',
   'Jakne',
-  'Obuća',
+  'Obuca',
   'Dodaci',
 ]
 
@@ -33,11 +34,11 @@ const CONDITIONS: { value: Condition; label: string }[] = [
 ]
 
 export default function UploadScreen() {
-  console.log('[UploadScreen] Rendering')
   const router = useRouter()
 
   // Image state
   const [images, setImages] = useState<string[]>([])
+  const [uploadedUrls, setUploadedUrls] = useState<string[]>([])
 
   // Form state
   const [category, setCategory] = useState<string>('')
@@ -53,12 +54,11 @@ export default function UploadScreen() {
 
   // Loading states
   const [isGeneratingAI, setIsGeneratingAI] = useState(false)
-  const [isSubmitting, setIsSubmittingFinal] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Image picker handlers
   const pickImageFromCamera = async () => {
     if (images.length >= 5) {
-      Alert.alert('Limit', 'Možete dodati maksimalno 5 slika')
+      Alert.alert('Limit', 'Mozete dodati maksimalno 5 slika')
       return
     }
 
@@ -69,7 +69,7 @@ export default function UploadScreen() {
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [3, 4],
       quality: 0.8,
@@ -82,7 +82,7 @@ export default function UploadScreen() {
 
   const pickImageFromGallery = async () => {
     if (images.length >= 5) {
-      Alert.alert('Limit', 'Možete dodati maksimalno 5 slika')
+      Alert.alert('Limit', 'Mozete dodati maksimalno 5 slika')
       return
     }
 
@@ -94,9 +94,7 @@ export default function UploadScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [3, 4],
+      mediaTypes: ['images'],
       quality: 0.8,
       allowsMultipleSelection: true,
       selectionLimit: 5 - images.length,
@@ -112,15 +110,13 @@ export default function UploadScreen() {
     setImages(images.filter((_, i) => i !== index))
   }
 
-  // Validation & Submit Flow
   const handleGenerateDescription = async () => {
-    // Validacija
     if (images.length === 0) {
-      Alert.alert('Greška', 'Dodajte bar jednu sliku')
+      Alert.alert('Greska', 'Dodajte bar jednu sliku')
       return
     }
     if (!category) {
-      Alert.alert('Greška', 'Izaberite kategoriju')
+      Alert.alert('Greska', 'Izaberite kategoriju')
       return
     }
 
@@ -128,7 +124,7 @@ export default function UploadScreen() {
       setIsGeneratingAI(true)
 
       // Step 1: Upload all images to API
-      const uploadedUrls: string[] = []
+      const urls: string[] = []
       for (const imageUri of images) {
         const formData = new FormData()
         const filename = imageUri.split('/').pop() || 'image.jpg'
@@ -142,47 +138,44 @@ export default function UploadScreen() {
         } as any)
 
         const uploadRes = await client.post('/api/upload', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 30000,
         })
 
         if (uploadRes.data?.ok && uploadRes.data?.url) {
-          uploadedUrls.push(uploadRes.data.url)
+          urls.push(uploadRes.data.url)
         } else {
           throw new Error('Upload slike nije uspeo')
         }
       }
 
-      // Step 2: Generate AI description
-      const aiRes = await axios.post(
-        'http://localhost:8000/generate-description',
-        {
-          category,
-          brand: brand || undefined,
-          size: size || undefined,
-          condition,
-          color: color || undefined,
-          language: 'sr',
-        }
-      )
+      setUploadedUrls(urls)
 
-      if (aiRes.data?.title && aiRes.data?.description) {
-        setTitle(aiRes.data.title)
-        setDescription(aiRes.data.description)
+      // Step 2: Generate AI description via backend proxy
+      const aiRes = await client.post('/api/ai/generate-description', {
+        category,
+        brand: brand || undefined,
+        size: size || undefined,
+        condition,
+        color: color || undefined,
+        language: 'sr',
+      }, { timeout: 60000 })
+
+      if (aiRes.data?.ok && aiRes.data?.data) {
+        setTitle(aiRes.data.data.title || '')
+        setDescription(aiRes.data.data.description || '')
         setShowAIFields(true)
-        // Store uploaded URLs for final submit
-        setImages(uploadedUrls)
       } else {
         throw new Error('AI nije generisao opis')
       }
     } catch (error: any) {
       console.error('Generate description error:', error)
       Alert.alert(
-        'Greška',
-        error.response?.data?.message ||
+        'Greska',
+        error.response?.data?.error ||
+          error.response?.data?.message ||
           error.message ||
-          'Greška pri generisanju opisa'
+          'Greska pri generisanju opisa'
       )
     } finally {
       setIsGeneratingAI(false)
@@ -190,31 +183,61 @@ export default function UploadScreen() {
   }
 
   const handleFinalSubmit = async () => {
-    if (!title || !description) {
-      Alert.alert('Greška', 'Naslov i opis su obavezni')
+    if (!title.trim()) {
+      Alert.alert('Greska', 'Naslov je obavezan')
+      return
+    }
+    if (!description.trim()) {
+      Alert.alert('Greska', 'Opis je obavezan')
       return
     }
 
     try {
-      setIsSubmittingFinal(true)
+      setIsSubmitting(true)
+
+      // If images weren't uploaded yet (manual mode), upload now
+      let finalUrls = uploadedUrls
+      if (finalUrls.length === 0 && images.length > 0) {
+        for (const imageUri of images) {
+          const formData = new FormData()
+          const filename = imageUri.split('/').pop() || 'image.jpg'
+          const match = /\.(\w+)$/.exec(filename)
+          const type = match ? `image/${match[1]}` : 'image/jpeg'
+
+          formData.append('image', {
+            uri: imageUri,
+            name: filename,
+            type,
+          } as any)
+
+          const uploadRes = await client.post('/api/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 30000,
+          })
+
+          if (uploadRes.data?.ok && uploadRes.data?.url) {
+            finalUrls.push(uploadRes.data.url)
+          }
+        }
+      }
 
       const res = await client.post('/api/items', {
-        title,
-        description,
+        title: title.trim(),
+        description: description.trim(),
         category,
         brand: brand || undefined,
         size: size || undefined,
         condition,
-        images,
+        images: finalUrls,
       })
 
       if (res.data?.ok) {
-        Alert.alert('Uspeh', 'Item je uspešno dodat!', [
+        Alert.alert('Uspeh', 'Item je uspesno dodat!', [
           {
             text: 'OK',
             onPress: () => {
-              // Reset form
               setImages([])
+              setUploadedUrls([])
               setCategory('')
               setBrand('')
               setSize('')
@@ -223,278 +246,366 @@ export default function UploadScreen() {
               setTitle('')
               setDescription('')
               setShowAIFields(false)
-              // Navigate to feed
               router.push('/(tabs)/feed')
             },
           },
         ])
       } else {
-        throw new Error('Neuspešan submit')
+        throw new Error('Neuspesan submit')
       }
     } catch (error: any) {
       console.error('Final submit error:', error)
       Alert.alert(
-        'Greška',
-        error.response?.data?.message || error.message || 'Greška pri upload-u'
+        'Greska',
+        error.response?.data?.message || error.message || 'Greska pri upload-u'
       )
     } finally {
-      setIsSubmittingFinal(false)
+      setIsSubmitting(false)
     }
   }
 
-  return (
-    <ScrollView className="flex-1 bg-base-canvas">
-      <View className="p-4 pb-8">
-        {/* Header */}
-        <Text className="font-display text-ink-dark text-2xl mb-6">
-          Dodaj novi item
-        </Text>
+  const resetForm = () => {
+    setImages([])
+    setUploadedUrls([])
+    setCategory('')
+    setBrand('')
+    setSize('')
+    setCondition('good')
+    setColor('')
+    setTitle('')
+    setDescription('')
+    setShowAIFields(false)
+  }
 
-        {/* Image Picker Section */}
-        {!showAIFields && (
-          <>
-            <View className="mb-6">
-              <Text className="font-sans text-ink-dark text-sm mb-3">
-                Slike (do 5)
-              </Text>
-              <View className="flex-row gap-3 mb-3">
-                <TouchableOpacity
-                  onPress={pickImageFromCamera}
-                  className="flex-1 bg-brand-accent-deep rounded-full py-4 items-center"
-                  disabled={isGeneratingAI}
-                >
-                  <Text className="font-sans text-base-canvas font-semibold">
-                    Kamera
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={pickImageFromGallery}
-                  className="flex-1 border border-ink-dark rounded-full py-4 items-center"
-                  disabled={isGeneratingAI}
-                >
-                  <Text className="font-sans text-ink-dark font-semibold">
-                    Galerija
-                  </Text>
-                </TouchableOpacity>
+  return (
+    <KeyboardAvoidingView
+      className="flex-1 bg-base-canvas"
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
+        <View className="p-4 pt-14 pb-8">
+          {/* Header */}
+          <View className="flex-row justify-between items-center mb-6">
+            <Text className="font-display text-ink-dark text-2xl">
+              Dodaj novi item
+            </Text>
+            {(images.length > 0 || category || brand || title) && (
+              <TouchableOpacity onPress={resetForm}>
+                <Text className="font-sans text-brand-accent-deep text-sm">Resetuj</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Step indicator */}
+          <View className="flex-row mb-6">
+            <View className={`flex-1 h-1 rounded-full mr-1 ${!showAIFields ? 'bg-brand-accent-deep' : 'bg-brand-accent-light'}`} />
+            <View className={`flex-1 h-1 rounded-full ml-1 ${showAIFields ? 'bg-brand-accent-deep' : 'bg-brand-accent-light'}`} />
+          </View>
+
+          {!showAIFields ? (
+            <>
+              {/* Image Picker Section */}
+              <View className="mb-6">
+                <Text className="font-sans text-ink-dark text-sm mb-3">
+                  Slike ({images.length}/5)
+                </Text>
+                <View className="flex-row gap-3 mb-3">
+                  <TouchableOpacity
+                    onPress={pickImageFromCamera}
+                    className="flex-1 bg-brand-accent-deep rounded-full py-4 items-center"
+                    disabled={isGeneratingAI}
+                  >
+                    <Text className="font-sans text-base-canvas font-semibold">
+                      Kamera
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={pickImageFromGallery}
+                    className="flex-1 border border-ink-dark rounded-full py-4 items-center"
+                    disabled={isGeneratingAI}
+                  >
+                    <Text className="font-sans text-ink-dark font-semibold">
+                      Galerija
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Image Thumbnails */}
+                {images.length > 0 && (
+                  <View className="flex-row flex-wrap gap-2">
+                    {images.map((uri, index) => (
+                      <View key={index} className="relative">
+                        <Image
+                          source={{ uri }}
+                          className="w-20 h-24 rounded-lg"
+                          resizeMode="cover"
+                        />
+                        {index === 0 && (
+                          <View className="absolute top-1 left-1 bg-brand-highlight px-2 py-0.5 rounded">
+                            <Text className="font-sans text-ink-dark text-xs font-bold">
+                              Glavna
+                            </Text>
+                          </View>
+                        )}
+                        <TouchableOpacity
+                          onPress={() => removeImage(index)}
+                          className="absolute top-1 right-1 bg-ink-dark rounded-full w-6 h-6 items-center justify-center"
+                        >
+                          <Text className="text-base-canvas font-bold">x</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
 
-              {/* Image Thumbnails */}
-              {images.length > 0 && (
+              {/* Category Picker */}
+              <View className="mb-4">
+                <Text className="font-sans text-ink-dark text-sm mb-2">
+                  Kategorija *
+                </Text>
                 <View className="flex-row flex-wrap gap-2">
-                  {images.map((uri, index) => (
-                    <View key={index} className="relative">
+                  {CATEGORIES.map((cat) => (
+                    <TouchableOpacity
+                      key={cat}
+                      onPress={() => setCategory(cat)}
+                      className={`px-4 py-2 rounded-full ${
+                        category === cat
+                          ? 'bg-brand-accent-deep'
+                          : 'border border-ink-dark'
+                      }`}
+                      disabled={isGeneratingAI}
+                    >
+                      <Text
+                        className={`font-sans ${
+                          category === cat ? 'text-base-canvas' : 'text-ink-dark'
+                        }`}
+                      >
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Brand */}
+              <View className="mb-4">
+                <Text className="font-sans text-ink-dark text-sm mb-2">Brand</Text>
+                <TextInput
+                  value={brand}
+                  onChangeText={setBrand}
+                  placeholder="Npr. Zara, H&M..."
+                  className="font-sans border border-ink-dark rounded-lg px-4 py-3 text-ink-dark"
+                  placeholderTextColor="#2B2A2B66"
+                  editable={!isGeneratingAI}
+                />
+              </View>
+
+              {/* Size */}
+              <View className="mb-4">
+                <Text className="font-sans text-ink-dark text-sm mb-2">Velicina</Text>
+                <TextInput
+                  value={size}
+                  onChangeText={setSize}
+                  placeholder="Npr. S, M, L, 38..."
+                  className="font-sans border border-ink-dark rounded-lg px-4 py-3 text-ink-dark"
+                  placeholderTextColor="#2B2A2B66"
+                  editable={!isGeneratingAI}
+                />
+              </View>
+
+              {/* Condition */}
+              <View className="mb-4">
+                <Text className="font-sans text-ink-dark text-sm mb-2">Stanje</Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {CONDITIONS.map((cond) => (
+                    <TouchableOpacity
+                      key={cond.value}
+                      onPress={() => setCondition(cond.value)}
+                      className={`px-4 py-2 rounded-full ${
+                        condition === cond.value
+                          ? 'bg-brand-accent-deep'
+                          : 'border border-ink-dark'
+                      }`}
+                      disabled={isGeneratingAI}
+                    >
+                      <Text
+                        className={`font-sans ${
+                          condition === cond.value
+                            ? 'text-base-canvas'
+                            : 'text-ink-dark'
+                        }`}
+                      >
+                        {cond.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Color */}
+              <View className="mb-6">
+                <Text className="font-sans text-ink-dark text-sm mb-2">Boja</Text>
+                <TextInput
+                  value={color}
+                  onChangeText={setColor}
+                  placeholder="Npr. Crna, Bela, Plava..."
+                  className="font-sans border border-ink-dark rounded-lg px-4 py-3 text-ink-dark"
+                  placeholderTextColor="#2B2A2B66"
+                  editable={!isGeneratingAI}
+                />
+              </View>
+
+              {/* Generate AI Description Button */}
+              <TouchableOpacity
+                onPress={handleGenerateDescription}
+                className={`rounded-full py-4 items-center mb-3 ${
+                  isGeneratingAI ? 'bg-brand-highlight opacity-60' : 'bg-brand-highlight'
+                }`}
+                disabled={isGeneratingAI}
+              >
+                {isGeneratingAI ? (
+                  <View className="flex-row items-center">
+                    <ActivityIndicator color="#2B2A2B" size="small" />
+                    <Text className="font-sans text-ink-dark font-bold text-base ml-2">
+                      AI generise opis...
+                    </Text>
+                  </View>
+                ) : (
+                  <Text className="font-sans text-ink-dark font-bold text-base">
+                    Generisi AI opis
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              {/* Manual entry option */}
+              <TouchableOpacity
+                onPress={() => {
+                  if (images.length === 0) {
+                    Alert.alert('Greska', 'Dodajte bar jednu sliku')
+                    return
+                  }
+                  if (!category) {
+                    Alert.alert('Greska', 'Izaberite kategoriju')
+                    return
+                  }
+                  setShowAIFields(true)
+                }}
+                className="rounded-full py-4 items-center border border-ink-dark"
+                disabled={isGeneratingAI}
+              >
+                <Text className="font-sans text-ink-dark text-base">
+                  Napisi rucno
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              {/* Preview uploaded images */}
+              {(uploadedUrls.length > 0 || images.length > 0) && (
+                <View className="mb-4">
+                  <Text className="font-sans text-ink-dark text-sm mb-2">Slike</Text>
+                  <View className="flex-row flex-wrap gap-2">
+                    {(uploadedUrls.length > 0 ? uploadedUrls : images).map((uri, index) => (
                       <Image
+                        key={index}
                         source={{ uri }}
                         className="w-20 h-24 rounded-lg"
                         resizeMode="cover"
                       />
-                      {index === 0 && (
-                        <View className="absolute top-1 left-1 bg-brand-highlight px-2 py-0.5 rounded">
-                          <Text className="font-sans text-ink-dark text-xs font-bold">
-                            Glavna
-                          </Text>
-                        </View>
-                      )}
-                      <TouchableOpacity
-                        onPress={() => removeImage(index)}
-                        className="absolute top-1 right-1 bg-ink-dark rounded-full w-6 h-6 items-center justify-center"
-                      >
-                        <Text className="text-base-canvas font-bold">×</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
+                    ))}
+                  </View>
                 </View>
               )}
-            </View>
 
-            {/* Category Picker */}
-            <View className="mb-4">
-              <Text className="font-sans text-ink-dark text-sm mb-2">
-                Kategorija *
-              </Text>
-              <View className="flex-row flex-wrap gap-2">
-                {CATEGORIES.map((cat) => (
-                  <TouchableOpacity
-                    key={cat}
-                    onPress={() => setCategory(cat)}
-                    className={`px-4 py-2 rounded-full ${
-                      category === cat
-                        ? 'bg-brand-accent-deep'
-                        : 'border border-ink-dark'
-                    }`}
-                    disabled={isGeneratingAI}
-                  >
-                    <Text
-                      className={`font-sans ${
-                        category === cat ? 'text-base-canvas' : 'text-ink-dark'
-                      }`}
-                    >
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+              {/* Summary chips */}
+              <View className="flex-row flex-wrap gap-2 mb-4">
+                <View className="bg-brand-accent-light px-3 py-1 rounded-full">
+                  <Text className="font-sans text-ink-dark text-xs">{category}</Text>
+                </View>
+                {brand ? (
+                  <View className="bg-brand-accent-light px-3 py-1 rounded-full">
+                    <Text className="font-sans text-ink-dark text-xs">{brand}</Text>
+                  </View>
+                ) : null}
+                {size ? (
+                  <View className="bg-brand-accent-light px-3 py-1 rounded-full">
+                    <Text className="font-sans text-ink-dark text-xs">{size}</Text>
+                  </View>
+                ) : null}
+                <View className="bg-brand-accent-light px-3 py-1 rounded-full">
+                  <Text className="font-sans text-ink-dark text-xs">
+                    {CONDITIONS.find(c => c.value === condition)?.label}
+                  </Text>
+                </View>
               </View>
-            </View>
 
-            {/* Brand */}
-            <View className="mb-4">
-              <Text className="font-sans text-ink-dark text-sm mb-2">
-                Brand
-              </Text>
-              <TextInput
-                value={brand}
-                onChangeText={setBrand}
-                placeholder="Npr. Zara, H&M..."
-                className="font-sans border border-ink-dark rounded-lg px-4 py-3 text-ink-dark"
-                placeholderTextColor="#2B2A2B66"
-                editable={!isGeneratingAI}
-              />
-            </View>
-
-            {/* Size */}
-            <View className="mb-4">
-              <Text className="font-sans text-ink-dark text-sm mb-2">
-                Veličina
-              </Text>
-              <TextInput
-                value={size}
-                onChangeText={setSize}
-                placeholder="Npr. S, M, L, 38..."
-                className="font-sans border border-ink-dark rounded-lg px-4 py-3 text-ink-dark"
-                placeholderTextColor="#2B2A2B66"
-                editable={!isGeneratingAI}
-              />
-            </View>
-
-            {/* Condition */}
-            <View className="mb-4">
-              <Text className="font-sans text-ink-dark text-sm mb-2">
-                Stanje
-              </Text>
-              <View className="flex-row flex-wrap gap-2">
-                {CONDITIONS.map((cond) => (
-                  <TouchableOpacity
-                    key={cond.value}
-                    onPress={() => setCondition(cond.value)}
-                    className={`px-4 py-2 rounded-full ${
-                      condition === cond.value
-                        ? 'bg-brand-accent-deep'
-                        : 'border border-ink-dark'
-                    }`}
-                    disabled={isGeneratingAI}
-                  >
-                    <Text
-                      className={`font-sans ${
-                        condition === cond.value
-                          ? 'text-base-canvas'
-                          : 'text-ink-dark'
-                      }`}
-                    >
-                      {cond.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+              {/* Title */}
+              <View className="mb-4">
+                <Text className="font-sans text-ink-dark text-sm mb-2">Naslov *</Text>
+                <TextInput
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholder="Unesi naslov..."
+                  className="font-sans border border-ink-dark rounded-lg px-4 py-3 text-ink-dark"
+                  placeholderTextColor="#2B2A2B66"
+                  editable={!isSubmitting}
+                />
               </View>
-            </View>
 
-            {/* Color */}
-            <View className="mb-6">
-              <Text className="font-sans text-ink-dark text-sm mb-2">Boja</Text>
-              <TextInput
-                value={color}
-                onChangeText={setColor}
-                placeholder="Npr. Crna, Bela, Plava..."
-                className="font-sans border border-ink-dark rounded-lg px-4 py-3 text-ink-dark"
-                placeholderTextColor="#2B2A2B66"
-                editable={!isGeneratingAI}
-              />
-            </View>
+              {/* Description */}
+              <View className="mb-6">
+                <Text className="font-sans text-ink-dark text-sm mb-2">Opis *</Text>
+                <TextInput
+                  value={description}
+                  onChangeText={setDescription}
+                  placeholder="Unesi opis..."
+                  multiline
+                  numberOfLines={6}
+                  textAlignVertical="top"
+                  className="font-sans border border-ink-dark rounded-lg px-4 py-3 text-ink-dark min-h-[120px]"
+                  placeholderTextColor="#2B2A2B66"
+                  editable={!isSubmitting}
+                />
+              </View>
 
-            {/* Generate Description Button */}
-            <TouchableOpacity
-              onPress={handleGenerateDescription}
-              className="bg-brand-highlight rounded-full py-4 items-center mb-4"
-              disabled={isGeneratingAI}
-            >
-              {isGeneratingAI ? (
-                <ActivityIndicator color="#2B2A2B" />
-              ) : (
-                <Text className="font-sans text-ink-dark font-bold text-base">
-                  Generiši AI opis
+              {/* Submit Button */}
+              <TouchableOpacity
+                onPress={handleFinalSubmit}
+                className="bg-brand-accent-deep rounded-full py-4 items-center mb-3"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <View className="flex-row items-center">
+                    <ActivityIndicator color="#F6F8ED" size="small" />
+                    <Text className="font-sans text-base-canvas font-bold text-base ml-2">
+                      Objavljujem...
+                    </Text>
+                  </View>
+                ) : (
+                  <Text className="font-sans text-base-canvas font-bold text-base">
+                    Objavi item
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              {/* Back Button */}
+              <TouchableOpacity
+                onPress={() => {
+                  setShowAIFields(false)
+                  setUploadedUrls([])
+                }}
+                className="border border-ink-dark rounded-full py-4 items-center"
+                disabled={isSubmitting}
+              >
+                <Text className="font-sans text-ink-dark font-semibold">
+                  Nazad na izmenu
                 </Text>
-              )}
-            </TouchableOpacity>
-
-            {isGeneratingAI && (
-              <Text className="font-sans text-ink-dark text-center text-sm opacity-60">
-                AI generiše opis...
-              </Text>
-            )}
-          </>
-        )}
-
-        {/* AI-Generated Fields (after AI generates) */}
-        {showAIFields && (
-          <>
-            <View className="mb-4">
-              <Text className="font-sans text-ink-dark text-sm mb-2">
-                Naslov *
-              </Text>
-              <TextInput
-                value={title}
-                onChangeText={setTitle}
-                placeholder="Izmeni naslov..."
-                className="font-sans border border-ink-dark rounded-lg px-4 py-3 text-ink-dark"
-                placeholderTextColor="#2B2A2B66"
-                editable={!isSubmitting}
-              />
-            </View>
-
-            <View className="mb-6">
-              <Text className="font-sans text-ink-dark text-sm mb-2">
-                Opis *
-              </Text>
-              <TextInput
-                value={description}
-                onChangeText={setDescription}
-                placeholder="Izmeni opis..."
-                multiline
-                numberOfLines={6}
-                textAlignVertical="top"
-                className="font-sans border border-ink-dark rounded-lg px-4 py-3 text-ink-dark"
-                placeholderTextColor="#2B2A2B66"
-                editable={!isSubmitting}
-              />
-            </View>
-
-            {/* Final Submit Button */}
-            <TouchableOpacity
-              onPress={handleFinalSubmit}
-              className="bg-brand-accent-deep rounded-full py-4 items-center mb-4"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#F6F8ED" />
-              ) : (
-                <Text className="font-sans text-base-canvas font-bold text-base">
-                  Objavi item
-                </Text>
-              )}
-            </TouchableOpacity>
-
-            {/* Back Button */}
-            <TouchableOpacity
-              onPress={() => setShowAIFields(false)}
-              className="border border-ink-dark rounded-full py-4 items-center"
-              disabled={isSubmitting}
-            >
-              <Text className="font-sans text-ink-dark font-semibold">
-                Nazad na izmenu
-              </Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    </ScrollView>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   )
 }

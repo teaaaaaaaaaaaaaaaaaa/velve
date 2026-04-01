@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -14,14 +14,23 @@ import { auth } from '@/config/firebase'
 
 WebBrowser.maybeCompleteAuthSession()
 
-export function useAuth() {
+type AuthContextType = {
+  currentUser: User | null
+  loading: boolean
+  signInWithGoogle: () => Promise<void>
+  signInWithEmail: (email: string, password: string) => Promise<any>
+  registerWithEmail: (email: string, password: string) => Promise<any>
+  logout: () => Promise<void>
+}
+
+const AuthContext = createContext<AuthContextType | null>(null)
+
+export function useAuthProvider() {
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    console.log('[useAuth] Setting up onAuthStateChanged listener')
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log('[useAuth] Auth state changed:', user ? `User: ${user.email}` : 'No user')
       setCurrentUser(user)
       setLoading(false)
     })
@@ -29,27 +38,29 @@ export function useAuth() {
   }, [])
 
   async function signInWithGoogle() {
-    console.log('[useAuth] signInWithGoogle called')
-    // TODO: Nedelja 1 — dodati Google OAuth client ID iz Firebase konzole
     const redirectUri = AuthSession.makeRedirectUri({ scheme: 'velve' })
-    console.log('[useAuth] Google Sign-In redirect URI:', redirectUri)
-    throw new Error('Google Sign-In nije još konfigurisan — dodati CLIENT_ID')
+    throw new Error('Google Sign-In nije jos konfigurisan — dodati CLIENT_ID')
   }
 
   async function signInWithEmail(email: string, password: string) {
-    console.log('[useAuth] signInWithEmail called for:', email)
     return signInWithEmailAndPassword(auth, email, password)
   }
 
   async function registerWithEmail(email: string, password: string) {
-    console.log('[useAuth] registerWithEmail called for:', email)
     return createUserWithEmailAndPassword(auth, email, password)
   }
 
   async function logout() {
-    console.log('[useAuth] logout called')
     return signOut(auth)
   }
 
   return { currentUser, loading, signInWithGoogle, signInWithEmail, registerWithEmail, logout }
+}
+
+export { AuthContext }
+
+export function useAuth() {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
+  return ctx
 }

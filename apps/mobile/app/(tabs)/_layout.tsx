@@ -1,8 +1,7 @@
+import { Text } from 'react-native'
 import { Tabs } from 'expo-router'
 
 export default function TabsLayout() {
-  console.log('[TabsLayout] Rendering tabs')
-
   return (
     <Tabs
       screenOptions={{
@@ -22,17 +21,25 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="feed"
-        options={{ title: 'Feed', tabBarIcon: () => null }}
+        options={{
+          title: 'Feed',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🏠</Text>,
+        }}
       />
       <Tabs.Screen
         name="upload"
-        options={{ title: 'Upload', tabBarIcon: () => null }}
+        options={{
+          title: 'Upload',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>➕</Text>,
+        }}
       />
       <Tabs.Screen
         name="profile"
-        options={{ title: 'Profil', tabBarIcon: () => null }}
+        options={{
+          title: 'Profil',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>👤</Text>,
+        }}
       />
-      {/* Sakrij chat rute iz tab bar-a */}
       <Tabs.Screen
         name="chat/index"
         options={{ href: null }}
