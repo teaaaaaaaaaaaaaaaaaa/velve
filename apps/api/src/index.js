@@ -108,6 +108,7 @@ app.post('/api/admin/retry-embeddings', async (req, res) => {
 // Routes
 app.use('/api/items', itemsRouter)
 app.use('/api/items', likesRouter)      // /api/items/:id/like
+app.use('/api/likes', likesRouter)      // /api/likes (GET user's liked items)
 app.use('/api/feed', feedRouter)
 app.use('/api/chat', chatRouter)
 app.use('/api/trades', tradesRouter)

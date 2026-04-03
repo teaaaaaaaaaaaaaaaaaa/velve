@@ -29,7 +29,18 @@ function generateEmbeddingAsync(itemId, imageUrl) {
 router.get('/', async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 20, 50)
-    const query = { status: 'available', isDeleted: false }
+    const query = { isDeleted: false }
+
+    // Filter by userId — prikazuje sve statuse korisnika (za profil)
+    if (req.query.userId) {
+      if (!mongoose.Types.ObjectId.isValid(req.query.userId)) {
+        return res.status(400).json({ error: 'Invalid userId' })
+      }
+      query.userId = new mongoose.Types.ObjectId(req.query.userId)
+    } else {
+      // Za opšti feed — samo dostupni itemi
+      query.status = 'available'
+    }
 
     // Cursor-based pagination: items older than cursor
     if (req.query.cursor) {
