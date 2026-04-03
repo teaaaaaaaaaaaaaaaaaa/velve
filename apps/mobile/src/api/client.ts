@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { Alert } from 'react-native'
 import { auth } from '@/config/firebase'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000'
@@ -6,11 +7,13 @@ console.log('[APIClient] Creating client with baseURL:', API_URL)
 
 const client = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
 })
+
+let lastOfflineAlert = 0
 
 // Request interceptor: dodaje Firebase ID token u svaki zahtev
 client.interceptors.request.use(async (config) => {
@@ -25,14 +28,50 @@ client.interceptors.request.use(async (config) => {
   return config
 })
 
-// Response interceptor: loguje odgovore i greške
+// Response interceptor: loguje odgovore i greške + offline detekcija
 client.interceptors.response.use(
   (response) => {
     console.log('[APIClient] Response:', response.status, response.config.url)
     return response
   },
   (error) => {
-    console.log('[APIClient] Error:', error.response?.status, error.config?.url, error.message)
+    const url = error.config?.url || ''
+    const status = error.response?.status
+
+    console.log('[APIClient] Error:', status, url, error.message)
+
+    // Network/offline error detection
+    if (!error.response && error.message?.includes('Network Error')) {
+      const now = Date.now()
+      // Prevent spamming alerts - max one per 10 seconds
+      if (now - lastOfflineAlert > 10000) {
+        lastOfflineAlert = now
+        Alert.alert(
+          'Nema interneta',
+          'Proveri internet konekciju i pokušaj ponovo.',
+          [{ text: 'OK' }]
+        )
+      }
+    }
+
+    // Timeout error
+    if (error.code === 'ECONNABORTED') {
+      const now = Date.now()
+      if (now - lastOfflineAlert > 10000) {
+        lastOfflineAlert = now
+        Alert.alert(
+          'Spor internet',
+          'Server ne odgovara. Pokušaj ponovo za par sekundi.',
+          [{ text: 'OK' }]
+        )
+      }
+    }
+
+    // Auth expired
+    if (status === 401) {
+      console.log('[APIClient] Auth token expired or invalid')
+    }
+
     return Promise.reject(error)
   }
 )

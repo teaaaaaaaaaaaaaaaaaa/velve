@@ -6,6 +6,59 @@ const User = require('../models/User')
 const Item = require('../models/Item')
 const Follow = require('../models/Follow')
 
+function buildOnboardingUpdates(body = {}) {
+  const { stylePreferences, favoriteBrands, categories, sizes, location } = body
+
+  const hasOnboardingPayload = [
+    stylePreferences,
+    favoriteBrands,
+    categories,
+    sizes,
+    location,
+  ].some((value) => value !== undefined)
+
+  if (!hasOnboardingPayload) {
+    return null
+  }
+
+  const updates = {
+    onboardingCompleted: true,
+  }
+
+  if (Array.isArray(stylePreferences)) {
+    updates.stylePreferences = stylePreferences.slice(0, 20)
+  }
+
+  if (Array.isArray(favoriteBrands)) {
+    updates.favoriteBrands = favoriteBrands.slice(0, 20)
+  }
+
+  if (Array.isArray(categories)) {
+    updates.categories = categories.slice(0, 20)
+  }
+
+  if (sizes && typeof sizes === 'object') {
+    updates.sizes = {
+      clothing: sizes.clothing ? String(sizes.clothing).slice(0, 10) : '',
+      shoes: sizes.shoes ? String(sizes.shoes).slice(0, 10) : '',
+    }
+  }
+
+  if (location && typeof location === 'object') {
+    updates.location = {
+      city: location.city ? String(location.city).slice(0, 100) : '',
+      region: location.region ? String(location.region).slice(0, 100) : '',
+    }
+  }
+
+  return updates
+}
+
+async function saveCurrentUser(req, res, updates) {
+  const updated = await User.findByIdAndUpdate(req.dbUser._id, updates, { new: true })
+  res.json({ ok: true, data: updated })
+}
+
 // GET /api/users/me — profil ulogovanog korisnika
 router.get('/me', requireAuth, async (req, res) => {
   try {
@@ -41,8 +94,12 @@ router.put('/me', requireAuth, async (req, res) => {
     if (updates.displayName) updates.displayName = updates.displayName.slice(0, 50)
     if (updates.bio) updates.bio = updates.bio.slice(0, 200)
 
-    const updated = await User.findByIdAndUpdate(req.dbUser._id, updates, { new: true })
-    res.json({ ok: true, data: updated })
+    const onboardingUpdates = buildOnboardingUpdates(req.body)
+    if (onboardingUpdates) {
+      Object.assign(updates, onboardingUpdates)
+    }
+
+    await saveCurrentUser(req, res, updates)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -64,52 +121,22 @@ router.put('/me/push-token', requireAuth, async (req, res) => {
 })
 
 // PUT /api/users/me/onboarding — završi onboarding proces
-router.put('/me/onboarding', requireAuth, async (req, res) => {
+async function handleOnboardingUpdate(req, res) {
   try {
-    const {
-      stylePreferences,
-      favoriteBrands,
-      categories,
-      sizes,
-      location,
-    } = req.body
-
-    const updates = {
-      onboardingCompleted: true,
+    const updates = buildOnboardingUpdates(req.body)
+    if (!updates) {
+      return res.status(400).json({ error: 'Onboarding payload is required' })
     }
 
-    if (Array.isArray(stylePreferences)) {
-      updates.stylePreferences = stylePreferences.slice(0, 20)
-    }
-
-    if (Array.isArray(favoriteBrands)) {
-      updates.favoriteBrands = favoriteBrands.slice(0, 20)
-    }
-
-    if (Array.isArray(categories)) {
-      updates.categories = categories.slice(0, 20)
-    }
-
-    if (sizes && typeof sizes === 'object') {
-      updates.sizes = {
-        clothing: sizes.clothing ? String(sizes.clothing).slice(0, 10) : '',
-        shoes: sizes.shoes ? String(sizes.shoes).slice(0, 10) : '',
-      }
-    }
-
-    if (location && typeof location === 'object') {
-      updates.location = {
-        city: location.city ? String(location.city).slice(0, 100) : '',
-        region: location.region ? String(location.region).slice(0, 100) : '',
-      }
-    }
-
-    const updated = await User.findByIdAndUpdate(req.dbUser._id, updates, { new: true })
-    res.json({ ok: true, data: updated })
+    await saveCurrentUser(req, res, updates)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
-})
+}
+
+router.put('/me/onboarding', requireAuth, handleOnboardingUpdate)
+router.post('/me/onboarding', requireAuth, handleOnboardingUpdate)
+router.patch('/me/onboarding', requireAuth, handleOnboardingUpdate)
 
 // GET /api/users/:id — javni profil korisnika
 router.get('/:id', async (req, res) => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ type Item = {
   brand: string
   size: string
   condition: 'new' | 'like_new' | 'good' | 'fair'
+  status?: 'available' | 'pending_trade' | 'traded'
   images: string[]
   userId: {
     _id: string
@@ -98,7 +99,7 @@ export default function FeedScreen() {
     }
   }
 
-  const handleLike = async (itemId: string) => {
+  const handleLike = useCallback(async (itemId: string) => {
     try {
       await client.post(`/api/items/${itemId}/like`)
       setItems((prev) =>
@@ -117,11 +118,11 @@ export default function FeedScreen() {
     } catch (error: any) {
       Alert.alert('Greska', 'Nije moguce lajkovati item.')
     }
-  }
+  }, [])
 
-  const handleItemPress = (itemId: string) => {
+  const handleItemPress = useCallback((itemId: string) => {
     router.push(`/items/${itemId}`)
-  }
+  }, [router])
 
   const renderItem = ({ item }: { item: Item }) => (
     <ItemCard
@@ -205,7 +206,7 @@ type ItemCardProps = {
   onPress: () => void
 }
 
-function ItemCard({ item, onLike, onPress }: ItemCardProps) {
+const ItemCard = memo(function ItemCard({ item, onLike, onPress }: ItemCardProps) {
   const scale = useRef(new Animated.Value(1)).current
   const heartScale = useRef(new Animated.Value(0)).current
   const [lastTap, setLastTap] = useState(0)
@@ -247,6 +248,16 @@ function ItemCard({ item, onLike, onPress }: ItemCardProps) {
             className="w-full h-80"
             resizeMode="cover"
           />
+
+          {/* Status badge */}
+          {item.status && item.status !== 'available' && (
+            <View className="absolute top-3 right-3 bg-black/70 px-3 py-1 rounded-full">
+              <Text className="font-sans text-xs text-white font-semibold">
+                {item.status === 'traded' ? '✓ Razmenjeno' : '⏳ U razmeni'}
+              </Text>
+            </View>
+          )}
+
           {/* Animirano srce za dupli tap */}
           <Animated.View
             style={{
@@ -309,4 +320,4 @@ function ItemCard({ item, onLike, onPress }: ItemCardProps) {
       </Pressable>
     </Animated.View>
   )
-}
+})

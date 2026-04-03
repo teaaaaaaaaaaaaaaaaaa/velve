@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StatusBar } from 'react-native'
 import { useRouter } from 'expo-router'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Ionicons } from '@expo/vector-icons'
 
 const STYLE_OPTIONS = [
@@ -25,9 +24,15 @@ export default function StyleScreen() {
     )
   }
 
-  const handleContinue = async () => {
-    await AsyncStorage.setItem('onboarding_styles', JSON.stringify(selectedStyles))
-    router.push('/onboarding/brands')
+  const handleContinue = () => {
+    if (selectedStyles.length === 0) return
+
+    router.push({
+      pathname: '/onboarding/brands',
+      params: {
+        styles: JSON.stringify(selectedStyles),
+      },
+    })
   }
 
   const handleBack = () => {
@@ -106,7 +111,7 @@ export default function StyleScreen() {
         </View>
       </ScrollView>
 
-      {/* CTA Buttons */}
+      {/* CTA Button */}
       <View className="px-6 pb-12 pt-4">
         <TouchableOpacity
           className={`rounded-full py-4 items-center ${
@@ -117,17 +122,8 @@ export default function StyleScreen() {
           onPress={handleContinue}
           disabled={selectedStyles.length === 0}
         >
-          <Text className="text-base-canvas font-sans text-lg font-semibold">
+          <Text className={`font-sans text-lg font-semibold ${selectedStyles.length > 0 ? 'text-base-canvas' : 'text-ink-dark/40'}`}>
             Nastavi
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          className="mt-3 py-3 items-center"
-          onPress={() => router.push('/onboarding/brands')}
-        >
-          <Text className="text-ink-dark/50 font-sans text-sm">
-            Preskoči
           </Text>
         </TouchableOpacity>
       </View>

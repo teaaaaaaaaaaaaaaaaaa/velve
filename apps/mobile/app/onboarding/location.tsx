@@ -8,8 +8,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native'
-import { useRouter } from 'expo-router'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import client from '@/api/client'
 
@@ -38,28 +37,55 @@ const SERBIAN_CITIES = [
 
 export default function LocationScreen() {
   const router = useRouter()
+  const params = useLocalSearchParams()
   const [selectedCity, setSelectedCity] = useState<string>('')
   const [loading, setLoading] = useState(false)
 
+  const submitOnboarding = async (onboardingData: {
+    stylePreferences: string[]
+    favoriteBrands: string[]
+    sizes: { clothing: string; shoes: string }
+    location: { city: string; region: string }
+  }) => {
+    try {
+      await client.put('/api/users/me/onboarding', onboardingData)
+    } catch (error: any) {
+      if (error.response?.status !== 404) {
+        throw error
+      }
+
+      console.warn('[Onboarding] Primary onboarding route missing, retrying profile update fallback')
+
+      try {
+        await client.post('/api/users/me/onboarding', onboardingData)
+      } catch (postError: any) {
+        if (postError.response?.status !== 404) {
+          throw postError
+        }
+
+        await client.put('/api/users/me', onboardingData)
+      }
+    }
+  }
+
   const handleFinish = async () => {
+    if (!selectedCity) return
+
     try {
       setLoading(true)
 
-      // Gather all onboarding data
-      const stylesData = await AsyncStorage.getItem('onboarding_styles')
-      const brandsData = await AsyncStorage.getItem('onboarding_brands')
-      const sizesData = await AsyncStorage.getItem('onboarding_sizes')
-
-      const styles = stylesData ? JSON.parse(stylesData) : []
-      const brands = brandsData ? JSON.parse(brandsData) : []
-      const sizesData_parsed = sizesData ? JSON.parse(sizesData) : {}
+      // Parse accumulated data from params
+      const styles = params.styles ? JSON.parse(params.styles as string) : []
+      const brands = params.brands ? JSON.parse(params.brands as string) : []
+      const clothingSize = params.clothingSize as string || ''
+      const shoeSize = params.shoeSize as string || ''
 
       const onboardingData = {
         stylePreferences: styles,
         favoriteBrands: brands,
         sizes: {
-          clothing: sizesData_parsed.clothingSize || '',
-          shoes: sizesData_parsed.shoeSize ? String(sizesData_parsed.shoeSize) : '',
+          clothing: clothingSize,
+          shoes: shoeSize,
         },
         location: {
           city: selectedCity,
@@ -67,23 +93,18 @@ export default function LocationScreen() {
         },
       }
 
-      // Submit to API
-      await client.put('/api/users/me/onboarding', onboardingData)
+      console.log('[Onboarding] Submitting data:', onboardingData)
 
-      // Clear onboarding data from AsyncStorage
-      await AsyncStorage.multiRemove([
-        'onboarding_styles',
-        'onboarding_brands',
-        'onboarding_sizes',
-      ])
+      // Submit to API
+      await submitOnboarding(onboardingData)
 
       // Navigate to feed
       router.replace('/(tabs)/feed')
     } catch (error: any) {
-      console.error('Onboarding error:', error)
+      console.error('[Onboarding] Error:', error)
       Alert.alert(
         'Greška',
-        error.response?.data?.message || 'Došlo je do greške. Pokušaj ponovo.',
+        error.response?.data?.error || 'Došlo je do greške. Pokušaj ponovo.',
         [{ text: 'OK' }]
       )
     } finally {
@@ -176,7 +197,7 @@ export default function LocationScreen() {
         </View>
       </ScrollView>
 
-      {/* CTA Buttons */}
+      {/* CTA Button */}
       <View className="px-6 pb-12 pt-4">
         <TouchableOpacity
           className={`rounded-full py-4 items-center ${
@@ -190,22 +211,11 @@ export default function LocationScreen() {
           {loading ? (
             <ActivityIndicator color="#2B2A2B" />
           ) : (
-            <Text className="text-ink-dark font-sans text-lg font-bold">
+            <Text className={`font-sans text-lg font-bold ${selectedCity ? 'text-ink-dark' : 'text-ink-dark/40'}`}>
               Završi ✨
             </Text>
           )}
         </TouchableOpacity>
-
-        {!loading && (
-          <TouchableOpacity
-            className="mt-3 py-3 items-center"
-            onPress={handleFinish}
-          >
-            <Text className="text-ink-dark/50 font-sans text-sm">
-              Preskoči
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
     </View>
   )

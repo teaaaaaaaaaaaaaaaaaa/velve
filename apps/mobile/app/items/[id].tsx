@@ -159,6 +159,30 @@ export default function ItemDetailsScreen() {
     }
   };
 
+  const handleDelete = () => {
+    Alert.alert(
+      'Obriši predmet',
+      'Da li si siguran da želiš da obrišeš ovaj predmet?',
+      [
+        { text: 'Otkaži', style: 'cancel' },
+        {
+          text: 'Obriši',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await client.delete(`/api/items/${id}`);
+              Alert.alert('Uspeh', 'Predmet je obrisan', [
+                { text: 'OK', onPress: () => router.back() },
+              ]);
+            } catch (error: any) {
+              Alert.alert('Greška', 'Nije moguće obrisati predmet');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // Check if the current user owns this item
   const isOwnItem = () => {
     if (!currentUser || !item) return false;
@@ -195,14 +219,21 @@ export default function ItemDetailsScreen() {
       });
 
       if (response.data.ok) {
+        const chatId = response.data.data?.chatId;
         setShowTradeModal(false);
         Alert.alert(
           'Uspeh',
           'Zahtev za razmenu je poslat!',
           [
             {
-              text: 'OK',
-              onPress: () => router.push('/(tabs)/chat'),
+              text: 'Otvori chat',
+              onPress: () => {
+                if (chatId) {
+                  router.push(`/(tabs)/chat/${chatId}`);
+                } else {
+                  router.push('/(tabs)/chat');
+                }
+              },
             },
           ]
         );
@@ -405,16 +436,28 @@ export default function ItemDetailsScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Trade Button */}
-          <TouchableOpacity
-            onPress={handleOpenTradeModal}
-            className="flex-1 bg-brand-accent-deep rounded-full py-4 px-6"
-            activeOpacity={0.8}
-          >
-            <Text className="font-sans text-base text-base-canvas text-center font-medium">
-              Predloži razmenu
-            </Text>
-          </TouchableOpacity>
+          {/* Trade or Delete Button */}
+          {isOwnItem() ? (
+            <TouchableOpacity
+              onPress={handleDelete}
+              className="flex-1 bg-red-600 rounded-full py-4 px-6"
+              activeOpacity={0.8}
+            >
+              <Text className="font-sans text-base text-white text-center font-medium">
+                Obriši predmet
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={handleOpenTradeModal}
+              className="flex-1 bg-brand-accent-deep rounded-full py-4 px-6"
+              activeOpacity={0.8}
+            >
+              <Text className="font-sans text-base text-base-canvas text-center font-medium">
+                Predloži razmenu
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 

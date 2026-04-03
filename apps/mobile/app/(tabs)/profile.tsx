@@ -110,10 +110,10 @@ export default function ProfileScreen() {
   }, [])
 
   useEffect(() => {
-    if (profile) {
+    if (profile?._id) {
       fetchItems()
     }
-  }, [profile])
+  }, [profile?._id])
 
   const handleLogout = async () => {
     Alert.alert('Odjavi se', 'Da li si siguran da želiš da se odjaviš?', [

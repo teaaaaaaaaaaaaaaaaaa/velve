@@ -9,8 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native'
-import { useRouter } from 'expo-router'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 
 const SUGGESTED_BRANDS = [
@@ -34,6 +33,7 @@ const SUGGESTED_BRANDS = [
 
 export default function BrandsScreen() {
   const router = useRouter()
+  const params = useLocalSearchParams()
   const [selectedBrands, setSelectedBrands] = useState<string[]>([])
   const [customBrand, setCustomBrand] = useState('')
 
@@ -50,9 +50,16 @@ export default function BrandsScreen() {
     }
   }
 
-  const handleContinue = async () => {
-    await AsyncStorage.setItem('onboarding_brands', JSON.stringify(selectedBrands))
-    router.push('/onboarding/sizes')
+  const handleContinue = () => {
+    if (selectedBrands.length === 0) return
+
+    router.push({
+      pathname: '/onboarding/sizes',
+      params: {
+        ...params,
+        brands: JSON.stringify(selectedBrands),
+      },
+    })
   }
 
   const handleBack = () => {
@@ -96,7 +103,7 @@ export default function BrandsScreen() {
           <View className="mb-6">
             <View className="flex-row items-center">
               <TextInput
-                className="flex-1 bg-base-canvas border-2 border-ink-dark/20 rounded-2xl px-5 py-4 font-sans text-base text-ink-dark"
+                className="flex-1 bg-white border-2 border-ink-dark/20 rounded-2xl px-5 py-4 font-sans text-base text-ink-dark"
                 placeholder="Dodaj svoj brend..."
                 placeholderTextColor="#2B2A2B66"
                 value={customBrand}
@@ -158,7 +165,7 @@ export default function BrandsScreen() {
         </View>
       </ScrollView>
 
-      {/* CTA Buttons */}
+      {/* CTA Button */}
       <View className="px-6 pb-12 pt-4 bg-base-canvas">
         <TouchableOpacity
           className={`rounded-full py-4 items-center ${
@@ -169,17 +176,8 @@ export default function BrandsScreen() {
           onPress={handleContinue}
           disabled={selectedBrands.length === 0}
         >
-          <Text className="text-base-canvas font-sans text-lg font-semibold">
+          <Text className={`font-sans text-lg font-semibold ${selectedBrands.length > 0 ? 'text-base-canvas' : 'text-ink-dark/40'}`}>
             Nastavi
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          className="mt-3 py-3 items-center"
-          onPress={() => router.push('/onboarding/sizes')}
-        >
-          <Text className="text-ink-dark/50 font-sans text-sm">
-            Preskoči
           </Text>
         </TouchableOpacity>
       </View>

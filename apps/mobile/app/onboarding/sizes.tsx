@@ -7,24 +7,30 @@ import {
   StatusBar,
   TextInput,
 } from 'react-native'
-import { useRouter } from 'expo-router'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 
 const CLOTHING_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
 
 export default function SizesScreen() {
   const router = useRouter()
+  const params = useLocalSearchParams()
   const [clothingSize, setClothingSize] = useState<string>('')
   const [shoeSize, setShoeSize] = useState('')
 
-  const handleContinue = async () => {
-    const data = {
-      clothingSize,
-      shoeSize: shoeSize ? parseInt(shoeSize) : null,
-    }
-    await AsyncStorage.setItem('onboarding_sizes', JSON.stringify(data))
-    router.push('/onboarding/location')
+  const isValid = clothingSize && shoeSize && parseInt(shoeSize) >= 36 && parseInt(shoeSize) <= 47
+
+  const handleContinue = () => {
+    if (!isValid) return
+
+    router.push({
+      pathname: '/onboarding/location',
+      params: {
+        ...params,
+        clothingSize,
+        shoeSize,
+      },
+    })
   }
 
   const handleBack = () => {
@@ -71,14 +77,15 @@ export default function SizesScreen() {
                 <TouchableOpacity
                   key={size}
                   onPress={() => setClothingSize(size)}
-                  className={`flex-1 min-w-[70px] items-center justify-center py-4 rounded-2xl border-2 ${
+                  className={`items-center justify-center py-5 rounded-2xl border-2 ${
                     clothingSize === size
                       ? 'bg-brand-accent-deep border-brand-accent-deep'
                       : 'bg-base-canvas border-ink-dark/20'
                   }`}
+                  style={{ width: '30%' }}
                 >
                   <Text
-                    className={`font-sans text-xl font-bold ${
+                    className={`font-sans text-2xl font-bold ${
                       clothingSize === size ? 'text-base-canvas' : 'text-ink-dark'
                     }`}
                   >
@@ -94,25 +101,23 @@ export default function SizesScreen() {
             <Text className="text-lg font-sans font-semibold text-ink-dark mb-4">
               Broj cipela
             </Text>
-            <View className="flex-row items-center">
+            <View className="flex-row items-center bg-white rounded-2xl border-2 border-ink-dark/20 px-5 py-4">
               <Ionicons name="footsteps-outline" size={24} color="#2B2A2B" style={{ marginRight: 12 }} />
               <TextInput
-                className="flex-1 bg-base-canvas border-2 border-ink-dark/20 rounded-2xl px-5 py-4 font-sans text-base text-ink-dark"
+                className="flex-1 font-sans text-lg text-ink-dark"
                 placeholder="npr. 42"
                 placeholderTextColor="#2B2A2B66"
                 value={shoeSize}
                 onChangeText={(text) => {
-                  // Only allow numbers between 36 and 47
-                  const num = parseInt(text)
-                  if (text === '' || (!isNaN(num) && num >= 36 && num <= 47)) {
-                    setShoeSize(text)
-                  }
+                  // Only allow numbers
+                  const cleaned = text.replace(/[^0-9]/g, '')
+                  setShoeSize(cleaned)
                 }}
                 keyboardType="numeric"
                 maxLength={2}
               />
             </View>
-            <Text className="text-sm font-sans text-ink-dark/50 mt-2 ml-9">
+            <Text className="text-sm font-sans text-ink-dark/50 mt-2">
               Veličine od 36 do 47
             </Text>
           </View>
@@ -122,35 +127,26 @@ export default function SizesScreen() {
             <Ionicons name="information-circle-outline" size={24} color="#431A43" style={{ marginRight: 12 }} />
             <View className="flex-1">
               <Text className="text-sm font-sans text-ink-dark/70 leading-relaxed">
-                Ove informacije su opcione i možeš ih kasnije promeniti u svom profilu.
+                Ove informacije su obavezne kako bismo ti prikazali najbolje rezultate.
               </Text>
             </View>
           </View>
         </View>
       </ScrollView>
 
-      {/* CTA Buttons */}
+      {/* CTA Button */}
       <View className="px-6 pb-12 pt-4">
         <TouchableOpacity
           className={`rounded-full py-4 items-center ${
-            clothingSize
+            isValid
               ? 'bg-brand-accent-deep'
               : 'bg-ink-dark/20'
           }`}
           onPress={handleContinue}
-          disabled={!clothingSize}
+          disabled={!isValid}
         >
-          <Text className="text-base-canvas font-sans text-lg font-semibold">
+          <Text className={`font-sans text-lg font-semibold ${isValid ? 'text-base-canvas' : 'text-ink-dark/40'}`}>
             Nastavi
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          className="mt-3 py-3 items-center"
-          onPress={() => router.push('/onboarding/location')}
-        >
-          <Text className="text-ink-dark/50 font-sans text-sm">
-            Preskoči
           </Text>
         </TouchableOpacity>
       </View>
