@@ -184,6 +184,7 @@ export default function FeedScreen() {
         data={items}
         renderItem={renderItem}
         keyExtractor={(item) => item._id}
+        estimatedItemSize={450}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
@@ -283,19 +284,19 @@ const ItemCard = memo(function ItemCard({ item, onLike, onPress }: ItemCardProps
           </Text>
 
           <Text className="font-sans text-ink-dark opacity-60 text-sm mb-3">
-            {item.brand} • {item.size.toUpperCase()}
+            {item.brand} • {(item.size || '').toUpperCase()}
           </Text>
 
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center flex-1">
               <Image
                 source={{
-                  uri: item.userId.photoURL || 'https://via.placeholder.com/30',
+                  uri: (typeof item.userId === 'object' && item.userId?.photoURL) || 'https://via.placeholder.com/30',
                 }}
                 className="w-8 h-8 rounded-full mr-2"
               />
               <Text className="font-sans text-ink-dark text-sm" numberOfLines={1}>
-                {item.userId.displayName}
+                {typeof item.userId === 'object' ? item.userId?.displayName : 'Korisnik'}
               </Text>
             </View>
 
