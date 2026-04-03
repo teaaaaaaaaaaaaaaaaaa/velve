@@ -66,7 +66,7 @@ export default function ItemDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   console.log('[ItemDetailsScreen] Rendering, id:', id);
   const router = useRouter();
-  const { currentUser } = useAuth();
+  const { currentUser, dbUser } = useAuth();
 
   const [item, setItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
@@ -110,11 +110,11 @@ export default function ItemDetailsScreen() {
   };
 
   const fetchUserItems = async () => {
-    if (!currentUser) return;
+    if (!dbUser) return;
 
     try {
       setLoadingUserItems(true);
-      const response = await client.get(`/api/items?userId=${currentUser.uid}`);
+      const response = await client.get(`/api/items?userId=${dbUser._id}`);
 
       if (response.data.ok) {
         // Filter out the current item from user's items
@@ -185,13 +185,13 @@ export default function ItemDetailsScreen() {
 
   // Check if the current user owns this item
   const isOwnItem = () => {
-    if (!currentUser || !item) return false;
+    if (!dbUser || !item) return false;
 
     if (typeof item.userId === 'object' && item.userId !== null) {
-      return item.userId._id === currentUser.uid;
+      return item.userId._id === dbUser._id;
     }
 
-    return item.userId === currentUser.uid;
+    return item.userId === dbUser._id;
   };
 
   const handleOpenTradeModal = async () => {

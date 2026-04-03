@@ -101,20 +101,21 @@ export default function FeedScreen() {
 
   const handleLike = useCallback(async (itemId: string) => {
     try {
-      await client.post(`/api/items/${itemId}/like`)
-      setItems((prev) =>
-        prev.map((item) =>
-          item._id === itemId
-            ? {
-                ...item,
-                isLiked: !item.isLiked,
-                likesCount: item.isLiked
-                  ? (item.likesCount ?? 0) - 1
-                  : (item.likesCount ?? 0) + 1,
-              }
-            : item
+      const response = await client.post(`/api/items/${itemId}/like`)
+
+      if (response.data.ok) {
+        setItems((prev) =>
+          prev.map((item) =>
+            item._id === itemId
+              ? {
+                  ...item,
+                  isLiked: response.data.isLiked,
+                  likesCount: response.data.likesCount,
+                }
+              : item
+          )
         )
-      )
+      }
     } catch (error: any) {
       Alert.alert('Greska', 'Nije moguce lajkovati item.')
     }

@@ -3,7 +3,9 @@ const mongoose = require('mongoose')
 const router = express.Router()
 const { requireAuth } = require('../middleware/auth')
 const Item = require('../models/Item')
+const User = require('../models/User')
 const { sanitizeInput } = require('../lib/sanitize')
+const { enrichItems } = require('../lib/enrichItems')
 
 const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:8000'
 
@@ -74,7 +76,13 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Item not found' })
     }
 
-    res.json({ ok: true, data: item })
+    // Enrich with isLiked, isWishlisted, likesCount (if user is logged in)
+    const userId = req.user?.uid
+      ? (await User.findOne({ firebaseUid: req.user.uid }))?._id
+      : null
+    const enriched = await enrichItems(item, userId)
+
+    res.json({ ok: true, data: enriched })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

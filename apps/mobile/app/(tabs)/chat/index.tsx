@@ -51,7 +51,7 @@ function formatTime(dateStr: string) {
 
 export default function ChatListScreen() {
   const router = useRouter()
-  const { currentUser } = useAuth()
+  const { currentUser, dbUser } = useAuth()
   const [chats, setChats] = useState<ChatRoom[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -78,8 +78,8 @@ export default function ChatListScreen() {
   }, [])
 
   const getOtherParticipant = (participants: Participant[]) => {
-    if (!currentUser) return participants[0]
-    return participants.find((p) => p._id !== currentUser.uid) || participants[0]
+    if (!dbUser) return participants[0]
+    return participants.find((p) => p._id !== dbUser._id) || participants[0]
   }
 
   const renderChatItem = ({ item }: { item: ChatRoom }) => {

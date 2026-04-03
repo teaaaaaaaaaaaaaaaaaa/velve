@@ -1,6 +1,6 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { View, ActivityIndicator } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter, useSegments } from 'expo-router'
 import { useAuth } from '@/hooks/useAuth'
 import client from '@/api/client'
 
@@ -8,24 +8,27 @@ export default function Index() {
   console.log('[Index] Rendering')
   const { currentUser, loading: authLoading } = useAuth()
   const router = useRouter()
+  const segments = useSegments()
   const [checkingOnboarding, setCheckingOnboarding] = useState(false)
-  const hasRedirected = useRef(false)
-  const lastUserId = useRef<string | null>(null)
 
   useEffect(() => {
-    // Reset redirect flag when user changes (login/logout)
-    const currentUserId = currentUser?.uid || null
-    if (lastUserId.current !== currentUserId) {
-      hasRedirected.current = false
-      lastUserId.current = currentUserId
-    }
-
-    // Only run once when auth is ready and we haven't redirected yet
-    if (hasRedirected.current) return
-
     async function checkOnboardingStatus() {
+      console.log('[Index] Current segments:', segments)
       console.log('[Index] Auth check:', { user: !!currentUser, loading: authLoading })
-      if (authLoading) return
+
+      if (authLoading) {
+        console.log('[Index] Auth still loading, waiting...')
+        return
+      }
+
+      // Don't redirect if user is already on a valid route
+      const isOnValidRoute = segments.length > 0 && segments[0] !== 'index'
+      if (isOnValidRoute) {
+        console.log('[Index] User already on valid route, skipping redirect')
+        return
+      }
+
+      console.log('[Index] Starting onboarding check...')
 
       if (currentUser) {
         try {
@@ -41,31 +44,27 @@ export default function Index() {
 
           if (onboardingCompleted) {
             console.log('[Index] User logged in, redirecting to feed')
-            hasRedirected.current = true
             router.replace('/(tabs)/feed')
           } else {
             console.log('[Index] Onboarding not completed, redirecting to onboarding')
-            hasRedirected.current = true
             router.replace('/onboarding/welcome')
           }
         } catch (error) {
           console.error('[Index] Error checking onboarding:', error)
           // If error, assume onboarding needed
           console.log('[Index] Error occurred, redirecting to onboarding')
-          hasRedirected.current = true
           router.replace('/onboarding/welcome')
         } finally {
           setCheckingOnboarding(false)
         }
       } else {
         console.log('[Index] No user, redirecting to login')
-        hasRedirected.current = true
         router.replace('/(auth)/login')
       }
     }
 
     checkOnboardingStatus()
-  }, [currentUser, authLoading])
+  }, [currentUser, authLoading, segments])
 
   return (
     <View className="flex-1 items-center justify-center bg-base-canvas">

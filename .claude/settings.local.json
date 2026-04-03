@@ -22,7 +22,8 @@
       "Bash(timeout /t:*)",
       "Bash(ping:*)",
       "Bash(npm uninstall:*)",
-      "Bash(ls -la \"c:\\\\Users\\\\Vukasin\\\\Documents\\\\git projekti\\\\velve\\\\apps\\\\mobile\"\" 2>&1 | grep -E \"^- \")"
+      "Bash(ls -la \"c:\\\\Users\\\\Vukasin\\\\Documents\\\\git projekti\\\\velve\\\\apps\\\\mobile\"\" 2>&1 | grep -E \"^- \")",
+      "Bash(ls:*)"
     ]
   }
 }
