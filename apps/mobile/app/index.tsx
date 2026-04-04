@@ -11,17 +11,26 @@ export default function Index() {
   useEffect(() => {
     if (authLoading) return
 
-    const isOnValidRoute = segments.length > 0 && segments[0] !== 'index'
+    const isOnValidRoute = segments.length > 0
     if (isOnValidRoute) return
 
-    if (currentUser) {
-      if (dbUser?.onboardingCompleted) {
-        router.replace('/(tabs)/feed')
-      } else {
-        router.replace('/onboarding/welcome')
-      }
-    } else {
+    if (!currentUser) {
+      // Not logged in - go to login
       router.replace('/(auth)/login')
+      return
+    }
+
+    // Wait for dbUser to load before redirecting
+    if (!dbUser) {
+      console.log('[Index] Waiting for dbUser to load...')
+      return
+    }
+
+    // Both currentUser and dbUser loaded - safe to redirect
+    if (dbUser.onboardingCompleted) {
+      router.replace('/(tabs)/feed')
+    } else {
+      router.replace('/onboarding/welcome')
     }
   }, [currentUser, dbUser, authLoading, segments])
 

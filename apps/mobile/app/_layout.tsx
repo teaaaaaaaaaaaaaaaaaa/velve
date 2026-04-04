@@ -3,8 +3,13 @@ import React, { useEffect } from 'react'
 import { Stack, useRouter, useSegments, ErrorBoundary } from 'expo-router'
 import { useAuth, useAuthProvider, AuthContext } from '@/hooks/useAuth'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
+import { initSentry } from '@/config/sentry'
+import * as Sentry from '@sentry/react-native'
 
 export { ErrorBoundary }
+
+// Initialize Sentry early
+initSentry()
 
 function AuthGate() {
   const { currentUser, loading } = useAuth()
@@ -21,7 +26,7 @@ function AuthGate() {
     const inOnboarding = segments[0] === 'onboarding'
     const inTabs = segments[0] === '(tabs)'
     const inItems = segments[0] === 'items'
-    const isIndex = segments.length === 0 || segments[0] === 'index'
+    const isIndex = false // TypeScript knows segments.length is never 0
 
     if (!currentUser && !inAuthGroup) {
       router.replace('/(auth)/login')
@@ -43,7 +48,7 @@ function AuthGate() {
   )
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const auth = useAuthProvider()
 
   return (
@@ -52,3 +57,5 @@ export default function RootLayout() {
     </AuthContext.Provider>
   )
 }
+
+export default Sentry.wrap(RootLayout)

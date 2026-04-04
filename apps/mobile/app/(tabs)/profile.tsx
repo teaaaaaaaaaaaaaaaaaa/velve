@@ -252,10 +252,10 @@ export default function ProfileScreen() {
 
   const handleUnlike = async (itemId: string) => {
     try {
-      await client.post(`/api/items/${itemId}/like`)
+      await client.delete(`/api/items/${itemId}/like`)
       setLikedItems((prev) => prev.filter((i) => i._id !== itemId))
     } catch {
-      Alert.alert('Greška', 'Greška pri lajkovanju')
+      Alert.alert('Greška', 'Greška pri uklanjanju lajka')
     }
   }
 

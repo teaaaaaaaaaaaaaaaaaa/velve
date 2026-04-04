@@ -74,7 +74,7 @@ export default function ChatScreen() {
 
   const socketRef = useRef<Socket | null>(null)
   const flatListRef = useRef<FlatList>(null)
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchChat = useCallback(async () => {
     try {

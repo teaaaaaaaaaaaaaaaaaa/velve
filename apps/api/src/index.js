@@ -4,6 +4,8 @@ const express = require('express')
 const cors = require('cors')
 const mongoose = require('mongoose')
 const { apiLimiter } = require('./middleware/rateLimit')
+const { requireAuth } = require('./middleware/auth')
+const { initSentry, Sentry } = require('./config/sentry')
 const { initSocket } = require('./lib/socket')
 const { updateEngagementScores } = require('./lib/updateEngagementScores')
 const { retryMissingEmbeddings } = require('./lib/retryMissingEmbeddings')
@@ -22,6 +24,11 @@ const wishlistRouter = require('./routes/wishlist')
 
 const app = express()
 const PORT = process.env.PORT || 3000
+
+// Initialize Sentry early
+initSentry(app)
+app.use(Sentry.Handlers.requestHandler())
+app.use(Sentry.Handlers.tracingHandler())
 
 // Middleware - CORS configuration
 app.use(
@@ -85,8 +92,8 @@ app.get('/health', async (req, res) => {
   })
 })
 
-// Manual trigger for engagement score update (admin only, add auth later)
-app.post('/api/admin/update-scores', async (req, res) => {
+// Manual trigger for engagement score update (admin only)
+app.post('/api/admin/update-scores', requireAuth, async (req, res) => {
   try {
     await updateEngagementScores()
     res.json({ ok: true, message: 'Engagement scores updated' })
@@ -95,8 +102,8 @@ app.post('/api/admin/update-scores', async (req, res) => {
   }
 })
 
-// Manual trigger for embedding retry (admin only, add auth later)
-app.post('/api/admin/retry-embeddings', async (req, res) => {
+// Manual trigger for embedding retry (admin only)
+app.post('/api/admin/retry-embeddings', requireAuth, async (req, res) => {
   try {
     await retryMissingEmbeddings()
     res.json({ ok: true, message: 'Embedding retry completed' })
@@ -118,6 +125,9 @@ app.use('/api/users', followsRouter)    // /api/users/:id/follow
 app.use('/api/ai', aiRouter)
 app.use('/api/verification', verificationRouter)
 app.use('/api/wishlist', wishlistRouter)
+
+// Sentry error handler (must be before other error middleware)
+app.use(Sentry.Handlers.errorHandler())
 
 // Create HTTP server and attach socket.io
 const server = http.createServer(app)
