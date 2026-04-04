@@ -17,9 +17,16 @@ const itemSchema = new mongoose.Schema(
     embedding: [{ type: Number }],      // CLIP vektor (512 dim)
     engagementScore: { type: Number, default: 0 },  // Pre-computed feed ranking score
     lastScoreUpdate: { type: Date },    // When score was last calculated
+    listingType: {
+      type: String,
+      enum: ['sell', 'trade', 'both'],
+      default: 'trade',
+    },
+    price: { type: Number, min: 0 },               // Samo za sell/both
+    tradeFor: { type: String, maxlength: 200 },    // Opis za šta želi da razmeni (trade/both)
     status: {
       type: String,
-      enum: ['available', 'pending_trade', 'traded'],
+      enum: ['available', 'pending_trade', 'traded', 'sold'],
       default: 'available',
     },
     isDeleted: { type: Boolean, default: false },   // Soft delete flag

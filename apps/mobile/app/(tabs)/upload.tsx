@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router'
 import client from '@/api/client'
 
 type Condition = 'new' | 'like_new' | 'good' | 'fair'
+type ListingType = 'trade' | 'sell' | 'both'
 
 const CATEGORIES = [
   'Haljine',
@@ -33,12 +34,35 @@ const CONDITIONS: { value: Condition; label: string }[] = [
   { value: 'fair', label: 'Prihvatljivo' },
 ]
 
+const LISTING_TYPES: { value: ListingType; label: string }[] = [
+  { value: 'trade', label: 'Razmeni' },
+  { value: 'sell', label: 'Proda' },
+  { value: 'both', label: 'Oboje' },
+]
+
+const TRADE_FOR_CHIPS = [
+  'Bilo šta',
+  'Majice',
+  'Jakne',
+  'Pantalone',
+  'Haljine',
+  'Obuća',
+  'Dodaci',
+]
+
 export default function UploadScreen() {
   const router = useRouter()
 
   // Image state
   const [images, setImages] = useState<string[]>([])
   const [uploadedUrls, setUploadedUrls] = useState<string[]>([])
+
+  // Listing type state
+  const [listingType, setListingType] = useState<ListingType>('trade')
+  const [price, setPrice] = useState('')
+  const [tradeFor, setTradeFor] = useState('')
+  const [selectedTradeForChip, setSelectedTradeForChip] = useState('')
+  const [tradeForFreeText, setTradeForFreeText] = useState('')
 
   // Form state
   const [category, setCategory] = useState<string>('')
@@ -55,6 +79,27 @@ export default function UploadScreen() {
   // Loading states
   const [isGeneratingAI, setIsGeneratingAI] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleTradeForChip = (chip: string) => {
+    if (selectedTradeForChip === chip) {
+      setSelectedTradeForChip('')
+    } else {
+      setSelectedTradeForChip(chip)
+    }
+  }
+
+  const getTradeForValue = (): string => {
+    const parts: string[] = []
+    if (selectedTradeForChip && selectedTradeForChip !== 'Bilo šta') {
+      parts.push(selectedTradeForChip)
+    } else if (selectedTradeForChip === 'Bilo šta') {
+      return 'Bilo šta'
+    }
+    if (tradeForFreeText.trim()) {
+      parts.push(tradeForFreeText.trim())
+    }
+    return parts.join(', ')
+  }
 
   const pickImageFromCamera = async () => {
     if (images.length >= 5) {
@@ -110,6 +155,27 @@ export default function UploadScreen() {
     setImages(images.filter((_, i) => i !== index))
   }
 
+  const uploadImages = async (): Promise<string[]> => {
+    const urls: string[] = []
+    for (const imageUri of images) {
+      const formData = new FormData()
+      const filename = imageUri.split('/').pop() || 'image.jpg'
+      const match = /\.(\w+)$/.exec(filename)
+      const type = match ? `image/${match[1]}` : 'image/jpeg'
+      formData.append('image', { uri: imageUri, name: filename, type } as any)
+      const uploadRes = await client.post('/api/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 30000,
+      })
+      if (uploadRes.data?.ok && uploadRes.data?.url) {
+        urls.push(uploadRes.data.url)
+      } else {
+        throw new Error('Upload slike nije uspeo')
+      }
+    }
+    return urls
+  }
+
   const handleGenerateDescription = async () => {
     if (images.length === 0) {
       Alert.alert('Greska', 'Dodajte bar jednu sliku')
@@ -123,60 +189,33 @@ export default function UploadScreen() {
     try {
       setIsGeneratingAI(true)
 
-      // Step 1: Upload all images to API
-      const urls: string[] = []
-      for (const imageUri of images) {
-        const formData = new FormData()
-        const filename = imageUri.split('/').pop() || 'image.jpg'
-        const match = /\.(\w+)$/.exec(filename)
-        const type = match ? `image/${match[1]}` : 'image/jpeg'
-
-        formData.append('image', {
-          uri: imageUri,
-          name: filename,
-          type,
-        } as any)
-
-        const uploadRes = await client.post('/api/upload', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 30000,
-        })
-
-        if (uploadRes.data?.ok && uploadRes.data?.url) {
-          urls.push(uploadRes.data.url)
-        } else {
-          throw new Error('Upload slike nije uspeo')
-        }
-      }
-
+      // Korak 1: Upload slika (uvek)
+      const urls = await uploadImages()
       setUploadedUrls(urls)
 
-      // Step 2: Generate AI description via backend proxy
-      const aiRes = await client.post('/api/ai/generate-description', {
-        category,
-        brand: brand || undefined,
-        size: size || undefined,
-        condition,
-        color: color || undefined,
-        language: 'sr',
-      }, { timeout: 60000 })
+      // Korak 2: AI opis (opcionalan — ako ne radi, ide na ručni unos)
+      try {
+        const aiRes = await client.post('/api/ai/generate-description', {
+          category,
+          brand: brand || undefined,
+          size: size || undefined,
+          condition,
+          color: color || undefined,
+          language: 'sr',
+        }, { timeout: 60000 })
 
-      if (aiRes.data?.ok && aiRes.data?.data) {
-        setTitle(aiRes.data.data.title || '')
-        setDescription(aiRes.data.data.description || '')
-        setShowAIFields(true)
-      } else {
-        throw new Error('AI nije generisao opis')
+        if (aiRes.data?.ok && aiRes.data?.data) {
+          setTitle(aiRes.data.data.title || '')
+          setDescription(aiRes.data.data.description || '')
+        }
+      } catch {
+        // AI server nije dostupan — samo nastavlja bez opisa
       }
+
+      setShowAIFields(true)
     } catch (error: any) {
-      console.error('Generate description error:', error)
-      Alert.alert(
-        'Greska',
-        error.response?.data?.error ||
-          error.response?.data?.message ||
-          error.message ||
-          'Greska pri generisanju opisa'
-      )
+      console.error('Upload error:', error)
+      Alert.alert('Greska', error.response?.data?.message || error.message || 'Greska pri upload-u slika')
     } finally {
       setIsGeneratingAI(false)
     }
@@ -189,6 +228,10 @@ export default function UploadScreen() {
     }
     if (!description.trim()) {
       Alert.alert('Greska', 'Opis je obavezan')
+      return
+    }
+    if ((listingType === 'sell' || listingType === 'both') && !price.trim()) {
+      Alert.alert('Greska', 'Cena je obavezna za prodaju')
       return
     }
 
@@ -221,7 +264,9 @@ export default function UploadScreen() {
         }
       }
 
-      const res = await client.post('/api/items', {
+      const finalTradeFor = getTradeForValue()
+
+      const body: any = {
         title: title.trim(),
         description: description.trim(),
         category,
@@ -229,23 +274,25 @@ export default function UploadScreen() {
         size: size || undefined,
         condition,
         images: finalUrls,
-      })
+        listingType,
+      }
+
+      if (listingType === 'sell' || listingType === 'both') {
+        body.price = Number(price)
+      }
+
+      if ((listingType === 'trade' || listingType === 'both') && finalTradeFor) {
+        body.tradeFor = finalTradeFor
+      }
+
+      const res = await client.post('/api/items', body)
 
       if (res.data?.ok) {
         Alert.alert('Uspeh', 'Item je uspesno dodat!', [
           {
             text: 'OK',
             onPress: () => {
-              setImages([])
-              setUploadedUrls([])
-              setCategory('')
-              setBrand('')
-              setSize('')
-              setCondition('good')
-              setColor('')
-              setTitle('')
-              setDescription('')
-              setShowAIFields(false)
+              resetForm()
               router.push('/(tabs)/feed')
             },
           },
@@ -267,6 +314,11 @@ export default function UploadScreen() {
   const resetForm = () => {
     setImages([])
     setUploadedUrls([])
+    setListingType('trade')
+    setPrice('')
+    setTradeFor('')
+    setSelectedTradeForChip('')
+    setTradeForFreeText('')
     setCategory('')
     setBrand('')
     setSize('')
@@ -304,6 +356,88 @@ export default function UploadScreen() {
 
           {!showAIFields ? (
             <>
+              {/* Listing Type Selector */}
+              <View className="mb-6">
+                <Text className="font-sans text-ink-dark text-sm mb-3">
+                  Tip oglasa *
+                </Text>
+                <View className="flex-row gap-2">
+                  {LISTING_TYPES.map((lt) => (
+                    <TouchableOpacity
+                      key={lt.value}
+                      onPress={() => setListingType(lt.value)}
+                      className={`flex-1 py-3 rounded-full items-center ${
+                        listingType === lt.value
+                          ? 'bg-brand-accent-deep'
+                          : 'border border-ink-dark'
+                      }`}
+                      disabled={isGeneratingAI}
+                    >
+                      <Text
+                        className={`font-sans font-semibold ${
+                          listingType === lt.value ? 'text-base-canvas' : 'text-ink-dark'
+                        }`}
+                      >
+                        {lt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Price — only for sell or both */}
+              {(listingType === 'sell' || listingType === 'both') && (
+                <View className="mb-4">
+                  <Text className="font-sans text-ink-dark text-sm mb-2">Cena *</Text>
+                  <TextInput
+                    value={price}
+                    onChangeText={setPrice}
+                    placeholder="Cena u EUR"
+                    keyboardType="numeric"
+                    className="font-sans border border-ink-dark rounded-lg px-4 py-3 text-ink-dark"
+                    placeholderTextColor="#2B2A2B66"
+                    editable={!isGeneratingAI}
+                  />
+                </View>
+              )}
+
+              {/* Trade For — only for trade or both */}
+              {(listingType === 'trade' || listingType === 'both') && (
+                <View className="mb-4">
+                  <Text className="font-sans text-ink-dark text-sm mb-2">Za šta razmeniš</Text>
+                  <View className="flex-row flex-wrap gap-2 mb-3">
+                    {TRADE_FOR_CHIPS.map((chip) => (
+                      <TouchableOpacity
+                        key={chip}
+                        onPress={() => handleTradeForChip(chip)}
+                        className={`px-4 py-2 rounded-full ${
+                          selectedTradeForChip === chip
+                            ? 'bg-brand-highlight'
+                            : 'border border-ink-dark'
+                        }`}
+                        disabled={isGeneratingAI}
+                      >
+                        <Text
+                          className={`font-sans text-sm ${
+                            selectedTradeForChip === chip ? 'text-ink-dark font-semibold' : 'text-ink-dark'
+                          }`}
+                        >
+                          {chip}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <TextInput
+                    value={tradeForFreeText}
+                    onChangeText={setTradeForFreeText}
+                    placeholder="Ili napiši slobodan tekst (opciono)..."
+                    className="font-sans border border-ink-dark rounded-lg px-4 py-3 text-ink-dark"
+                    placeholderTextColor="#2B2A2B66"
+                    editable={!isGeneratingAI}
+                  />
+                </View>
+              )}
+
               {/* Image Picker Section */}
               <View className="mb-6">
                 <Text className="font-sans text-ink-dark text-sm mb-3">
@@ -480,7 +614,7 @@ export default function UploadScreen() {
 
               {/* Manual entry option */}
               <TouchableOpacity
-                onPress={() => {
+                onPress={async () => {
                   if (images.length === 0) {
                     Alert.alert('Greska', 'Dodajte bar jednu sliku')
                     return
@@ -489,7 +623,16 @@ export default function UploadScreen() {
                     Alert.alert('Greska', 'Izaberite kategoriju')
                     return
                   }
-                  setShowAIFields(true)
+                  try {
+                    setIsGeneratingAI(true)
+                    const urls = await uploadImages()
+                    setUploadedUrls(urls)
+                    setShowAIFields(true)
+                  } catch (error: any) {
+                    Alert.alert('Greska', error.response?.data?.message || error.message || 'Greska pri upload-u slika')
+                  } finally {
+                    setIsGeneratingAI(false)
+                  }
                 }}
                 className="rounded-full py-4 items-center border border-ink-dark"
                 disabled={isGeneratingAI}
@@ -538,6 +681,11 @@ export default function UploadScreen() {
                     {CONDITIONS.find(c => c.value === condition)?.label}
                   </Text>
                 </View>
+                <View className="bg-brand-highlight px-3 py-1 rounded-full">
+                  <Text className="font-sans text-ink-dark text-xs font-semibold">
+                    {LISTING_TYPES.find(lt => lt.value === listingType)?.label}
+                  </Text>
+                </View>
               </View>
 
               {/* Title */}
@@ -554,7 +702,7 @@ export default function UploadScreen() {
               </View>
 
               {/* Description */}
-              <View className="mb-6">
+              <View className="mb-4">
                 <Text className="font-sans text-ink-dark text-sm mb-2">Opis *</Text>
                 <TextInput
                   value={description}
@@ -568,6 +716,59 @@ export default function UploadScreen() {
                   editable={!isSubmitting}
                 />
               </View>
+
+              {/* Price in step 2 (if sell or both) */}
+              {(listingType === 'sell' || listingType === 'both') && (
+                <View className="mb-4">
+                  <Text className="font-sans text-ink-dark text-sm mb-2">Cena *</Text>
+                  <TextInput
+                    value={price}
+                    onChangeText={setPrice}
+                    placeholder="Cena u EUR"
+                    keyboardType="numeric"
+                    className="font-sans border border-ink-dark rounded-lg px-4 py-3 text-ink-dark"
+                    placeholderTextColor="#2B2A2B66"
+                    editable={!isSubmitting}
+                  />
+                </View>
+              )}
+
+              {/* TradeFor in step 2 (if trade or both) */}
+              {(listingType === 'trade' || listingType === 'both') && (
+                <View className="mb-6">
+                  <Text className="font-sans text-ink-dark text-sm mb-2">Za šta razmeniš</Text>
+                  <View className="flex-row flex-wrap gap-2 mb-3">
+                    {TRADE_FOR_CHIPS.map((chip) => (
+                      <TouchableOpacity
+                        key={chip}
+                        onPress={() => handleTradeForChip(chip)}
+                        className={`px-4 py-2 rounded-full ${
+                          selectedTradeForChip === chip
+                            ? 'bg-brand-highlight'
+                            : 'border border-ink-dark'
+                        }`}
+                        disabled={isSubmitting}
+                      >
+                        <Text
+                          className={`font-sans text-sm ${
+                            selectedTradeForChip === chip ? 'text-ink-dark font-semibold' : 'text-ink-dark'
+                          }`}
+                        >
+                          {chip}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <TextInput
+                    value={tradeForFreeText}
+                    onChangeText={setTradeForFreeText}
+                    placeholder="Ili napiši slobodan tekst (opciono)..."
+                    className="font-sans border border-ink-dark rounded-lg px-4 py-3 text-ink-dark"
+                    placeholderTextColor="#2B2A2B66"
+                    editable={!isSubmitting}
+                  />
+                </View>
+              )}
 
               {/* Submit Button */}
               <TouchableOpacity

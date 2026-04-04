@@ -41,9 +41,11 @@ interface Item {
   brand?: string
   size?: string
   userId?: string
+  status?: string
+  archivedReason?: 'deleted' | 'sold'
 }
 
-type ProfileTab = 'items' | 'saved' | 'liked'
+type ProfileTab = 'items' | 'saved' | 'liked' | 'archive'
 
 export default function ProfileScreen() {
   const router = useRouter()
@@ -57,10 +59,12 @@ export default function ProfileScreen() {
   const [myItems, setMyItems] = useState<Item[]>([])
   const [savedItems, setSavedItems] = useState<Item[]>([])
   const [likedItems, setLikedItems] = useState<Item[]>([])
+  const [archivedItems, setArchivedItems] = useState<Item[]>([])
 
   const [itemsLoading, setItemsLoading] = useState(false)
   const [savedLoading, setSavedLoading] = useState(false)
   const [likedLoading, setLikedLoading] = useState(false)
+  const [archivedLoading, setArchivedLoading] = useState(false)
 
   const [modalVisible, setModalVisible] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -124,11 +128,29 @@ export default function ProfileScreen() {
     finally { setLikedLoading(false) }
   }
 
+  const fetchArchivedItems = async (profileData: User) => {
+    try {
+      setArchivedLoading(true)
+      const response = await client.get('/api/items', {
+        params: { userId: profileData._id, archived: true },
+      })
+      if (response.data.ok) {
+        setArchivedItems(response.data.data)
+      }
+    } catch {}
+    finally { setArchivedLoading(false) }
+  }
+
   const loadAll = async () => {
     setLoading(true)
     const profileData = await fetchProfile()
     if (profileData) {
-      await Promise.all([fetchMyItems(profileData), fetchSaved(), fetchLiked()])
+      await Promise.all([
+        fetchMyItems(profileData),
+        fetchSaved(),
+        fetchLiked(),
+        fetchArchivedItems(profileData),
+      ])
     }
     setLoading(false)
   }
@@ -257,9 +279,22 @@ export default function ProfileScreen() {
   }
 
   const tabData: Item[] =
-    activeTab === 'items' ? myItems : activeTab === 'saved' ? savedItems : likedItems
+    activeTab === 'items'
+      ? myItems
+      : activeTab === 'saved'
+      ? savedItems
+      : activeTab === 'liked'
+      ? likedItems
+      : archivedItems
+
   const tabLoading =
-    activeTab === 'items' ? itemsLoading : activeTab === 'saved' ? savedLoading : likedLoading
+    activeTab === 'items'
+      ? itemsLoading
+      : activeTab === 'saved'
+      ? savedLoading
+      : activeTab === 'liked'
+      ? likedLoading
+      : archivedLoading
 
   return (
     <>
@@ -331,9 +366,19 @@ export default function ProfileScreen() {
 
             {/* Tabs */}
             <View style={styles.tabBar}>
-              {(['items', 'saved', 'liked'] as ProfileTab[]).map((tab) => {
-                const labels = { items: 'Moji predmeti', saved: 'Sačuvano', liked: 'Lajkovano' }
-                const icons = { items: 'shirt-outline', saved: 'bookmark-outline', liked: 'heart-outline' }
+              {(['items', 'saved', 'liked', 'archive'] as ProfileTab[]).map((tab) => {
+                const labels: Record<ProfileTab, string> = {
+                  items: 'Moji predmeti',
+                  saved: 'Sačuvano',
+                  liked: 'Lajkovano',
+                  archive: 'Arhiva',
+                }
+                const icons: Record<ProfileTab, string> = {
+                  items: 'shirt-outline',
+                  saved: 'bookmark-outline',
+                  liked: 'heart-outline',
+                  archive: 'archive-outline',
+                }
                 return (
                   <TouchableOpacity
                     key={tab}
@@ -343,7 +388,7 @@ export default function ProfileScreen() {
                   >
                     <Ionicons
                       name={icons[tab] as any}
-                      size={18}
+                      size={16}
                       color={activeTab === tab ? '#431A43' : '#2B2A2B80'}
                     />
                     <Text style={[styles.tabLabel, activeTab === tab && styles.tabLabelActive]}>
@@ -369,7 +414,9 @@ export default function ProfileScreen() {
                   ? 'Nemaš još predmeta'
                   : activeTab === 'saved'
                   ? 'Nemaš sačuvanih itema'
-                  : 'Nisi lajkovala nijedan item'}
+                  : activeTab === 'liked'
+                  ? 'Nisi lajkovala nijedan item'
+                  : 'Arhiva je prazna'}
               </Text>
             </View>
           )
@@ -378,12 +425,24 @@ export default function ProfileScreen() {
           <ItemTile
             item={item}
             tab={activeTab}
-            onPress={() => router.push(`/items/${item._id}?viewOnly=${activeTab === 'items'}`)}
+            onPress={() =>
+              router.push(
+                `/items/${item._id}?viewOnly=${activeTab === 'items' || activeTab === 'archive'}`
+              )
+            }
             onRemove={
               activeTab === 'saved'
                 ? () => handleRemoveSaved(item._id)
                 : activeTab === 'liked'
                 ? () => handleUnlike(item._id)
+                : undefined
+            }
+            archived={activeTab === 'archive'}
+            archiveStatus={
+              activeTab === 'archive'
+                ? item.status === 'sold'
+                  ? 'sold'
+                  : 'deleted'
                 : undefined
             }
           />
@@ -466,11 +525,15 @@ function ItemTile({
   tab,
   onPress,
   onRemove,
+  archived,
+  archiveStatus,
 }: {
   item: Item
   tab: ProfileTab
   onPress: () => void
   onRemove?: () => void
+  archived?: boolean
+  archiveStatus?: 'deleted' | 'sold'
 }) {
   return (
     <TouchableOpacity
@@ -485,6 +548,21 @@ function ItemTile({
           <Ionicons name="shirt-outline" size={32} color="#9DD3E4" />
         </View>
       )}
+
+      {/* Archive badge */}
+      {archived && archiveStatus && (
+        <View
+          style={[
+            styles.archiveBadge,
+            archiveStatus === 'sold' ? styles.archiveBadgeSold : styles.archiveBadgeDeleted,
+          ]}
+        >
+          <Text style={styles.archiveBadgeText}>
+            {archiveStatus === 'sold' ? 'Prodato' : 'Obrisano'}
+          </Text>
+        </View>
+      )}
+
       <View style={styles.tileMeta}>
         <Text style={styles.tileTitle} numberOfLines={1}>{item.title}</Text>
       </View>
@@ -520,21 +598,22 @@ const styles = StyleSheet.create({
   },
   tabBtn: {
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderRadius: 12,
-    gap: 5,
+    gap: 3,
   },
   tabBtnActive: {
     backgroundColor: '#F6F8ED',
   },
   tabLabel: {
     fontFamily: 'Inter',
-    fontSize: 11,
+    fontSize: 9,
     color: '#2B2A2B80',
     fontWeight: '500',
+    textAlign: 'center',
   },
   tabLabelActive: {
     color: '#431A43',
@@ -571,5 +650,25 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.9)',
     borderRadius: 12,
     padding: 4,
+  },
+  archiveBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  archiveBadgeSold: {
+    backgroundColor: '#CBDA63',
+  },
+  archiveBadgeDeleted: {
+    backgroundColor: '#FF3B5C',
+  },
+  archiveBadgeText: {
+    fontFamily: 'Inter',
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#2B2A2B',
   },
 })

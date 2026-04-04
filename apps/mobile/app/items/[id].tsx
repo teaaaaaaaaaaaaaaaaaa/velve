@@ -48,6 +48,10 @@ interface Item {
   likesCount?: number
   isLiked?: boolean
   isWishlisted?: boolean
+  listingType?: 'trade' | 'sell' | 'both'
+  price?: number
+  tradeFor?: string
+  status?: string
 }
 
 interface UserItem {
@@ -70,12 +74,26 @@ export default function ItemDetailsScreen() {
   const [isWishlisted, setIsWishlisted] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
+  // Trade modal
   const [showTradeModal, setShowTradeModal] = useState(false)
   const [currentUserItems, setUserItems] = useState<UserItem[]>([])
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [tradeMessage, setTradeMessage] = useState('')
   const [loadingUserItems, setLoadingUserItems] = useState(false)
   const [submittingTrade, setSubmittingTrade] = useState(false)
+
+  // Edit modal
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editBrand, setEditBrand] = useState('')
+  const [editSize, setEditSize] = useState('')
+  const [editCondition, setEditCondition] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  // Mark as sold
+  const [showSoldConfirm, setShowSoldConfirm] = useState(false)
+  const [markingSold, setMarkingSold] = useState(false)
 
   const scrollRef = useRef<ScrollView>(null)
 
@@ -100,6 +118,11 @@ export default function ItemDetailsScreen() {
         setIsLiked(data.isLiked || false)
         setLikesCount(data.likesCount || 0)
         setIsWishlisted(data.isWishlisted || false)
+        setEditTitle(data.title || '')
+        setEditDescription(data.description || '')
+        setEditBrand(data.brand || '')
+        setEditSize(data.size || '')
+        setEditCondition(data.condition || 'good')
       }
     } catch {
       Alert.alert('Greška', 'Nije moguće učitati detalje itema')
@@ -168,6 +191,55 @@ export default function ItemDetailsScreen() {
     ])
   }
 
+  const handleMarkAsSold = () => {
+    Alert.alert(
+      'Označi kao prodato',
+      'Da li si sigurna da si prodala/razmenila ovaj item?',
+      [
+        { text: 'Otkaži', style: 'cancel' },
+        {
+          text: 'Da, označi',
+          onPress: async () => {
+            try {
+              setMarkingSold(true)
+              await client.put(`/api/items/${id}/sold`)
+              router.back()
+            } catch {
+              Alert.alert('Greška', 'Nije moguće označiti item kao prodat')
+            } finally {
+              setMarkingSold(false)
+            }
+          },
+        },
+      ]
+    )
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editTitle.trim()) {
+      Alert.alert('Greška', 'Naslov je obavezan')
+      return
+    }
+    try {
+      setSavingEdit(true)
+      const response = await client.put(`/api/items/${id}`, {
+        title: editTitle.trim(),
+        description: editDescription.trim(),
+        brand: editBrand.trim() || undefined,
+        size: editSize.trim() || undefined,
+        condition: editCondition || undefined,
+      })
+      if (response.data.ok) {
+        setItem(response.data.data)
+        setShowEditModal(false)
+      }
+    } catch {
+      Alert.alert('Greška', 'Nije moguće sačuvati izmene')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
   const handleSubmitTrade = async () => {
     if (!selectedItemId) {
       Alert.alert('Greška', 'Izaberi item za razmenu')
@@ -192,6 +264,30 @@ export default function ItemDetailsScreen() {
       }
     } catch {
       Alert.alert('Greška', 'Nije moguće poslati zahtev')
+    } finally {
+      setSubmittingTrade(false)
+    }
+  }
+
+  const handleSubmitBuy = async () => {
+    try {
+      setSubmittingTrade(true)
+      const response = await client.post('/api/trades', {
+        requestedItemId: id,
+        type: 'buy',
+        message: tradeMessage.trim() || undefined,
+      })
+      if (response.data.ok) {
+        const chatId = response.data.data?.chatId
+        Alert.alert('Uspeh', 'Zahtev za kupovinu je poslat!', [
+          {
+            text: 'Otvori chat',
+            onPress: () => router.push(chatId ? `/(tabs)/chat/${chatId}` : '/(tabs)/chat'),
+          },
+        ])
+      }
+    } catch {
+      Alert.alert('Greška', 'Nije moguće poslati zahtev za kupovinu')
     } finally {
       setSubmittingTrade(false)
     }
@@ -224,6 +320,12 @@ export default function ItemDetailsScreen() {
     item.size ? item.size.toUpperCase() : null,
     CONDITION_LABELS[item.condition],
   ].filter(Boolean)
+
+  const showTradeButton = !isOwn() && (item.listingType === 'trade' || item.listingType === 'both' || !item.listingType)
+  const showBuyButton = !isOwn() && (item.listingType === 'sell' || item.listingType === 'both')
+  const showPrice = (item.listingType === 'sell' || item.listingType === 'both') && item.price != null
+  const showTradeFor = (item.listingType === 'trade' || item.listingType === 'both') && !!item.tradeFor
+  const canMarkAsSold = isOwn() && item.status !== 'sold'
 
   return (
     <View style={styles.container}>
@@ -272,7 +374,7 @@ export default function ItemDetailsScreen() {
         <Text style={styles.itemMeta}>{metaParts.join('  ·  ')}</Text>
       </View>
 
-      {/* Bottom info: user + description */}
+      {/* Bottom info: user + description + price + tradeFor */}
       <View style={styles.bottomInfo}>
         {owner && (
           <View style={styles.userRow}>
@@ -282,6 +384,12 @@ export default function ItemDetailsScreen() {
             />
             <Text style={styles.userName}>@{owner.displayName}</Text>
           </View>
+        )}
+        {showPrice && (
+          <Text style={styles.priceText}>Cena: {item.price} EUR</Text>
+        )}
+        {showTradeFor && (
+          <Text style={styles.tradeForText}>Traži: {item.tradeFor}</Text>
         )}
         {!!item.description && (
           <Text style={styles.description} numberOfLines={3}>{item.description}</Text>
@@ -322,18 +430,62 @@ export default function ItemDetailsScreen() {
             </TouchableOpacity>
           )}
 
-          {isOwn() ? (
-            <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete} activeOpacity={0.8}>
-              <Ionicons name="trash-outline" size={22} color="white" />
-              <Text style={styles.actionLabel}>Obriši</Text>
-            </TouchableOpacity>
-          ) : (
+          {/* Own item actions: edit + delete */}
+          {isOwn() && (
+            <View style={styles.ownActions}>
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => setShowEditModal(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="pencil-outline" size={28} color="white" />
+                <Text style={styles.actionLabel}>Izmeni</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionBtn} onPress={handleDelete} activeOpacity={0.8}>
+                <Ionicons name="trash-outline" size={28} color="white" />
+                <Text style={styles.actionLabel}>Obriši</Text>
+              </TouchableOpacity>
+              {canMarkAsSold && (
+                <TouchableOpacity
+                  style={styles.soldBtn}
+                  onPress={handleMarkAsSold}
+                  activeOpacity={0.8}
+                  disabled={markingSold}
+                >
+                  {markingSold ? (
+                    <ActivityIndicator size="small" color="#2B2A2B" />
+                  ) : (
+                    <Text style={styles.soldBtnText}>Prodato</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {/* Trade button for others */}
+          {showTradeButton && (
             <TouchableOpacity
               style={styles.tradeBtn}
               onPress={() => { setShowTradeModal(true); fetchUserItems() }}
               activeOpacity={0.8}
             >
               <Text style={styles.tradeBtnText}>Razmeni</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Buy button for others */}
+          {showBuyButton && (
+            <TouchableOpacity
+              style={styles.buyBtn}
+              onPress={handleSubmitBuy}
+              activeOpacity={0.8}
+              disabled={submittingTrade}
+            >
+              {submittingTrade ? (
+                <ActivityIndicator size="small" color="#F6F8ED" />
+              ) : (
+                <Text style={styles.buyBtnText}>Kupi</Text>
+              )}
             </TouchableOpacity>
           )}
         </View>
@@ -433,6 +585,103 @@ export default function ItemDetailsScreen() {
           )}
         </View>
       </Modal>
+
+      {/* Edit Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#F6F8ED' }}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowEditModal(false)}>
+              <Ionicons name="close" size={28} color="#2B2A2B" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Izmeni item</Text>
+            <TouchableOpacity onPress={handleSaveEdit} disabled={savingEdit}>
+              <Text style={[styles.saveEditText, savingEdit && { opacity: 0.4 }]}>
+                {savingEdit ? 'Čuvam...' : 'Sačuvaj'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={{ flex: 1, paddingHorizontal: 24 }}>
+            <View style={{ marginTop: 20 }}>
+              <Text style={styles.editLabel}>Naslov *</Text>
+              <TextInput
+                value={editTitle}
+                onChangeText={setEditTitle}
+                placeholder="Naslov..."
+                placeholderTextColor="#2B2A2B60"
+                style={styles.editInput}
+              />
+            </View>
+
+            <View style={{ marginTop: 16 }}>
+              <Text style={styles.editLabel}>Opis</Text>
+              <TextInput
+                value={editDescription}
+                onChangeText={setEditDescription}
+                placeholder="Opis..."
+                placeholderTextColor="#2B2A2B60"
+                multiline
+                numberOfLines={5}
+                textAlignVertical="top"
+                style={[styles.editInput, { minHeight: 110 }]}
+              />
+            </View>
+
+            <View style={{ marginTop: 16 }}>
+              <Text style={styles.editLabel}>Brand</Text>
+              <TextInput
+                value={editBrand}
+                onChangeText={setEditBrand}
+                placeholder="Brand..."
+                placeholderTextColor="#2B2A2B60"
+                style={styles.editInput}
+              />
+            </View>
+
+            <View style={{ marginTop: 16 }}>
+              <Text style={styles.editLabel}>Veličina</Text>
+              <TextInput
+                value={editSize}
+                onChangeText={setEditSize}
+                placeholder="Veličina..."
+                placeholderTextColor="#2B2A2B60"
+                style={styles.editInput}
+              />
+            </View>
+
+            <View style={{ marginTop: 16, marginBottom: 40 }}>
+              <Text style={styles.editLabel}>Stanje</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                {(['new', 'like_new', 'good', 'fair'] as const).map((cond) => {
+                  const labels = { new: 'Novo', like_new: 'Kao novo', good: 'Dobro stanje', fair: 'Prihvatljivo' }
+                  return (
+                    <TouchableOpacity
+                      key={cond}
+                      onPress={() => setEditCondition(cond)}
+                      style={[
+                        styles.conditionChip,
+                        editCondition === cond && styles.conditionChipActive,
+                      ]}
+                    >
+                      <Text style={[
+                        styles.conditionChipText,
+                        editCondition === cond && styles.conditionChipTextActive,
+                      ]}>
+                        {labels[cond]}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   )
 }
@@ -528,6 +777,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     ...shadow,
   },
+  priceText: {
+    color: '#CBDA63',
+    fontSize: 15,
+    fontFamily: 'Inter',
+    fontWeight: '700',
+    marginBottom: 4,
+    ...shadow,
+  },
+  tradeForText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    fontFamily: 'Inter',
+    fontStyle: 'italic',
+    marginBottom: 4,
+    ...shadow,
+  },
   description: {
     color: 'rgba(255,255,255,0.85)',
     fontSize: 13,
@@ -541,6 +806,10 @@ const styles = StyleSheet.create({
     bottom: 120,
     alignItems: 'center',
     gap: 20,
+  },
+  ownActions: {
+    alignItems: 'center',
+    gap: 16,
   },
   actionBtn: {
     alignItems: 'center',
@@ -560,9 +829,6 @@ const styles = StyleSheet.create({
     marginTop: 3,
     ...shadow,
   },
-  deleteBtn: {
-    alignItems: 'center',
-  },
   tradeBtn: {
     backgroundColor: '#431A43',
     borderRadius: 20,
@@ -573,6 +839,35 @@ const styles = StyleSheet.create({
   tradeBtnText: {
     color: '#F6F8ED',
     fontSize: 13,
+    fontFamily: 'Inter',
+    fontWeight: '700',
+  },
+  buyBtn: {
+    backgroundColor: '#CBDA63',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    marginTop: 4,
+    minWidth: 56,
+    alignItems: 'center',
+  },
+  buyBtnText: {
+    color: '#2B2A2B',
+    fontSize: 13,
+    fontFamily: 'Inter',
+    fontWeight: '700',
+  },
+  soldBtn: {
+    backgroundColor: '#CBDA63',
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    alignItems: 'center',
+    minWidth: 56,
+  },
+  soldBtnText: {
+    color: '#2B2A2B',
+    fontSize: 11,
     fontFamily: 'Inter',
     fontWeight: '700',
   },
@@ -691,5 +986,49 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontSize: 15,
     fontWeight: '700',
+  },
+  saveEditText: {
+    fontFamily: 'Inter',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#431A43',
+  },
+  editLabel: {
+    fontFamily: 'Inter',
+    fontSize: 13,
+    color: '#2B2A2B',
+    marginBottom: 6,
+    fontWeight: '500',
+  },
+  editInput: {
+    borderWidth: 1,
+    borderColor: 'rgba(43,42,43,0.2)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontFamily: 'Inter',
+    fontSize: 14,
+    color: '#2B2A2B',
+    backgroundColor: 'white',
+  },
+  conditionChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(43,42,43,0.2)',
+  },
+  conditionChipActive: {
+    backgroundColor: '#431A43',
+    borderColor: '#431A43',
+  },
+  conditionChipText: {
+    fontFamily: 'Inter',
+    fontSize: 13,
+    color: '#2B2A2B',
+  },
+  conditionChipTextActive: {
+    color: '#F6F8ED',
+    fontWeight: '600',
   },
 })

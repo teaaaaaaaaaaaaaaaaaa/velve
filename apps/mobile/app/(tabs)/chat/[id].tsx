@@ -36,13 +36,20 @@ interface TradeData {
   requestedItemImage: string
 }
 
+interface BuyData {
+  requestedItemId: string
+  requestedItemTitle: string
+  requestedItemImage: string
+}
+
 interface Message {
   _id: string
   chatId: string
   senderId: { _id: string; displayName: string; photoURL: string } | string
   text: string
-  type?: 'text' | 'trade'
+  type?: 'text' | 'trade' | 'buy'
   tradeData?: TradeData
+  buyData?: BuyData
   createdAt: string
 }
 
@@ -208,6 +215,23 @@ export default function ChatScreen() {
       )
     }
 
+    if (item.type === 'buy' && item.buyData) {
+      return (
+        <View>
+          {showDate && (
+            <Text style={styles.dateLabel}>{formatDate(item.createdAt)}</Text>
+          )}
+          <BuyCard
+            buyData={item.buyData}
+            text={item.text}
+            onViewItem={() =>
+              router.push(`/items/${item.buyData!.requestedItemId}?viewOnly=true`)
+            }
+          />
+        </View>
+      )
+    }
+
     return (
       <View>
         {showDate && (
@@ -365,6 +389,41 @@ function TradeCard({
   )
 }
 
+function BuyCard({
+  buyData,
+  text,
+  onViewItem,
+}: {
+  buyData: BuyData
+  text: string
+  onViewItem: () => void
+}) {
+  return (
+    <View style={styles.buyCard}>
+      <Text style={styles.buyCardTitle}>Zahtev za kupovinu</Text>
+
+      <View style={styles.buyItemRow}>
+        <Image
+          source={{ uri: buyData.requestedItemImage || '' }}
+          style={styles.buyItemImage}
+          resizeMode="cover"
+        />
+        <View style={{ flex: 1, marginLeft: 12 }}>
+          <Text style={styles.buyItemLabel} numberOfLines={2}>
+            {buyData.requestedItemTitle}
+          </Text>
+          <Text style={styles.buyItemSubtext}>želi da kupi ovaj item</Text>
+        </View>
+      </View>
+
+      <TouchableOpacity style={styles.tradeViewBtn} onPress={onViewItem} activeOpacity={0.8}>
+        <Text style={styles.tradeViewBtnText}>Vidi item</Text>
+        <Ionicons name="arrow-forward" size={16} color="#431A43" />
+      </TouchableOpacity>
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F6F8ED' },
   centered: { flex: 1, backgroundColor: '#F6F8ED', justifyContent: 'center', alignItems: 'center' },
@@ -489,6 +548,47 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#431A43',
     fontWeight: '700',
+  },
+  // Buy card
+  buyCard: {
+    marginHorizontal: 16,
+    marginVertical: 8,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(203,218,99,0.4)',
+  },
+  buyCardTitle: {
+    fontFamily: 'AlteHaasGrotesk-Bold',
+    fontSize: 15,
+    color: '#2B2A2B',
+    marginBottom: 14,
+    textAlign: 'center',
+  },
+  buyItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  buyItemImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 12,
+    backgroundColor: '#E8F7FB',
+  },
+  buyItemLabel: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    color: '#2B2A2B',
+    fontWeight: '600',
+    lineHeight: 19,
+  },
+  buyItemSubtext: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: 'rgba(43,42,43,0.5)',
+    marginTop: 4,
   },
 })
 

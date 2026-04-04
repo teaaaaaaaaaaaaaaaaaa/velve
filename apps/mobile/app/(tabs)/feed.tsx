@@ -42,6 +42,9 @@ type Item = {
   likesCount?: number
   isLiked?: boolean
   isWishlisted?: boolean
+  listingType?: 'trade' | 'sell' | 'both'
+  price?: number
+  tradeFor?: string
 }
 
 export default function FeedScreen() {
@@ -80,7 +83,6 @@ export default function FeedScreen() {
   }, [])
 
   const handleLike = useCallback(async (itemId: string) => {
-    // Čuvamo originalne vrednosti pre optimistic update-a
     let originalLiked = false
     let originalCount = 0
     setItems((prev) => {
@@ -111,7 +113,6 @@ export default function FeedScreen() {
         )
       }
     } catch {
-      // Revert na originalne vrednosti
       setItems((prev) =>
         prev.map((item) =>
           item._id === itemId
@@ -208,6 +209,10 @@ function FeedItem({ item, height, onLike, onWishlist }: FeedItemProps) {
     CONDITION_LABELS[item.condition],
   ].filter(Boolean)
 
+  const showPrice = (item.listingType === 'sell' || item.listingType === 'both') && item.price != null
+  const showTradeBtn = !item.listingType || item.listingType === 'trade' || item.listingType === 'both'
+  const showBuyBtn = item.listingType === 'sell' || item.listingType === 'both'
+
   return (
     <View style={[styles.item, { height }]}>
       {/* Full screen image */}
@@ -225,7 +230,7 @@ function FeedItem({ item, height, onLike, onWishlist }: FeedItemProps) {
         <Text style={styles.itemMeta}>{metaParts.join('  ·  ')}</Text>
       </View>
 
-      {/* Bottom info: user + description */}
+      {/* Bottom info: user + description + price */}
       <View style={styles.bottomInfo}>
         {typeof item.userId === 'object' && (
           <View style={styles.userRow}>
@@ -235,6 +240,9 @@ function FeedItem({ item, height, onLike, onWishlist }: FeedItemProps) {
             />
             <Text style={styles.userName}>@{item.userId.displayName}</Text>
           </View>
+        )}
+        {showPrice && (
+          <Text style={styles.priceText}>{item.price} EUR</Text>
         )}
         {!!item.description && (
           <Text style={styles.description} numberOfLines={2}>
@@ -272,13 +280,25 @@ function FeedItem({ item, height, onLike, onWishlist }: FeedItemProps) {
           <Text style={styles.actionLabel}>Poruka</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.tradeBtn}
-          onPress={() => router.push(`/items/${item._id}?openTrade=true`)}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.tradeBtnText}>Razmeni</Text>
-        </TouchableOpacity>
+        {showTradeBtn && (
+          <TouchableOpacity
+            style={styles.tradeBtn}
+            onPress={() => router.push(`/items/${item._id}?openTrade=true`)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.tradeBtnText}>Razmeni</Text>
+          </TouchableOpacity>
+        )}
+
+        {showBuyBtn && (
+          <TouchableOpacity
+            style={styles.buyBtn}
+            onPress={() => router.push(`/items/${item._id}`)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.buyBtnText}>Kupi</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   )
@@ -352,7 +372,7 @@ const styles = StyleSheet.create({
   userRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   avatar: {
     width: 36,
@@ -367,6 +387,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter',
     fontWeight: '700',
+    ...shadow,
+  },
+  priceText: {
+    color: '#CBDA63',
+    fontSize: 15,
+    fontFamily: 'Inter',
+    fontWeight: '700',
+    marginBottom: 4,
     ...shadow,
   },
   description: {
@@ -410,6 +438,19 @@ const styles = StyleSheet.create({
   },
   tradeBtnText: {
     color: '#F6F8ED',
+    fontSize: 13,
+    fontFamily: 'Inter',
+    fontWeight: '700',
+  },
+  buyBtn: {
+    backgroundColor: '#CBDA63',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    marginTop: 4,
+  },
+  buyBtnText: {
+    color: '#2B2A2B',
     fontSize: 13,
     fontFamily: 'Inter',
     fontWeight: '700',

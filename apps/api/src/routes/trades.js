@@ -109,27 +109,49 @@ router.post('/', requireAuth, async (req, res) => {
     // Send automatic trade card message
     const Message = require('../models/Message')
     const senderName = req.dbUser.displayName || 'Korisnik'
-    await Message.create({
-      chatId: chat._id,
-      senderId: req.dbUser._id,
-      type: 'trade',
-      text: `${senderName} želi da zameni "${offeredItem.title}" za "${requestedItem.title}"`,
-      tradeData: {
-        offeredItemId: offeredItem._id,
-        offeredItemTitle: offeredItem.title,
-        offeredItemImage: offeredItem.images[0] || '',
-        requestedItemId: requestedItem._id,
-        requestedItemTitle: requestedItem.title,
-        requestedItemImage: requestedItem.images[0] || '',
-      },
-    })
+
+    // Ako je requestedItem listingType 'sell' — ovo je kupovina, ne razmena
+    const isBuyRequest = requestedItem.listingType === 'sell'
+
+    if (isBuyRequest) {
+      await Message.create({
+        chatId: chat._id,
+        senderId: req.dbUser._id,
+        type: 'buy',
+        text: `${senderName} želi da kupi "${requestedItem.title}"`,
+        tradeData: {
+          requestedItemId: requestedItem._id,
+          requestedItemTitle: requestedItem.title,
+          requestedItemImage: requestedItem.images[0] || '',
+        },
+      })
+    } else {
+      await Message.create({
+        chatId: chat._id,
+        senderId: req.dbUser._id,
+        type: 'trade',
+        text: `${senderName} želi da zameni "${offeredItem.title}" za "${requestedItem.title}"`,
+        tradeData: {
+          offeredItemId: offeredItem._id,
+          offeredItemTitle: offeredItem.title,
+          offeredItemImage: offeredItem.images[0] || '',
+          requestedItemId: requestedItem._id,
+          requestedItemTitle: requestedItem.title,
+          requestedItemImage: requestedItem.images[0] || '',
+        },
+      })
+    }
 
     await Chat.findByIdAndUpdate(chat._id, { lastMessageAt: new Date() })
 
     // Push notification to receiver
+    const pushBody = isBuyRequest
+      ? `${senderName} želi da kupi "${requestedItem.title}"`
+      : `${senderName} želi da zameni "${offeredItem.title}" za tvoj predmet`
+
     sendPushToUser(receiverId, {
-      title: 'Novi zahtev za razmenu!',
-      body: `${senderName} želi da zameni "${offeredItem.title}" za tvoj predmet`,
+      title: isBuyRequest ? 'Novi zahtev za kupovinu!' : 'Novi zahtev za razmenu!',
+      body: pushBody,
       data: { type: 'trade_request', tradeId: trade._id.toString(), chatId: chat._id.toString() },
     })
 
