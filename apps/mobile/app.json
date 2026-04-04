@@ -27,6 +27,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cafba5a3-b0d3-4e06-8ad2-e3a9633f3858"
+      }
+    },
+    "owner": "vukixxx"
   }
 }

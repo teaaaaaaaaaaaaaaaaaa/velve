@@ -19,19 +19,33 @@ async function rankFeedItems(items, user) {
     // 3. Preference match
     let preferenceMatch = 0
 
-    // Brand match: 0.5 weight
+    // Brand match: 0.4 weight
     if (user.favoriteBrands?.includes(item.brand)) {
-      preferenceMatch += 0.5
+      preferenceMatch += 0.4
     }
 
-    // Category/style match: 0.3 weight
-    if (user.stylePreferences?.includes(item.category)) {
+    // Category match: 0.3 weight (exact match on user selected categories)
+    if (user.categories?.includes(item.category)) {
       preferenceMatch += 0.3
     }
 
-    // Size match: 0.2 weight
-    if (user.sizes?.clothing === item.size || user.sizes?.shoes === item.size) {
+    // Style match: 0.2 weight (fuzzy match on style preferences)
+    const styleMatch = user.stylePreferences?.some(s => {
+      const styleLower = s.toLowerCase()
+      const categoryLower = (item.category || '').toLowerCase()
+      const titleLower = (item.title || '').toLowerCase()
+      return categoryLower.includes(styleLower) || titleLower.includes(styleLower)
+    })
+    if (styleMatch) {
       preferenceMatch += 0.2
+    }
+
+    // Size match: 0.1 weight
+    const userSize = (item.category || '').includes('Shoes') || (item.category || '').includes('Patike') || (item.category || '').includes('Cipele')
+      ? user.sizes?.shoes
+      : user.sizes?.clothing
+    if (item.size === userSize) {
+      preferenceMatch += 0.1
     }
 
     // Normalize to 0-1

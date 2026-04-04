@@ -14,6 +14,33 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
+// Validate Google OAuth configuration
+function validateGoogleOAuthConfig() {
+  const clientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
+
+  if (!clientId) {
+    console.warn('[Firebase] WARNING: EXPO_PUBLIC_GOOGLE_CLIENT_ID is not defined. Google Sign-In will not work.');
+    return false;
+  }
+
+  if (!clientId.endsWith('.apps.googleusercontent.com')) {
+    console.warn('[Firebase] WARNING: EXPO_PUBLIC_GOOGLE_CLIENT_ID does not match expected format (.apps.googleusercontent.com)');
+    return false;
+  }
+
+  // Check for placeholder/example values
+  if (clientId.includes('example') || clientId.includes('placeholder') || clientId.includes('YOUR_')) {
+    console.warn('[Firebase] WARNING: EXPO_PUBLIC_GOOGLE_CLIENT_ID appears to be a placeholder. Update .env with real credentials.');
+    return false;
+  }
+
+  console.log('[Firebase] Google OAuth config validated successfully');
+  return true;
+}
+
+// Run validation
+validateGoogleOAuthConfig();
+
 // Zaštita od duplog initializovanja (hot reload)
 let app: FirebaseApp;
 let auth: Auth;

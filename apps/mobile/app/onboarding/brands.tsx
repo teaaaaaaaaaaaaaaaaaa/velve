@@ -54,7 +54,7 @@ export default function BrandsScreen() {
     if (selectedBrands.length === 0) return
 
     router.push({
-      pathname: '/onboarding/sizes',
+      pathname: '/onboarding/about',
       params: {
         ...params,
         brands: JSON.stringify(selectedBrands),
@@ -83,7 +83,7 @@ export default function BrandsScreen() {
         </TouchableOpacity>
 
         <View className="flex-row items-center justify-between mb-2">
-          <Text className="text-ink-dark font-sans text-sm">Korak 3 od 5</Text>
+          <Text className="text-ink-dark font-sans text-sm">Korak 4 od 5</Text>
         </View>
         <View className="h-2 bg-ink-dark/10 rounded-full overflow-hidden">
           <View className="h-full bg-brand-accent-deep rounded-full" style={{ width: '60%' }} />
@@ -95,8 +95,11 @@ export default function BrandsScreen() {
           <Text className="text-3xl font-display text-ink-dark mb-3">
             Koji brendovi te zanimaju?
           </Text>
-          <Text className="text-base font-sans text-ink-dark/70 mb-6">
+          <Text className="text-base font-sans text-ink-dark/70 mb-2">
             Pomozi nam da ti prikažemo ono što voliš.
+          </Text>
+          <Text className="text-base font-sans text-ink-dark/60 text-center mb-6">
+            Tvoji omiljeni brendovi pomoći će nam da preporučimo stvari koje ti se sviđaju. Možeš dodati i svoje! 🏷️
           </Text>
 
           {/* Custom Brand Input */}

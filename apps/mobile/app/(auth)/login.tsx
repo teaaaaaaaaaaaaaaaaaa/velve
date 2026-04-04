@@ -49,7 +49,25 @@ export default function LoginScreen() {
       await signInWithGoogle()
     } catch (e: any) {
       console.log('[LoginScreen] Google login error:', e.message)
-      Alert.alert('Google prijava', 'Google prijava nije još konfigurisana. Koristi email za sada.')
+
+      // User cancelled - silent return
+      if (e.message === 'USER_CANCELLED') {
+        return
+      }
+
+      // Specific error messages
+      let title = 'Google prijava'
+      let message = 'Došlo je do greške. Pokušaj ponovo.'
+
+      if (e.message.includes('CLIENT_ID')) {
+        message = 'Aplikacija nije pravilno konfigurisana. Kontaktiraj podršku.'
+      } else if (e.message === 'NETWORK_ERROR') {
+        message = 'Proveri internet konekciju i pokušaj ponovo.'
+      } else if (e.message === 'OAUTH_FAILED') {
+        message = 'Google prijava nije uspela. Pokušaj ponovo.'
+      }
+
+      Alert.alert(title, message)
     }
   }
 

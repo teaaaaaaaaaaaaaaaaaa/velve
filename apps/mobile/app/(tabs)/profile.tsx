@@ -32,6 +32,11 @@ interface User {
   followersCount: number
   followingCount: number
   itemsCount: number
+  stylePreferences?: string[]
+  categories?: string[]
+  favoriteBrands?: string[]
+  sizes?: { clothing?: string; shoes?: string }
+  location?: { city?: string; region?: string }
 }
 
 interface Item {
@@ -46,6 +51,27 @@ interface Item {
 }
 
 type ProfileTab = 'items' | 'saved' | 'liked' | 'archive'
+
+function calculateCompleteness(profile: User | null): number {
+  if (!profile) return 0
+
+  let score = 0
+
+  // Core profile (40%)
+  score += 13.3 // displayName always filled
+  if (profile.photoURL) score += 13.3
+  if (profile.bio && profile.bio.length > 0) score += 13.3
+
+  // Preferences (60%)
+  if (profile.stylePreferences && profile.stylePreferences.length > 0) score += 10
+  if (profile.categories && profile.categories.length > 0) score += 10
+  if (profile.favoriteBrands && profile.favoriteBrands.length > 0) score += 10
+  if (profile.sizes?.clothing) score += 10
+  if (profile.sizes?.shoes) score += 10
+  if (profile.location?.city) score += 10
+
+  return Math.round(score)
+}
 
 export default function ProfileScreen() {
   const router = useRouter()
@@ -330,6 +356,38 @@ export default function ProfileScreen() {
               {profile.bio ? (
                 <Text className="font-sans text-ink-dark text-center text-sm mb-4">{profile.bio}</Text>
               ) : null}
+
+              {/* Profile Completeness */}
+              {profile && calculateCompleteness(profile) < 100 && (
+                <View className="w-full px-6 mb-4">
+                  <View className="flex-row items-center justify-between mb-2">
+                    <Text className="text-ink-dark text-sm font-medium font-sans">
+                      Kompletnost profila
+                    </Text>
+                    <Text className="text-brand-accent-deep text-sm font-bold font-sans">
+                      {calculateCompleteness(profile)}%
+                    </Text>
+                  </View>
+
+                  {/* Progress bar */}
+                  <View className="w-full h-2 bg-brand-accent-light/30 rounded-full overflow-hidden">
+                    <View
+                      className="h-full bg-brand-accent-deep rounded-full"
+                      style={{ width: `${calculateCompleteness(profile)}%` }}
+                    />
+                  </View>
+
+                  {/* CTA */}
+                  <TouchableOpacity
+                    onPress={() => setModalVisible(true)}
+                    className="mt-2"
+                  >
+                    <Text className="text-brand-accent-deep text-xs font-sans">
+                      Završi profil za bolje preporuke
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {/* Stats */}
               <View className="flex-row justify-around w-full mb-5">
