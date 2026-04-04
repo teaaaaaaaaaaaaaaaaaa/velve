@@ -167,8 +167,8 @@ export default function UploadScreen() {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 30000,
       })
-      if (uploadRes.data?.ok && uploadRes.data?.url) {
-        urls.push(uploadRes.data.url)
+      if (uploadRes.data?.ok && uploadRes.data?.data?.url) {
+        urls.push(uploadRes.data.data.url)
       } else {
         throw new Error('Upload slike nije uspeo')
       }
@@ -258,8 +258,8 @@ export default function UploadScreen() {
             timeout: 30000,
           })
 
-          if (uploadRes.data?.ok && uploadRes.data?.url) {
-            finalUrls.push(uploadRes.data.url)
+          if (uploadRes.data?.ok && uploadRes.data?.data?.url) {
+            finalUrls.push(uploadRes.data.data.url)
           }
         }
       }
