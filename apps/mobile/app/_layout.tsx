@@ -20,15 +20,14 @@ function AuthGate() {
     const inAuthGroup = segments[0] === '(auth)'
     const inOnboarding = segments[0] === 'onboarding'
     const inTabs = segments[0] === '(tabs)'
+    const inItems = segments[0] === 'items'
     const isIndex = segments.length === 0 || segments[0] === 'index'
 
     if (!currentUser && !inAuthGroup) {
       router.replace('/(auth)/login')
     } else if (currentUser && inAuthGroup) {
-      // When user logs in, go to index to check onboarding status
       router.replace('/')
-    } else if (currentUser && !inOnboarding && !inTabs && !isIndex) {
-      // If user is logged in but not in a valid route, go to index
+    } else if (currentUser && !inOnboarding && !inTabs && !inItems && !isIndex) {
       router.replace('/')
     }
   }, [currentUser, loading, segments])

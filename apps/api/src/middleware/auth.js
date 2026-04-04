@@ -32,12 +32,21 @@ async function requireAuth(req, res, next) {
     // ensureUser: find or create MongoDB user from Firebase UID
     let dbUser = await User.findOne({ firebaseUid: decoded.uid })
     if (!dbUser) {
+      const emailPrefix = (decoded.email || '').split('@')[0]
       dbUser = await User.create({
         firebaseUid: decoded.uid,
         email: decoded.email || '',
-        displayName: decoded.name || '',
+        displayName: decoded.name || emailPrefix || 'Korisnik',
         photoURL: decoded.picture || '',
       })
+    } else if (!dbUser.displayName) {
+      // Retroaktivno popuni displayName za stare korisnike
+      const emailPrefix = (dbUser.email || '').split('@')[0]
+      dbUser = await User.findByIdAndUpdate(
+        dbUser._id,
+        { displayName: emailPrefix || 'Korisnik' },
+        { new: true }
+      )
     }
     req.dbUser = dbUser
 

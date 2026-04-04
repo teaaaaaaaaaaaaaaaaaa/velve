@@ -23,7 +23,8 @@
       "Bash(ping:*)",
       "Bash(npm uninstall:*)",
       "Bash(ls -la \"c:\\\\Users\\\\Vukasin\\\\Documents\\\\git projekti\\\\velve\\\\apps\\\\mobile\"\" 2>&1 | grep -E \"^- \")",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(xargs grep:*)"
     ]
   }
 }

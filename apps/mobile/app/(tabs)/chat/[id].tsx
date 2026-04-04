@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  StyleSheet,
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -19,44 +20,55 @@ import client from '@/api/client'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
 
-interface Sender {
+interface Participant {
   _id: string
   displayName: string
   photoURL: string
+  email?: string
+}
+
+interface TradeData {
+  offeredItemId: string
+  offeredItemTitle: string
+  offeredItemImage: string
+  requestedItemId: string
+  requestedItemTitle: string
+  requestedItemImage: string
 }
 
 interface Message {
   _id: string
   chatId: string
-  senderId: Sender | string
+  senderId: { _id: string; displayName: string; photoURL: string } | string
   text: string
+  type?: 'text' | 'trade'
+  tradeData?: TradeData
   createdAt: string
 }
 
-interface Participant {
-  _id: string
-  displayName: string
-  photoURL: string
+function getDisplayName(p: Participant | null | undefined): string {
+  if (!p) return 'Korisnik'
+  if (p.displayName) return p.displayName
+  if (p.email) return p.email.split('@')[0]
+  return 'Korisnik'
 }
 
 export default function ChatScreen() {
   const { id: chatId } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
-  const { currentUser } = useAuth()
+  const { dbUser } = useAuth()
 
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [otherUser, setOtherUser] = useState<Participant | null>(null)
-  const [myDbId, setMyDbId] = useState<string>('')
   const [typingUser, setTypingUser] = useState<string | null>(null)
 
   const socketRef = useRef<Socket | null>(null)
   const flatListRef = useRef<FlatList>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Fetch chat data and messages via REST
   const fetchChat = useCallback(async () => {
     try {
       const response = await client.get(`/api/chat/${chatId}`)
@@ -64,16 +76,11 @@ export default function ChatScreen() {
         const data = response.data.data
         setMessages(data.messages || [])
 
-        // Find the other participant
-        if (data.participants && currentUser) {
-          const meRes = await client.get('/api/users/me')
-          if (meRes.data.ok) {
-            setMyDbId(meRes.data.data._id)
-            const other = data.participants.find(
-              (p: Participant) => p._id !== meRes.data.data._id
-            )
-            setOtherUser(other || null)
-          }
+        if (data.participants && dbUser) {
+          const other = data.participants.find(
+            (p: Participant) => p._id !== dbUser._id
+          )
+          setOtherUser(other || null)
         }
       }
     } catch (error: any) {
@@ -81,16 +88,18 @@ export default function ChatScreen() {
     } finally {
       setLoading(false)
     }
-  }, [chatId, currentUser])
+  }, [chatId, dbUser])
 
-  // Connect WebSocket
+  useEffect(() => {
+    fetchChat()
+  }, [fetchChat])
+
   useEffect(() => {
     let socket: Socket | null = null
 
     async function connectSocket() {
       const user = firebaseAuth.currentUser
       if (!user) return
-
       const token = await user.getIdToken()
 
       socket = io(API_URL, {
@@ -102,14 +111,12 @@ export default function ChatScreen() {
       })
 
       socket.on('connect', () => {
-        console.log('[Chat] Socket connected')
         socket?.emit('join_chat', chatId)
       })
 
       socket.on('new_message', (data: { chatId: string; message: Message }) => {
         if (data.chatId === chatId) {
           setMessages((prev) => {
-            // Avoid duplicates
             if (prev.some((m) => m._id === data.message._id)) return prev
             return [...prev, data.message]
           })
@@ -122,10 +129,6 @@ export default function ChatScreen() {
           if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
           typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 3000)
         }
-      })
-
-      socket.on('disconnect', () => {
-        console.log('[Chat] Socket disconnected')
       })
 
       socketRef.current = socket
@@ -143,10 +146,6 @@ export default function ChatScreen() {
     }
   }, [chatId])
 
-  useEffect(() => {
-    fetchChat()
-  }, [fetchChat])
-
   const handleSend = async () => {
     const text = inputText.trim()
     if (!text || sending) return
@@ -155,11 +154,9 @@ export default function ChatScreen() {
     setSending(true)
 
     try {
-      // Try WebSocket first
       if (socketRef.current?.connected) {
         socketRef.current.emit('send_message', { chatId, text })
       } else {
-        // Fallback to REST
         const response = await client.post(`/api/chat/${chatId}/message`, { text })
         if (response.data.ok) {
           setMessages((prev) => {
@@ -182,53 +179,52 @@ export default function ChatScreen() {
   }
 
   const getSenderId = (msg: Message): string => {
-    if (typeof msg.senderId === 'object' && msg.senderId?._id) {
-      return msg.senderId._id
-    }
+    if (typeof msg.senderId === 'object' && msg.senderId?._id) return msg.senderId._id
     return msg.senderId as string
   }
 
-  const getSenderName = (msg: Message): string => {
-    if (typeof msg.senderId === 'object' && msg.senderId?.displayName) {
-      return msg.senderId.displayName
-    }
-    return ''
-  }
-
   const isMyMessage = (msg: Message): boolean => {
-    return getSenderId(msg) === myDbId
+    return getSenderId(msg) === dbUser?._id
   }
 
   const renderMessage = ({ item, index }: { item: Message; index: number }) => {
     const isMine = isMyMessage(item)
     const showDate = index === 0 || !isSameDay(item.createdAt, messages[index - 1]?.createdAt)
 
+    if (item.type === 'trade' && item.tradeData) {
+      return (
+        <View>
+          {showDate && (
+            <Text style={styles.dateLabel}>{formatDate(item.createdAt)}</Text>
+          )}
+          <TradeCard
+            tradeData={item.tradeData}
+            text={item.text}
+            onViewItem={() =>
+              router.push(`/items/${item.tradeData!.offeredItemId}?viewOnly=true`)
+            }
+          />
+        </View>
+      )
+    }
+
     return (
       <View>
         {showDate && (
-          <Text className="font-sans text-xs text-ink-dark/40 text-center my-4">
-            {formatDate(item.createdAt)}
-          </Text>
+          <Text style={styles.dateLabel}>{formatDate(item.createdAt)}</Text>
         )}
-        <View className={`px-4 mb-2 ${isMine ? 'items-end' : 'items-start'}`}>
+        <View style={[styles.msgRow, isMine ? styles.msgRowMine : styles.msgRowTheirs]}>
           <View
-            className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-              isMine
-                ? 'bg-brand-accent-deep rounded-br-sm'
-                : 'bg-white border border-ink-dark/10 rounded-bl-sm'
-            }`}
+            style={[
+              styles.bubble,
+              isMine ? styles.bubbleMine : styles.bubbleTheirs,
+            ]}
           >
-            <Text
-              className={`font-sans text-base ${
-                isMine ? 'text-base-canvas' : 'text-ink-dark'
-              }`}
-            >
+            <Text style={[styles.bubbleText, isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs]}>
               {item.text}
             </Text>
           </View>
-          <Text className="font-sans text-[10px] text-ink-dark/30 mt-1 px-1">
-            {formatTime(item.createdAt)}
-          </Text>
+          <Text style={styles.timeLabel}>{formatTime(item.createdAt)}</Text>
         </View>
       </View>
     )
@@ -236,7 +232,7 @@ export default function ChatScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-base-canvas justify-center items-center">
+      <View style={styles.centered}>
         <ActivityIndicator size="large" color="#431A43" />
       </View>
     )
@@ -244,41 +240,28 @@ export default function ChatScreen() {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-base-canvas"
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={0}
     >
       {/* Header */}
-      <View className="flex-row items-center px-4 pt-16 pb-4 border-b border-ink-dark/5 bg-base-canvas">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="mr-3 w-10 h-10 items-center justify-center"
-        >
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#2B2A2B" />
         </TouchableOpacity>
 
         {otherUser?.photoURL ? (
-          <Image
-            source={{ uri: otherUser.photoURL }}
-            className="w-10 h-10 rounded-full mr-3"
-          />
+          <Image source={{ uri: otherUser.photoURL }} style={styles.headerAvatar} />
         ) : (
-          <View className="w-10 h-10 rounded-full bg-brand-accent-light items-center justify-center mr-3">
-            <Text className="font-display text-brand-accent-deep text-lg">
-              {(otherUser?.displayName || '?').charAt(0).toUpperCase()}
+          <View style={[styles.headerAvatar, styles.headerAvatarPlaceholder]}>
+            <Text style={styles.headerAvatarText}>
+              {getDisplayName(otherUser).charAt(0).toUpperCase()}
             </Text>
           </View>
         )}
 
-        <View className="flex-1">
-          <Text className="font-sans text-base font-semibold text-ink-dark">
-            {otherUser?.displayName || 'Korisnik'}
-          </Text>
-          {typingUser && (
-            <Text className="font-sans text-xs text-brand-accent-deep">
-              piše...
-            </Text>
-          )}
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerName}>{getDisplayName(otherUser)}</Text>
+          {typingUser && <Text style={styles.typingText}>piše...</Text>}
         </View>
       </View>
 
@@ -292,38 +275,28 @@ export default function ChatScreen() {
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
         onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
         ListEmptyComponent={
-          <View className="flex-1 items-center justify-center py-20">
+          <View style={styles.emptyContainer}>
             <Ionicons name="chatbubble-outline" size={48} color="#2B2A2B" style={{ opacity: 0.15 }} />
-            <Text className="font-sans text-sm text-ink-dark/40 mt-3">
-              Započni razgovor
-            </Text>
+            <Text style={styles.emptyText}>Započni razgovor</Text>
           </View>
         }
       />
 
       {/* Input */}
-      <View className="flex-row items-end px-4 py-3 border-t border-ink-dark/5 bg-base-canvas">
+      <View style={styles.inputRow}>
         <TextInput
-          className="flex-1 bg-white border border-ink-dark/15 rounded-2xl px-4 py-3 font-sans text-base text-ink-dark max-h-[120px]"
+          style={styles.input}
           placeholder="Napiši poruku..."
           placeholderTextColor="#2B2A2B50"
           value={inputText}
-          onChangeText={(text) => {
-            setInputText(text)
-            handleTyping()
-          }}
+          onChangeText={(text) => { setInputText(text); handleTyping() }}
           multiline
           maxLength={1000}
-          returnKeyType="default"
         />
         <TouchableOpacity
           onPress={handleSend}
           disabled={!inputText.trim() || sending}
-          className={`ml-3 w-12 h-12 rounded-full items-center justify-center ${
-            inputText.trim() && !sending
-              ? 'bg-brand-accent-deep'
-              : 'bg-ink-dark/15'
-          }`}
+          style={[styles.sendBtn, inputText.trim() && !sending ? styles.sendBtnActive : styles.sendBtnDisabled]}
         >
           <Ionicons
             name="send"
@@ -336,17 +309,196 @@ export default function ChatScreen() {
   )
 }
 
-// Helpers
+function TradeCard({
+  tradeData,
+  text,
+  onViewItem,
+}: {
+  tradeData: TradeData
+  text: string
+  onViewItem: () => void
+}) {
+  return (
+    <View style={styles.tradeCard}>
+      <Text style={styles.tradeCardTitle}>Predlog razmene</Text>
+
+      {/* Two items side by side */}
+      <View style={styles.tradeItems}>
+        {/* Offered item (sender's) */}
+        <View style={styles.tradeItem}>
+          <Image
+            source={{ uri: tradeData.offeredItemImage || '' }}
+            style={styles.tradeItemImage}
+            resizeMode="cover"
+          />
+          <Text style={styles.tradeItemLabel} numberOfLines={2}>
+            {tradeData.offeredItemTitle}
+          </Text>
+          <Text style={styles.tradeItemRole}>Nudi</Text>
+        </View>
+
+        {/* Arrow */}
+        <View style={styles.tradeArrow}>
+          <Ionicons name="swap-horizontal" size={24} color="#431A43" />
+        </View>
+
+        {/* Requested item (receiver's) */}
+        <View style={styles.tradeItem}>
+          <Image
+            source={{ uri: tradeData.requestedItemImage || '' }}
+            style={styles.tradeItemImage}
+            resizeMode="cover"
+          />
+          <Text style={styles.tradeItemLabel} numberOfLines={2}>
+            {tradeData.requestedItemTitle}
+          </Text>
+          <Text style={styles.tradeItemRole}>Za tvoj</Text>
+        </View>
+      </View>
+
+      {/* View button */}
+      <TouchableOpacity style={styles.tradeViewBtn} onPress={onViewItem} activeOpacity={0.8}>
+        <Text style={styles.tradeViewBtnText}>Vidi predloženi predmet</Text>
+        <Ionicons name="arrow-forward" size={16} color="#431A43" />
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F6F8ED' },
+  centered: { flex: 1, backgroundColor: '#F6F8ED', justifyContent: 'center', alignItems: 'center' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 56,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(43,42,43,0.05)',
+    backgroundColor: '#F6F8ED',
+  },
+  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', marginRight: 4 },
+  headerAvatar: { width: 40, height: 40, borderRadius: 20, marginRight: 12 },
+  headerAvatarPlaceholder: { backgroundColor: '#9DD3E4', justifyContent: 'center', alignItems: 'center' },
+  headerAvatarText: { fontFamily: 'AlteHaasGrotesk-Bold', fontSize: 18, color: '#431A43' },
+  headerName: { fontFamily: 'Inter', fontSize: 15, fontWeight: '700', color: '#2B2A2B' },
+  typingText: { fontFamily: 'Inter', fontSize: 12, color: '#431A43' },
+  dateLabel: {
+    fontFamily: 'Inter',
+    fontSize: 11,
+    color: 'rgba(43,42,43,0.4)',
+    textAlign: 'center',
+    marginVertical: 12,
+  },
+  msgRow: { paddingHorizontal: 16, marginBottom: 4 },
+  msgRowMine: { alignItems: 'flex-end' },
+  msgRowTheirs: { alignItems: 'flex-start' },
+  bubble: { maxWidth: '80%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
+  bubbleMine: { backgroundColor: '#431A43', borderBottomRightRadius: 4 },
+  bubbleTheirs: { backgroundColor: 'white', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: 'rgba(43,42,43,0.08)' },
+  bubbleText: { fontFamily: 'Inter', fontSize: 15, lineHeight: 21 },
+  bubbleTextMine: { color: '#F6F8ED' },
+  bubbleTextTheirs: { color: '#2B2A2B' },
+  timeLabel: { fontFamily: 'Inter', fontSize: 10, color: 'rgba(43,42,43,0.3)', marginTop: 2, paddingHorizontal: 4 },
+  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
+  emptyText: { fontFamily: 'Inter', fontSize: 13, color: 'rgba(43,42,43,0.4)', marginTop: 12 },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(43,42,43,0.05)',
+    backgroundColor: '#F6F8ED',
+  },
+  input: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: 'rgba(43,42,43,0.15)',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontFamily: 'Inter',
+    fontSize: 15,
+    color: '#2B2A2B',
+    maxHeight: 120,
+  },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, marginLeft: 10, justifyContent: 'center', alignItems: 'center' },
+  sendBtnActive: { backgroundColor: '#431A43' },
+  sendBtnDisabled: { backgroundColor: 'rgba(43,42,43,0.1)' },
+  // Trade card
+  tradeCard: {
+    marginHorizontal: 16,
+    marginVertical: 8,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(67,26,67,0.15)',
+  },
+  tradeCardTitle: {
+    fontFamily: 'AlteHaasGrotesk-Bold',
+    fontSize: 15,
+    color: '#431A43',
+    marginBottom: 14,
+    textAlign: 'center',
+  },
+  tradeItems: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  tradeItem: { flex: 1, alignItems: 'center' },
+  tradeItemImage: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 12,
+    backgroundColor: '#E8F7FB',
+    marginBottom: 6,
+  },
+  tradeItemLabel: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: '#2B2A2B',
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  tradeItemRole: {
+    fontFamily: 'Inter',
+    fontSize: 10,
+    color: 'rgba(43,42,43,0.5)',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  tradeArrow: { paddingHorizontal: 10 },
+  tradeViewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(67,26,67,0.06)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    gap: 6,
+  },
+  tradeViewBtnText: {
+    fontFamily: 'Inter',
+    fontSize: 13,
+    color: '#431A43',
+    fontWeight: '700',
+  },
+})
+
 function formatTime(dateStr: string) {
-  const date = new Date(dateStr)
-  return date.toLocaleTimeString('sr-Latn', { hour: '2-digit', minute: '2-digit' })
+  return new Date(dateStr).toLocaleTimeString('sr-Latn', { hour: '2-digit', minute: '2-digit' })
 }
 
 function formatDate(dateStr: string) {
   const date = new Date(dateStr)
-  const now = new Date()
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / 86400000)
-
+  const diffDays = Math.floor((Date.now() - date.getTime()) / 86400000)
   if (diffDays === 0) return 'Danas'
   if (diffDays === 1) return 'Juče'
   return date.toLocaleDateString('sr-Latn', { day: 'numeric', month: 'long' })
@@ -354,7 +506,5 @@ function formatDate(dateStr: string) {
 
 function isSameDay(a: string, b: string) {
   if (!a || !b) return false
-  const da = new Date(a)
-  const db = new Date(b)
-  return da.toDateString() === db.toDateString()
+  return new Date(a).toDateString() === new Date(b).toDateString()
 }

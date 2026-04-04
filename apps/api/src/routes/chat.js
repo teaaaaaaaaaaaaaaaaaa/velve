@@ -11,7 +11,7 @@ router.get('/', requireAuth, async (req, res) => {
   try {
     const chats = await Chat.find({ participants: req.dbUser._id })
       .sort({ updatedAt: -1 })
-      .populate('participants', 'displayName photoURL')
+      .populate('participants', 'displayName photoURL email')
       .populate('tradeRequestId', 'status offeredItemId requestedItemId')
       .lean()
 
@@ -50,7 +50,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     }
 
     const chat = await Chat.findById(req.params.id)
-      .populate('participants', 'displayName photoURL')
+      .populate('participants', 'displayName photoURL email')
       .populate('tradeRequestId')
       .lean()
 

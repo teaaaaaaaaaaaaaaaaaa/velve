@@ -42,15 +42,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="wishlist"
-        options={{
-          title: 'Sačuvano',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="bookmark-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="chat/index"
         options={{
           title: 'Poruke',
@@ -68,10 +59,8 @@ export default function TabsLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="chat/[id]"
-        options={{ href: null }}
-      />
+      <Tabs.Screen name="wishlist" options={{ href: null }} />
+      <Tabs.Screen name="chat/[id]" options={{ href: null }} />
     </Tabs>
   )
 }

@@ -17,6 +17,7 @@ interface Participant {
   _id: string
   displayName: string
   photoURL: string
+  email?: string
 }
 
 interface LastMessage {
@@ -109,7 +110,7 @@ export default function ChatListScreen() {
         {/* Content */}
         <View className="flex-1 mr-3">
           <Text className="font-sans text-base font-semibold text-ink-dark" numberOfLines={1}>
-            {other?.displayName || 'Korisnik'}
+            {other?.displayName || other?.email?.split('@')[0] || 'Korisnik'}
           </Text>
           {lastMsg ? (
             <Text className="font-sans text-sm text-ink-dark/60 mt-1" numberOfLines={1}>

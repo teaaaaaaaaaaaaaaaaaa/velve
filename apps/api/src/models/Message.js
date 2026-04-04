@@ -4,6 +4,15 @@ const messageSchema = new mongoose.Schema({
   chatId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chat', required: true },
   senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   text: { type: String, required: true },
+  type: { type: String, enum: ['text', 'trade'], default: 'text' },
+  tradeData: {
+    offeredItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
+    offeredItemTitle: String,
+    offeredItemImage: String,
+    requestedItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
+    requestedItemTitle: String,
+    requestedItemImage: String,
+  },
   createdAt: { type: Date, default: Date.now },
 })
 

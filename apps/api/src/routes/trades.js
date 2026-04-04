@@ -72,6 +72,13 @@ router.post('/', requireAuth, async (req, res) => {
     })
 
     if (existingTrade) {
+      // Vrati postojeći chat ako postoji
+      const existingChat = await Chat.findOne({
+        participants: { $all: [req.dbUser._id, receiverId], $size: 2 },
+      })
+      if (existingChat) {
+        return res.json({ ok: true, data: { trade: existingTrade, chatId: existingChat._id } })
+      }
       return res.status(400).json({ error: 'You already have a pending trade request for this item' })
     }
 
@@ -84,17 +91,45 @@ router.post('/', requireAuth, async (req, res) => {
       message: (message || '').slice(0, 300),
     })
 
-    // Create chat room for this trade
-    const chat = await Chat.create({
-      participants: [req.dbUser._id, receiverId],
-      tradeRequestId: trade._id,
-      messages: [],
+    // Reuse existing chat between these two users, or create new one
+    let chat = await Chat.findOne({
+      participants: { $all: [req.dbUser._id, receiverId], $size: 2 },
     })
+
+    if (!chat) {
+      chat = await Chat.create({
+        participants: [req.dbUser._id, receiverId],
+        tradeRequestId: trade._id,
+      })
+    } else {
+      // Update tradeRequestId to latest trade
+      await Chat.findByIdAndUpdate(chat._id, { tradeRequestId: trade._id })
+    }
+
+    // Send automatic trade card message
+    const Message = require('../models/Message')
+    const senderName = req.dbUser.displayName || 'Korisnik'
+    await Message.create({
+      chatId: chat._id,
+      senderId: req.dbUser._id,
+      type: 'trade',
+      text: `${senderName} želi da zameni "${offeredItem.title}" za "${requestedItem.title}"`,
+      tradeData: {
+        offeredItemId: offeredItem._id,
+        offeredItemTitle: offeredItem.title,
+        offeredItemImage: offeredItem.images[0] || '',
+        requestedItemId: requestedItem._id,
+        requestedItemTitle: requestedItem.title,
+        requestedItemImage: requestedItem.images[0] || '',
+      },
+    })
+
+    await Chat.findByIdAndUpdate(chat._id, { lastMessageAt: new Date() })
 
     // Push notification to receiver
     sendPushToUser(receiverId, {
-      title: 'New trade request!',
-      body: `${req.dbUser.displayName || 'Someone'} wants to trade with you`,
+      title: 'Novi zahtev za razmenu!',
+      body: `${senderName} želi da zameni "${offeredItem.title}" za tvoj predmet`,
       data: { type: 'trade_request', tradeId: trade._id.toString(), chatId: chat._id.toString() },
     })
 
