@@ -57,10 +57,10 @@ export default function WishlistScreen() {
     setRefreshing(false)
   }, [])
 
-  const handleRemove = async (wishlistId: string) => {
+  const handleRemove = async (itemId: string) => {
     try {
-      await client.delete(`/api/wishlist/${wishlistId}`)
-      setItems((prev) => prev.filter((item) => item._id !== wishlistId))
+      await client.delete(`/api/wishlist/${itemId}`)
+      setItems((prev) => prev.filter((item) => item.itemId?._id !== itemId))
     } catch (error: any) {
       Alert.alert('Greška', 'Nije moguće ukloniti iz wishlist-a')
     }
@@ -98,7 +98,7 @@ export default function WishlistScreen() {
 
         {/* Remove button */}
         <TouchableOpacity
-          onPress={() => handleRemove(item._id)}
+          onPress={() => handleRemove(itemData._id)}
           className="w-10 h-10 items-center justify-center"
         >
           <Ionicons name="bookmark" size={24} color="#431A43" />
@@ -135,7 +135,6 @@ export default function WishlistScreen() {
           data={items}
           keyExtractor={(item) => item._id}
           renderItem={renderItem}
-          estimatedItemSize={100}
           contentContainerStyle={{ padding: 16 }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />

@@ -24,7 +24,10 @@
       "Bash(npm uninstall:*)",
       "Bash(ls -la \"c:\\\\Users\\\\Vukasin\\\\Documents\\\\git projekti\\\\velve\\\\apps\\\\mobile\"\" 2>&1 | grep -E \"^- \")",
       "Bash(ls:*)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(npx @sentry/wizard@latest -i reactNative --saas --org velve --project react-native)",
+      "Bash(npm run typecheck:*)",
+      "Bash(timeout 5 npm run dev:*)"
     ]
   }
 }

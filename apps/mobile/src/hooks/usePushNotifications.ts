@@ -17,13 +17,17 @@ if (!isExpoGo) {
     Device = require('expo-device')
 
     // Configure notification behavior
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-      }),
-    })
+    if (Notifications) {
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        }),
+      })
+    }
   } catch (e) {
     console.log('[Push] expo-notifications not available')
   }
@@ -77,8 +81,8 @@ async function registerForPushNotifications(): Promise<string | null> {
 export function usePushNotifications() {
   const router = useRouter()
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null)
-  const notificationListener = useRef<any>()
-  const responseListener = useRef<any>()
+  const notificationListener = useRef<any>(null)
+  const responseListener = useRef<any>(null)
 
   useEffect(() => {
     if (!Notifications) {
@@ -122,10 +126,10 @@ export function usePushNotifications() {
 
     return () => {
       if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current)
+        notificationListener.current.remove()
       }
       if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current)
+        responseListener.current.remove()
       }
     }
   }, [])

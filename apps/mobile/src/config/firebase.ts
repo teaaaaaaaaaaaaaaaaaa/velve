@@ -1,5 +1,6 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { initializeAuth, getAuth, getReactNativePersistence } from 'firebase/auth';
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+// @ts-expect-error - getReactNativePersistence exists in React Native build but not in TS definitions
+import { initializeAuth, getAuth, getReactNativePersistence, Auth } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 console.log('[Firebase] Initializing Firebase config...');
@@ -14,8 +15,8 @@ const firebaseConfig = {
 };
 
 // Zaštita od duplog initializovanja (hot reload)
-let app;
-let auth;
+let app: FirebaseApp;
+let auth: Auth;
 
 if (getApps().length === 0) {
   console.log('[Firebase] First init - creating app and auth');

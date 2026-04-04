@@ -57,8 +57,23 @@ export function useAuthProvider() {
         try {
           const response = await client.get('/api/users/me')
           if (response.data.ok) {
-            setDbUser(response.data.data)
-            console.log('[Auth] dbUser loaded:', response.data.data._id)
+            const fetchedDbUser = response.data.data
+
+            // Validate Firebase UID matches MongoDB firebaseUid
+            if (fetchedDbUser.firebaseUid !== user.uid) {
+              console.error('[Auth] User mismatch detected!', {
+                firebaseUid: user.uid,
+                dbUserFirebaseUid: fetchedDbUser.firebaseUid,
+              })
+              await auth.signOut()
+              setCurrentUser(null)
+              setDbUser(null)
+              setLoading(false)
+              return
+            }
+
+            setDbUser(fetchedDbUser)
+            console.log('[Auth] dbUser loaded:', fetchedDbUser._id)
           }
         } catch (error) {
           console.error('[Auth] Failed to fetch dbUser:', error)
