@@ -90,6 +90,12 @@ export function useAuthProvider() {
 
   async function signInWithGoogle() {
     try {
+      // Validate CLIENT_ID before attempting OAuth
+      const clientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
+      if (!clientId || !clientId.endsWith('.apps.googleusercontent.com')) {
+        throw new Error('CLIENT_ID_INVALID: Google OAuth is not properly configured');
+      }
+
       const redirectUri = AuthSession.makeRedirectUri({
         scheme: 'velve',
         path: 'auth/callback'
@@ -103,7 +109,7 @@ export function useAuthProvider() {
       }
 
       const request = new AuthSession.AuthRequest({
-        clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID!,
+        clientId,
         redirectUri,
         scopes: ['openid', 'profile', 'email'],
         responseType: AuthSession.ResponseType.IdToken,
@@ -112,18 +118,41 @@ export function useAuthProvider() {
 
       const result = await request.promptAsync(discovery)
 
-      if (result.type === 'success') {
-        const { id_token } = result.params
-
-        const credential = GoogleAuthProvider.credential(id_token)
-        await signInWithCredential(auth, credential)
-
-        // onAuthStateChanged will automatically fetch dbUser
-      } else {
-        throw new Error('Google sign-in was cancelled')
+      if (result.type === 'cancel') {
+        // User cancelled - throw specific error
+        throw new Error('USER_CANCELLED')
       }
+
+      if (result.type !== 'success') {
+        // OAuth flow failed
+        throw new Error('OAUTH_FAILED')
+      }
+
+      // Success - exchange token
+      const { id_token } = result.params
+
+      if (!id_token) {
+        throw new Error('OAUTH_FAILED: No ID token received')
+      }
+
+      const credential = GoogleAuthProvider.credential(id_token)
+      await signInWithCredential(auth, credential)
+
+      // onAuthStateChanged will automatically fetch dbUser
     } catch (error: any) {
       console.error('[Google Auth] Error:', error)
+
+      // Re-throw USER_CANCELLED silently (caller can handle)
+      if (error.message === 'USER_CANCELLED') {
+        throw error
+      }
+
+      // Check for network errors
+      if (error.message?.toLowerCase().includes('network') || error.code === 'auth/network-request-failed') {
+        throw new Error('NETWORK_ERROR')
+      }
+
+      // Re-throw all other errors
       throw error
     }
   }

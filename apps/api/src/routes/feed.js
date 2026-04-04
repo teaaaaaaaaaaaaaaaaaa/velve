@@ -13,6 +13,7 @@ router.get('/', requireAuth, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 20, 50)
     const page = Math.max(parseInt(req.query.page) || 0, 0)
+    const isFirstTime = req.query.firstTime === 'true'
 
     // Fetch MORE items (3x) for better personalization after ranking
     const fetchLimit = limit * 3
@@ -28,7 +29,31 @@ router.get('/', requireAuth, async (req, res) => {
       .lean()
 
     // Apply personalized ranking
-    const ranked = await rankFeedItems(items, req.dbUser)
+    let ranked = await rankFeedItems(items, req.dbUser)
+
+    // First-time user special treatment
+    if (isFirstTime) {
+      // Calculate preference match score for filtering
+      ranked = ranked.map(item => {
+        let preferenceScore = 0
+        if (req.dbUser.favoriteBrands?.includes(item.brand)) preferenceScore += 0.4
+        if (req.dbUser.categories?.includes(item.category)) preferenceScore += 0.3
+        return { ...item, preferenceScore }
+      })
+
+      // Filter: only show items with decent engagement or strong preference match
+      ranked = ranked.filter(item => {
+        return (item.engagementScore || 0) >= 10 || item.preferenceScore >= 0.3
+      })
+
+      // Boost scores for strong matches (preference >= 0.7)
+      ranked = ranked.map(item => {
+        if (item.preferenceScore >= 0.7) {
+          return { ...item, personalizedScore: item.personalizedScore * 1.5 }
+        }
+        return item
+      })
+    }
 
     // Sort by personalized score
     ranked.sort((a, b) => b.personalizedScore - a.personalizedScore)

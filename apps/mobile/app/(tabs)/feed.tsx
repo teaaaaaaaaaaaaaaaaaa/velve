@@ -54,21 +54,32 @@ export default function FeedScreen() {
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [containerHeight, setContainerHeight] = useState(Dimensions.get('window').height - 85)
+  const [isFirstTime, setIsFirstTime] = useState(true)
 
   const fetchFeed = async (pageNum: number) => {
     try {
       if (pageNum === 0) setIsLoading(true)
       else setIsLoadingMore(true)
 
-      const response = await client.get('/api/feed', {
-        params: { limit: 10, page: pageNum },
-      })
+      const params: any = { limit: 10, page: pageNum }
+
+      // Include firstTime flag for initial load only
+      if (pageNum === 0 && isFirstTime) {
+        params.firstTime = 'true'
+      }
+
+      const response = await client.get('/api/feed', { params })
 
       if (response.data.ok) {
         const newItems = response.data.data
         setItems((prev) => (pageNum === 0 ? newItems : [...prev, ...newItems]))
         setHasMore(response.data.hasMore)
         setPage(response.data.page)
+
+        // After first successful load, mark as no longer first time
+        if (pageNum === 0 && isFirstTime) {
+          setIsFirstTime(false)
+        }
       }
     } catch {
       // silent fail
