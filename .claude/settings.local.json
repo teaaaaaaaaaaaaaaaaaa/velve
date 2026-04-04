@@ -27,7 +27,8 @@
       "Bash(xargs grep:*)",
       "Bash(npx @sentry/wizard@latest -i reactNative --saas --org velve --project react-native)",
       "Bash(npm run typecheck:*)",
-      "Bash(timeout 5 npm run dev:*)"
+      "Bash(timeout 5 npm run dev:*)",
+      "Bash(exit 0)"
     ]
   }
 }
