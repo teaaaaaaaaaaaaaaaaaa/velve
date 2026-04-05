@@ -23,9 +23,13 @@
     },
     "plugins": [
       "expo-router",
+<<<<<<< HEAD
       "expo-web-browser",
       "@sentry/react-native",
       "@react-native-firebase/app"
+=======
+      "expo-web-browser"
+>>>>>>> 3a5ce2c5247aaf28e69aa7f8551ee44f6bfd6c86
     ],
     "experiments": {
       "typedRoutes": true

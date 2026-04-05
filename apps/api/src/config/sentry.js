@@ -1,5 +1,4 @@
 const Sentry = require('@sentry/node');
-const { ProfilingIntegration } = require('@sentry/profiling-node');
 
 function initSentry(app) {
   if (!process.env.SENTRY_DSN) {
@@ -12,10 +11,8 @@ function initSentry(app) {
     integrations: [
       new Sentry.Integrations.Http({ tracing: true }),
       new Sentry.Integrations.Express({ app }),
-      new ProfilingIntegration(),
     ],
-    tracesSampleRate: 0.1, // 10% of transactions
-    profilesSampleRate: 0.1,
+    tracesSampleRate: 0.1,
     environment: process.env.NODE_ENV || 'development',
   });
 
