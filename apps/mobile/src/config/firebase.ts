@@ -1,18 +1,16 @@
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-// @ts-expect-error - getReactNativePersistence exists in React Native build but not in TS definitions
-import { initializeAuth, getAuth, getReactNativePersistence, Auth } from 'firebase/auth';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+/**
+ * React Native Firebase configuration
+ *
+ * NOTE: React Native Firebase reads configuration from native files:
+ * - Android: android/app/google-services.json
+ * - iOS: ios/GoogleService-Info.plist
+ *
+ * These files are generated during `npx expo prebuild` from app.json
+ */
 
-console.log('[Firebase] Initializing Firebase config...');
+import auth from '@react-native-firebase/auth';
 
-const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-};
+console.log('[Firebase] React Native Firebase initialized');
 
 // Validate Google OAuth configuration
 function validateGoogleOAuthConfig() {
@@ -41,22 +39,6 @@ function validateGoogleOAuthConfig() {
 // Run validation
 validateGoogleOAuthConfig();
 
-// Zaštita od duplog initializovanja (hot reload)
-let app: FirebaseApp;
-let auth: Auth;
-
-if (getApps().length === 0) {
-  console.log('[Firebase] First init - creating app and auth');
-  app = initializeApp(firebaseConfig);
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
-} else {
-  console.log('[Firebase] Already initialized - reusing existing app');
-  app = getApp();
-  auth = getAuth(app);
-}
-
-console.log('[Firebase] Firebase ready, projectId:', firebaseConfig.projectId);
+console.log('[Firebase] Auth module ready');
 
 export { auth };

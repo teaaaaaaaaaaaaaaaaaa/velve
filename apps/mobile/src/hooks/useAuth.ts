@@ -1,22 +1,13 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  GoogleAuthProvider,
-  signInWithCredential,
-  User,
-} from 'firebase/auth'
+import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth'
 import * as AuthSession from 'expo-auth-session'
 import * as WebBrowser from 'expo-web-browser'
-import { auth } from '@/config/firebase'
 import client from '@/api/client'
 
 WebBrowser.maybeCompleteAuthSession()
 
 type AuthContextType = {
-  currentUser: User | null
+  currentUser: FirebaseAuthTypes.User | null
   dbUser: DbUser | null
   loading: boolean
   signInWithGoogle: () => Promise<void>
@@ -45,12 +36,12 @@ type DbUser = {
 const AuthContext = createContext<AuthContextType | null>(null)
 
 export function useAuthProvider() {
-  const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [currentUser, setCurrentUser] = useState<FirebaseAuthTypes.User | null>(null)
   const [dbUser, setDbUser] = useState<DbUser | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = auth().onAuthStateChanged(async (user) => {
       setCurrentUser(user)
 
       if (user) {
@@ -65,7 +56,7 @@ export function useAuthProvider() {
                 firebaseUid: user.uid,
                 dbUserFirebaseUid: fetchedDbUser.firebaseUid,
               })
-              await auth.signOut()
+              await auth().signOut()
               setCurrentUser(null)
               setDbUser(null)
               setLoading(false)
@@ -135,8 +126,8 @@ export function useAuthProvider() {
         throw new Error('OAUTH_FAILED: No ID token received')
       }
 
-      const credential = GoogleAuthProvider.credential(id_token)
-      await signInWithCredential(auth, credential)
+      const credential = auth.GoogleAuthProvider.credential(id_token)
+      await auth().signInWithCredential(credential)
 
       // onAuthStateChanged will automatically fetch dbUser
     } catch (error: any) {
@@ -158,15 +149,15 @@ export function useAuthProvider() {
   }
 
   async function signInWithEmail(email: string, password: string) {
-    return signInWithEmailAndPassword(auth, email, password)
+    return auth().signInWithEmailAndPassword(email, password)
   }
 
   async function registerWithEmail(email: string, password: string) {
-    return createUserWithEmailAndPassword(auth, email, password)
+    return auth().createUserWithEmailAndPassword(email, password)
   }
 
   async function logout() {
-    return signOut(auth)
+    return auth().signOut()
   }
 
   return { currentUser, dbUser, loading, signInWithGoogle, signInWithEmail, registerWithEmail, logout }

@@ -28,7 +28,16 @@
       "Bash(npx @sentry/wizard@latest -i reactNative --saas --org velve --project react-native)",
       "Bash(npm run typecheck:*)",
       "Bash(timeout 5 npm run dev:*)",
-      "Bash(exit 0)"
+      "Bash(exit 0)",
+      "Bash(npx expo:*)",
+      "Bash(java:*)",
+      "Bash(gradlew.bat wrapper:*)",
+      "Bash(./gradlew.bat wrapper:*)",
+      "Bash(export JAVA_HOME=\"/c/Program Files/Microsoft/jdk-21.0.10\")",
+      "Bash(export PATH=\"$JAVA_HOME/bin:$PATH\")",
+      "Bash(\"/c/Program Files/Microsoft/jdk-21.0.10/bin/java\" -version)",
+      "Bash(export JAVA_HOME=\"/c/Program Files/Java/jdk-21.0.10\")",
+      "Bash(\"$JAVA_HOME/bin/java\" -version)"
     ]
   }
 }
