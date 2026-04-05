@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import * as Sentry from '@sentry/react-native';
 
 export class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -17,12 +16,6 @@ export class ErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('[ErrorBoundary] Caught error:', error, errorInfo);
-    Sentry.withScope((scope) => {
-      scope.setContext('react', {
-        componentStack: errorInfo.componentStack,
-      });
-      Sentry.captureException(error);
-    });
   }
 
   render() {

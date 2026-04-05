@@ -3,13 +3,8 @@ import React, { useEffect } from 'react'
 import { Stack, useRouter, useSegments, ErrorBoundary } from 'expo-router'
 import { useAuth, useAuthProvider, AuthContext } from '@/hooks/useAuth'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
-import { initSentry } from '@/config/sentry'
-import * as Sentry from '@sentry/react-native'
 
 export { ErrorBoundary }
-
-// Initialize Sentry early
-initSentry()
 
 function AuthGate() {
   const { currentUser, loading } = useAuth()
@@ -58,4 +53,4 @@ function RootLayout() {
   )
 }
 
-export default Sentry.wrap(RootLayout)
+export default RootLayout

@@ -8,7 +8,9 @@
  * These files are generated during `npx expo prebuild` from app.json
  */
 
-import auth from '@react-native-firebase/auth';
+import firebaseAuth from '@react-native-firebase/auth';
+
+const auth = firebaseAuth();
 
 console.log('[Firebase] React Native Firebase initialized');
 

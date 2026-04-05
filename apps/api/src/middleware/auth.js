@@ -21,12 +21,14 @@ if (!admin.apps.length) {
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization
   if (!authHeader?.startsWith('Bearer ')) {
+    console.warn(`[AuthMiddleware] Missing bearer token for ${req.method} ${req.originalUrl}`)
     return res.status(401).json({ error: 'Missing or invalid Authorization header' })
   }
 
   const token = authHeader.split('Bearer ')[1]
   try {
     const decoded = await admin.auth().verifyIdToken(token)
+    console.log(`[AuthMiddleware] Firebase token verified for uid=${decoded.uid}`)
     req.user = decoded
 
     // ensureUser: find or create MongoDB user from Firebase UID
@@ -39,6 +41,7 @@ async function requireAuth(req, res, next) {
         displayName: decoded.name || emailPrefix || 'Korisnik',
         photoURL: decoded.picture || '',
       })
+      console.log(`[AuthMiddleware] Created MongoDB user for uid=${decoded.uid}`)
     } else if (!dbUser.displayName) {
       // Retroaktivno popuni displayName za stare korisnike
       const emailPrefix = (dbUser.email || '').split('@')[0]
@@ -52,6 +55,7 @@ async function requireAuth(req, res, next) {
 
     next()
   } catch (err) {
+    console.error(`[AuthMiddleware] Invalid token for ${req.method} ${req.originalUrl}:`, err.message)
     return res.status(401).json({ error: 'Invalid or expired token' })
   }
 }

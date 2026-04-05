@@ -1,5 +1,6 @@
 require('dotenv').config()
 const http = require('http')
+const os = require('os')
 const express = require('express')
 const cors = require('cors')
 const mongoose = require('mongoose')
@@ -25,6 +26,20 @@ const wishlistRouter = require('./routes/wishlist')
 const app = express()
 const PORT = process.env.PORT || 3000
 
+function getLocalLanIp() {
+  const interfaces = os.networkInterfaces()
+
+  for (const networkInterface of Object.values(interfaces)) {
+    for (const address of networkInterface || []) {
+      if (address.family === 'IPv4' && !address.internal) {
+        return address.address
+      }
+    }
+  }
+
+  return null
+}
+
 // Initialize Sentry early
 initSentry(app)
 app.use(Sentry.Handlers.requestHandler())
@@ -43,6 +58,17 @@ app.use(
 )
 app.use(express.json())
 app.use(apiLimiter)
+
+app.use((req, res, next) => {
+  const start = Date.now()
+  console.log(`[API] -> ${req.method} ${req.originalUrl} from ${req.ip}`)
+
+  res.on('finish', () => {
+    console.log(`[API] <- ${req.method} ${req.originalUrl} ${res.statusCode} ${Date.now() - start}ms`)
+  })
+
+  next()
+})
 
 // Health check - basic uptime
 app.get('/ping', (req, res) => {
@@ -153,7 +179,11 @@ mongoose
     })
 
     server.listen(PORT, () => {
+      const lanIp = getLocalLanIp()
       console.log(`Velve API running on http://localhost:${PORT}`)
+      if (lanIp) {
+        console.log(`Velve API running on http://${lanIp}:${PORT}`)
+      }
     })
   })
   .catch((err) => {

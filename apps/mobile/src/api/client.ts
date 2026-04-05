@@ -1,9 +1,9 @@
 import axios from 'axios'
 import { Alert } from 'react-native'
 import { auth } from '@/config/firebase'
+import { API_URL } from '@/config/api'
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000'
-console.log('[APIClient] Creating client with baseURL:', API_URL)
+console.log('[APIClient] Using baseURL:', API_URL)
 
 const client = axios.create({
   baseURL: API_URL,
@@ -21,9 +21,9 @@ client.interceptors.request.use(async (config) => {
   if (user) {
     const token = await user.getIdToken()
     config.headers.Authorization = `Bearer ${token}`
-    console.log('[APIClient] Request:', config.method?.toUpperCase(), config.url, '(with auth)')
+    console.log('[APIClient] Request:', config.method?.toUpperCase(), `${config.baseURL ?? ''}${config.url ?? ''}`, '(with auth)')
   } else {
-    console.log('[APIClient] Request:', config.method?.toUpperCase(), config.url, '(no auth)')
+    console.log('[APIClient] Request:', config.method?.toUpperCase(), `${config.baseURL ?? ''}${config.url ?? ''}`, '(no auth)')
   }
   return config
 })
@@ -36,9 +36,10 @@ client.interceptors.response.use(
   },
   (error) => {
     const url = error.config?.url || ''
+    const baseURL = error.config?.baseURL || ''
     const status = error.response?.status
 
-    console.log('[APIClient] Error:', status, url, error.message)
+    console.log('[APIClient] Error:', status, `${baseURL}${url}`, error.message)
 
     // Network/offline error detection
     if (!error.response && error.message?.includes('Network Error')) {

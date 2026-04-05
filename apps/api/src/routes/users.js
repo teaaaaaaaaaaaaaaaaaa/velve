@@ -62,6 +62,7 @@ async function saveCurrentUser(req, res, updates) {
 // GET /api/users/me — profil ulogovanog korisnika
 router.get('/me', requireAuth, async (req, res) => {
   try {
+    console.log(`[Users] /me requested by uid=${req.user.uid} dbUser=${req.dbUser._id}`)
     const followersCount = await Follow.countDocuments({ followingId: req.dbUser._id })
     const followingCount = await Follow.countDocuments({ followerId: req.dbUser._id })
     const itemsCount = await Item.countDocuments({ userId: req.dbUser._id })
