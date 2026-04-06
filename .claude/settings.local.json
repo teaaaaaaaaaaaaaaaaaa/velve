@@ -37,7 +37,13 @@
       "Bash(export PATH=\"$JAVA_HOME/bin:$PATH\")",
       "Bash(\"/c/Program Files/Microsoft/jdk-21.0.10/bin/java\" -version)",
       "Bash(export JAVA_HOME=\"/c/Program Files/Java/jdk-21.0.10\")",
-      "Bash(\"$JAVA_HOME/bin/java\" -version)"
+      "Bash(\"$JAVA_HOME/bin/java\" -version)",
+      "WebSearch",
+      "WebFetch(domain:fashn.ai)",
+      "WebFetch(domain:replicate.com)",
+      "WebFetch(domain:docs.openvino.ai)",
+      "WebFetch(domain:www.remove.bg)",
+      "WebFetch(domain:dev.to)"
     ]
   }
 }
