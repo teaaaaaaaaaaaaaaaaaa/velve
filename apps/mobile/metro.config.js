@@ -20,5 +20,6 @@ config.resolver.disableHierarchicalLookup = true;
 config.resolver.sourceExts = [...(config.resolver.sourceExts || []), 'cjs'];
 config.resolver.unstable_enablePackageExports = false;
 
-// 4. Na kraju wrappuj sa NativeWind
+
+// 5. Na kraju wrappuj sa NativeWind
 module.exports = withNativeWind(config, { input: './global.css' });

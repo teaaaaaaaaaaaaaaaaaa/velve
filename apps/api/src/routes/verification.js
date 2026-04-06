@@ -5,14 +5,11 @@ const { requireAuth } = require('../middleware/auth')
 const User = require('../models/User')
 const EmailVerification = require('../models/EmailVerification')
 
-// In-memory storage for SMS OTP codes (replace with Redis in production)
-const otpStore = new Map()
-
 // Email configuration (use environment variables in production)
 const nodemailer = require('nodemailer')
 
 // Configure email transporter (using Gmail as example - replace with SendGrid/SES in production)
-const transporter = nodemailer.createTransporter({
+const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
   port: parseInt(process.env.SMTP_PORT || '587'),
   secure: false,
@@ -106,97 +103,6 @@ router.post('/verify-email', async (req, res) => {
     await verification.save()
 
     res.json({ ok: true, message: 'Email verified successfully' })
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// POST /api/verification/send-sms — Send SMS OTP (placeholder - requires Twilio setup)
-router.post('/send-sms', requireAuth, async (req, res) => {
-  try {
-    const { phone } = req.body
-
-    if (!phone || typeof phone !== 'string') {
-      return res.status(400).json({ error: 'Valid phone number is required' })
-    }
-
-    if (req.dbUser.phoneVerified) {
-      return res.status(400).json({ error: 'Phone already verified' })
-    }
-
-    // Generate 6-digit code
-    const code = Math.floor(100000 + Math.random() * 900000).toString()
-
-    // Store code in memory (expires in 10 minutes)
-    otpStore.set(phone, {
-      code,
-      userId: req.dbUser._id.toString(),
-      expiresAt: Date.now() + 10 * 60 * 1000,
-    })
-
-    // Clean up expired codes periodically
-    setTimeout(() => {
-      const stored = otpStore.get(phone)
-      if (stored && stored.expiresAt < Date.now()) {
-        otpStore.delete(phone)
-      }
-    }, 10 * 60 * 1000)
-
-    // TODO: Send SMS via Twilio
-    // const twilio = require('twilio')(accountSid, authToken)
-    // await twilio.messages.create({
-    //   body: `Your Velve verification code is: ${code}`,
-    //   from: process.env.TWILIO_PHONE_NUMBER,
-    //   to: phone,
-    // })
-
-    // For development, log the code
-    console.log(`[SMS OTP] Phone: ${phone}, Code: ${code}`)
-
-    res.json({ ok: true, message: 'Verification code sent', devCode: process.env.NODE_ENV === 'development' ? code : undefined })
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// POST /api/verification/verify-phone — Verify phone with OTP
-router.post('/verify-phone', requireAuth, async (req, res) => {
-  try {
-    const { phone, code } = req.body
-
-    if (!phone || !code) {
-      return res.status(400).json({ error: 'Phone and code are required' })
-    }
-
-    const stored = otpStore.get(phone)
-
-    if (!stored) {
-      return res.status(404).json({ error: 'No verification code found for this phone' })
-    }
-
-    if (stored.expiresAt < Date.now()) {
-      otpStore.delete(phone)
-      return res.status(400).json({ error: 'Verification code has expired' })
-    }
-
-    if (stored.userId !== req.dbUser._id.toString()) {
-      return res.status(403).json({ error: 'Code does not match user' })
-    }
-
-    if (stored.code !== code) {
-      return res.status(400).json({ error: 'Invalid verification code' })
-    }
-
-    // Mark phone as verified
-    await User.findByIdAndUpdate(req.dbUser._id, {
-      phoneVerified: true,
-      phone,
-    })
-
-    // Remove used code
-    otpStore.delete(phone)
-
-    res.json({ ok: true, message: 'Phone verified successfully' })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

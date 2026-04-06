@@ -1,0 +1,35 @@
+{
+  "project_info": {
+    "project_number": "638299697925",
+    "firebase_url": "https://velve-a3b33.firebaseio.com",
+    "project_id": "velve-a3b33",
+    "storage_bucket": "velve-a3b33.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:638299697925:android:665caa315708ae4fe3bd6c",
+        "android_client_info": {
+          "package_name": "com.velve.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "638299697925-77be9rbi6oeill7mngt7t5q9dvmenuqf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDq1ofsvRPHYEUxt1QKYzTfojUdquiX_ok"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

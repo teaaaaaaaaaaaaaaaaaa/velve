@@ -110,7 +110,7 @@ router.post('/', uploadLimiter, requireAuth, upload.single('image'), async (req,
       })
     }
 
-    res.json({ ok: true, url: publicUrl })
+    res.json({ ok: true, data: { url: publicUrl } })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

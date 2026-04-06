@@ -1,9 +1,12 @@
 require('dotenv').config()
 const http = require('http')
+const os = require('os')
 const express = require('express')
 const cors = require('cors')
 const mongoose = require('mongoose')
 const { apiLimiter } = require('./middleware/rateLimit')
+const { requireAuth } = require('./middleware/auth')
+const { initSentry, Sentry } = require('./config/sentry')
 const { initSocket } = require('./lib/socket')
 const { updateEngagementScores } = require('./lib/updateEngagementScores')
 const { retryMissingEmbeddings } = require('./lib/retryMissingEmbeddings')
@@ -23,6 +26,25 @@ const wishlistRouter = require('./routes/wishlist')
 const app = express()
 const PORT = process.env.PORT || 3000
 
+function getLocalLanIp() {
+  const interfaces = os.networkInterfaces()
+
+  for (const networkInterface of Object.values(interfaces)) {
+    for (const address of networkInterface || []) {
+      if (address.family === 'IPv4' && !address.internal) {
+        return address.address
+      }
+    }
+  }
+
+  return null
+}
+
+// Initialize Sentry early
+initSentry(app)
+app.use(Sentry.Handlers.requestHandler())
+app.use(Sentry.Handlers.tracingHandler())
+
 // Middleware - CORS configuration
 app.use(
   cors({
@@ -36,6 +58,17 @@ app.use(
 )
 app.use(express.json())
 app.use(apiLimiter)
+
+app.use((req, res, next) => {
+  const start = Date.now()
+  console.log(`[API] -> ${req.method} ${req.originalUrl} from ${req.ip}`)
+
+  res.on('finish', () => {
+    console.log(`[API] <- ${req.method} ${req.originalUrl} ${res.statusCode} ${Date.now() - start}ms`)
+  })
+
+  next()
+})
 
 // Health check - basic uptime
 app.get('/ping', (req, res) => {
@@ -85,8 +118,8 @@ app.get('/health', async (req, res) => {
   })
 })
 
-// Manual trigger for engagement score update (admin only, add auth later)
-app.post('/api/admin/update-scores', async (req, res) => {
+// Manual trigger for engagement score update (admin only)
+app.post('/api/admin/update-scores', requireAuth, async (req, res) => {
   try {
     await updateEngagementScores()
     res.json({ ok: true, message: 'Engagement scores updated' })
@@ -95,8 +128,8 @@ app.post('/api/admin/update-scores', async (req, res) => {
   }
 })
 
-// Manual trigger for embedding retry (admin only, add auth later)
-app.post('/api/admin/retry-embeddings', async (req, res) => {
+// Manual trigger for embedding retry (admin only)
+app.post('/api/admin/retry-embeddings', requireAuth, async (req, res) => {
   try {
     await retryMissingEmbeddings()
     res.json({ ok: true, message: 'Embedding retry completed' })
@@ -108,6 +141,7 @@ app.post('/api/admin/retry-embeddings', async (req, res) => {
 // Routes
 app.use('/api/items', itemsRouter)
 app.use('/api/items', likesRouter)      // /api/items/:id/like
+app.use('/api/likes', likesRouter)      // /api/likes (GET user's liked items)
 app.use('/api/feed', feedRouter)
 app.use('/api/chat', chatRouter)
 app.use('/api/trades', tradesRouter)
@@ -117,6 +151,9 @@ app.use('/api/users', followsRouter)    // /api/users/:id/follow
 app.use('/api/ai', aiRouter)
 app.use('/api/verification', verificationRouter)
 app.use('/api/wishlist', wishlistRouter)
+
+// Sentry error handler (must be before other error middleware)
+app.use(Sentry.Handlers.errorHandler())
 
 // Create HTTP server and attach socket.io
 const server = http.createServer(app)
@@ -142,7 +179,11 @@ mongoose
     })
 
     server.listen(PORT, () => {
+      const lanIp = getLocalLanIp()
       console.log(`Velve API running on http://localhost:${PORT}`)
+      if (lanIp) {
+        console.log(`Velve API running on http://${lanIp}:${PORT}`)
+      }
     })
   })
   .catch((err) => {

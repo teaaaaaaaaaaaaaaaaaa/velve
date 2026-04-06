@@ -5,18 +5,32 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Velve Brand Colors — iz design_and_identity_guidelines.md
-        'brand-accent-deep': '#431A43',   // Deep Velvet — anchor, luxury
-        'brand-accent-light': '#9DD3E4',  // Air Blue — freshness, glass effects
-        'brand-highlight': '#CBDA63',     // Acid Lime — CTAs, highlights
-        'base-canvas': '#F6F8ED',         // Base White — main background
-        'ink-dark': '#2B2A2B',            // True Onyx — text, borders
+        'brand-accent-deep': '#431A43',
+        'brand-accent-light': '#9DD3E4',
+        'brand-highlight': '#CBDA63',
+        'base-canvas': '#F6F8ED',
+        'ink-dark': '#2B2A2B',
+        'surface-panel': '#FFFCF6',
+        'surface-soft': '#EEF4E5',
+        'surface-tint': '#EEE7EE',
+        'signal-danger': '#C53B59',
       },
       fontFamily: {
-        // Nikad ne koristiti hardcoded fontove u komponentama
-        logo: ['Ballet'],                 // SAMO za logo i hero catchphrase
-        display: ['AlteHaasGrotesk-Bold'], // Headings, aesthetic accents
-        sans: ['Inter'],                  // Sve funkcionalno UI
+        logo: ['Ballet'],
+        display: ['AlteHaasGrotesk-Bold'],
+        sans: ['Inter'],
+      },
+      spacing: {
+        gutter: '20px',
+        section: '28px',
+        panel: '18px',
+        float: '14px',
+      },
+      borderRadius: {
+        pill: '999px',
+        soft: '24px',
+        card: '30px',
+        editorial: '38px',
       },
     },
   },

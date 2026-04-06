@@ -11,7 +11,7 @@ router.get('/', requireAuth, async (req, res) => {
   try {
     const chats = await Chat.find({ participants: req.dbUser._id })
       .sort({ updatedAt: -1 })
-      .populate('participants', 'displayName photoURL')
+      .populate('participants', 'displayName photoURL email')
       .populate('tradeRequestId', 'status offeredItemId requestedItemId')
       .lean()
 
@@ -42,6 +42,31 @@ router.get('/', requireAuth, async (req, res) => {
   }
 })
 
+// POST /api/chat/direct/:userId — nadje ili napravi direktni chat sa korisnikom
+router.post('/direct/:userId', requireAuth, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
+      return res.status(400).json({ error: 'Invalid user ID' })
+    }
+    if (req.params.userId === req.dbUser._id.toString()) {
+      return res.status(400).json({ error: 'Cannot chat with yourself' })
+    }
+
+    const existing = await Chat.findOne({
+      participants: { $all: [req.dbUser._id, req.params.userId], $size: 2 },
+    })
+
+    if (existing) {
+      return res.json({ ok: true, data: { chatId: existing._id } })
+    }
+
+    const chat = await Chat.create({ participants: [req.dbUser._id, req.params.userId] })
+    res.json({ ok: true, data: { chatId: chat._id } })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // GET /api/chat/:id — poruke u chat sobi
 router.get('/:id', requireAuth, async (req, res) => {
   try {
@@ -50,7 +75,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     }
 
     const chat = await Chat.findById(req.params.id)
-      .populate('participants', 'displayName photoURL')
+      .populate('participants', 'displayName photoURL email')
       .populate('tradeRequestId')
       .lean()
 

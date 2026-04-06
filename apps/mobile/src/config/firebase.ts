@@ -1,34 +1,46 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { initializeAuth, getReactNativePersistence, getAuth } from 'firebase/auth';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+/**
+ * React Native Firebase configuration
+ *
+ * NOTE: React Native Firebase reads configuration from native files:
+ * - Android: android/app/google-services.json
+ * - iOS: ios/GoogleService-Info.plist
+ *
+ * These files are generated during `npx expo prebuild` from app.json
+ */
 
-console.log('[Firebase] Initializing Firebase config...');
+import firebaseAuth from '@react-native-firebase/auth';
 
-const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-};
+const auth = firebaseAuth();
 
-// Zaštita od duplog initializovanja (hot reload)
-let app;
-let auth;
+console.log('[Firebase] React Native Firebase initialized');
 
-if (getApps().length === 0) {
-  console.log('[Firebase] First init - creating app and auth');
-  app = initializeApp(firebaseConfig);
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
-} else {
-  console.log('[Firebase] Already initialized - reusing existing app');
-  app = getApp();
-  auth = getAuth(app);
+// Validate Google OAuth configuration
+function validateGoogleOAuthConfig() {
+  const clientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
+
+  if (!clientId) {
+    console.warn('[Firebase] WARNING: EXPO_PUBLIC_GOOGLE_CLIENT_ID is not defined. Google Sign-In will not work.');
+    return false;
+  }
+
+  if (!clientId.endsWith('.apps.googleusercontent.com')) {
+    console.warn('[Firebase] WARNING: EXPO_PUBLIC_GOOGLE_CLIENT_ID does not match expected format (.apps.googleusercontent.com)');
+    return false;
+  }
+
+  // Check for placeholder/example values
+  if (clientId.includes('example') || clientId.includes('placeholder') || clientId.includes('YOUR_')) {
+    console.warn('[Firebase] WARNING: EXPO_PUBLIC_GOOGLE_CLIENT_ID appears to be a placeholder. Update .env with real credentials.');
+    return false;
+  }
+
+  console.log('[Firebase] Google OAuth config validated successfully');
+  return true;
 }
 
-console.log('[Firebase] Firebase ready, projectId:', firebaseConfig.projectId);
+// Run validation
+validateGoogleOAuthConfig();
+
+console.log('[Firebase] Auth module ready');
 
 export { auth };

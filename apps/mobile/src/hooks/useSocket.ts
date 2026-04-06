@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { auth } from '@/config/firebase'
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
+import { API_URL } from '@/config/api'
 
 export function useSocket() {
   const socketRef = useRef<Socket | null>(null)
@@ -16,6 +15,7 @@ export function useSocket() {
       if (!user) return
 
       const token = await user.getIdToken()
+      console.log('[Socket] Connecting to:', API_URL)
 
       socket = io(API_URL, {
         auth: { token },

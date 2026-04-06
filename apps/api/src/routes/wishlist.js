@@ -4,6 +4,7 @@ const router = express.Router()
 const { requireAuth } = require('../middleware/auth')
 const Wishlist = require('../models/Wishlist')
 const Item = require('../models/Item')
+const { enrichItems } = require('../lib/enrichItems')
 
 // POST /api/wishlist/:itemId — Add item to wishlist (idempotent)
 router.post('/:itemId', requireAuth, async (req, res) => {
@@ -58,7 +59,7 @@ router.delete('/:itemId', requireAuth, async (req, res) => {
   }
 })
 
-// GET /api/wishlist — Get user's wishlist
+// GET /api/wishlist — Get user's saved items
 router.get('/', requireAuth, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 20, 50)
@@ -78,11 +79,13 @@ router.get('/', requireAuth, async (req, res) => {
       })
       .lean()
 
-    // Filter out deleted items or items that no longer exist
-    const validItems = wishlistItems.filter((w) => w.itemId && !w.itemId.isDeleted)
+    const validItems = wishlistItems
+      .filter((entry) => entry.itemId && !entry.itemId.isDeleted)
+      .map((entry) => entry.itemId)
 
     const hasMore = validItems.length > limit
-    const data = validItems.slice(0, limit)
+    const enriched = await enrichItems(validItems.slice(0, limit), req.dbUser._id)
+    const data = enriched.map((item) => ({ ...item, isWishlisted: true }))
 
     res.json({ ok: true, data, page, hasMore })
   } catch (err) {

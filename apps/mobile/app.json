@@ -14,7 +14,8 @@
       "bundleIdentifier": "com.velve.app"
     },
     "android": {
-      "package": "com.velve.app"
+      "package": "com.velve.app",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -22,10 +23,19 @@
     },
     "plugins": [
       "expo-router",
-      "expo-web-browser"
+      "expo-web-browser",
+      "@react-native-firebase/app",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cafba5a3-b0d3-4e06-8ad2-e3a9633f3858"
+      }
+    },
+    "owner": "vukixxx"
   }
 }

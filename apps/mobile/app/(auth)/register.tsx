@@ -1,16 +1,29 @@
 import { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native'
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 import { useRouter } from 'expo-router'
+
+import { BrandBackground } from '@/components/BrandBackground'
+import { BrandWordmark } from '@/components/BrandWordmark'
+import { GlassSurface } from '@/components/GlassSurface'
+import { colors } from '@/design/tokens'
 import { useAuth } from '@/hooks/useAuth'
+import { useI18n } from '@/i18n'
 
 function validateEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
 export default function RegisterScreen() {
-  console.log('[RegisterScreen] Rendering')
   const router = useRouter()
   const { registerWithEmail } = useAuth()
+  const { t } = useI18n()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -18,13 +31,13 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false)
 
   async function handleRegister() {
-    console.log('[RegisterScreen] handleRegister called with:', email)
     setError('')
 
     if (!validateEmail(email)) {
       setError('Unesi ispravan email.')
       return
     }
+
     if (password.length < 8) {
       setError('Lozinka mora imati najmanje 8 karaktera.')
       return
@@ -33,10 +46,7 @@ export default function RegisterScreen() {
     setLoading(true)
     try {
       await registerWithEmail(email, password)
-      console.log('[RegisterScreen] Registration successful')
-      // Root layout automatski redirectuje na /(tabs)/feed nakon uspešnog login-a
     } catch (e: any) {
-      console.log('[RegisterScreen] Registration error:', e.code, e.message)
       if (e.code === 'auth/email-already-in-use') {
         setError('Ovaj email je već registrovan.')
       } else if (e.code === 'auth/invalid-email') {
@@ -54,56 +64,70 @@ export default function RegisterScreen() {
       className="flex-1 bg-base-canvas"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View className="flex-1 justify-center items-center px-6">
-        <Text className="font-logo text-brand-accent-deep text-5xl mb-2">Velve</Text>
-        <Text className="font-sans text-ink-dark text-base mb-12 opacity-60">
-          Napravi nalog
-        </Text>
+      <BrandBackground />
 
-        <TextInput
-          className="w-full border border-ink-dark rounded-2xl px-4 py-4 font-sans text-ink-dark text-base mb-4"
-          placeholder="Email"
-          placeholderTextColor="#2B2A2B80"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          value={email}
-          onChangeText={setEmail}
-        />
+      <View className="flex-1 px-gutter pb-10 pt-16">
+        <View className="flex-1 justify-between">
+          <View className="pt-4">
+            <BrandWordmark width={180} />
+            <Text className="mt-5 font-logo text-[34px] leading-none text-brand-accent-deep/70">
+              join the swap scene
+            </Text>
+            <Text className="mt-4 font-display text-[40px] leading-[42px] text-ink-dark">
+              {t('auth.registerTitle')}
+            </Text>
+            <Text className="mt-4 max-w-[320px] font-sans text-base leading-7 text-ink-dark/68">
+              {t('auth.registerDescription')}
+            </Text>
+          </View>
 
-        <TextInput
-          className="w-full border border-ink-dark rounded-2xl px-4 py-4 font-sans text-ink-dark text-base mb-2"
-          placeholder="Lozinka (min. 8 karaktera)"
-          placeholderTextColor="#2B2A2B80"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+          <GlassSurface className="px-5 py-5">
+            <TextInput
+              className="mb-4 rounded-soft border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-base text-ink-dark"
+              placeholder={t('auth.emailPlaceholder')}
+              placeholderTextColor={colors.mutedText}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={email}
+              onChangeText={setEmail}
+            />
 
-        {error ? (
-          <Text className="font-sans text-sm mb-4 text-center" style={{ color: '#C0392B' }}>
-            {error}
-          </Text>
-        ) : (
-          <View className="mb-4" />
-        )}
+            <TextInput
+              className="rounded-soft border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-base text-ink-dark"
+              placeholder={t('auth.passwordLongPlaceholder')}
+              placeholderTextColor={colors.mutedText}
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+            />
 
-        <TouchableOpacity
-          className="w-full bg-brand-accent-deep py-4 rounded-full items-center mb-4"
-          onPress={handleRegister}
-          disabled={loading}
-        >
-          <Text className="font-sans text-base-canvas font-semibold text-base">
-            {loading ? 'Registrujem...' : 'Registruj se'}
-          </Text>
-        </TouchableOpacity>
+            {error ? (
+              <Text className="mt-4 font-sans text-sm leading-6" style={{ color: colors.danger }}>
+                {error}
+              </Text>
+            ) : null}
 
-        <TouchableOpacity
-          className="w-full border border-ink-dark py-4 rounded-full items-center"
-          onPress={() => router.back()}
-        >
-          <Text className="font-sans text-ink-dark text-base">Već imam nalog</Text>
-        </TouchableOpacity>
+            <TouchableOpacity
+              className="mt-5 items-center rounded-pill bg-brand-accent-deep px-4 py-4"
+              onPress={handleRegister}
+              disabled={loading}
+            >
+              <Text className="font-sans text-base font-semibold text-base-canvas">
+                {loading ? `${t('auth.register')}...` : t('auth.register')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              className="mt-3 items-center rounded-pill border border-ink-dark/10 bg-base-canvas/70 px-4 py-4"
+              onPress={() => router.back()}
+            >
+              <Text className="font-sans text-base font-medium text-ink-dark">
+                {t('auth.haveAccount')}
+              </Text>
+            </TouchableOpacity>
+          </GlassSurface>
+        </View>
       </View>
     </KeyboardAvoidingView>
   )

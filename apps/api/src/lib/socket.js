@@ -89,17 +89,23 @@ function initSocket(httpServer) {
         // Update chat's lastMessageAt
         await Chat.findByIdAndUpdate(chatId, { lastMessageAt: message.createdAt })
 
-        // Broadcast to all in the chat room with populated sender info
-        io.to(`chat:${chatId}`).emit('new_message', {
-          chatId,
-          message: {
-            _id: message._id,
-            chatId: message.chatId,
-            senderId: { _id: socket.dbUser._id, displayName: socket.dbUser.displayName, photoURL: socket.dbUser.photoURL },
-            text: message.text,
-            createdAt: message.createdAt,
-          },
-        })
+        const messagePayload = {
+          _id: message._id,
+          chatId: message.chatId,
+          senderId: { _id: socket.dbUser._id, displayName: socket.dbUser.displayName, photoURL: socket.dbUser.photoURL },
+          text: message.text,
+          createdAt: message.createdAt,
+        }
+
+        // Broadcast to all in the chat room
+        io.to(`chat:${chatId}`).emit('new_message', { chatId, message: messagePayload })
+
+        // Emit badge event direktno svakom učesniku (za badge u tab baru)
+        for (const participantId of chat.participants) {
+          if (participantId.toString() !== socket.userId) {
+            io.to(`user:${participantId.toString()}`).emit('badge_new_message', { chatId })
+          }
+        }
 
         // Push notification to other participant (if not in the room)
         const otherUserId = chat.participants.find((p) => p.toString() !== socket.userId)

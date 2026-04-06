@@ -9,9 +9,15 @@
     "dev:api": "npm run dev --workspace=apps/api",
     "dev:mobile": "npm run start --workspace=apps/mobile",
     "dev:web": "npm run dev --workspace=apps/web",
-    "dev:ai": "npm run dev --workspace=apps/ai-server"
+    "dev:ai": "npm run dev --workspace=apps/ai-server",
+    "lint": "npm run lint --workspaces --if-present",
+    "lint:fix": "npm run lint:fix --workspaces --if-present",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
+    "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
-    "expo": "~54.0.0"
+    "expo": "~54.0.0",
+    "eslint": "^8.50.0",
+    "prettier": "^3.0.3"
   }
 }

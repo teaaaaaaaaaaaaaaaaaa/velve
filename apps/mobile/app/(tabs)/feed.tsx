@@ -1,18 +1,28 @@
-import { useState, useEffect, useRef, useCallback, memo } from 'react'
-import {
-  View,
-  Text,
-  Image,
-  TouchableOpacity,
-  RefreshControl,
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  Animated,
-} from 'react-native'
-import { FlashList } from '@shopify/flash-list'
+import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  RefreshControl,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+
 import client from '@/api/client'
+import { EditorialEmptyState } from '@/components/EditorialEmptyState'
+import { FeedSkeleton } from '@/components/BrandedLoader'
+import { GlassSurface } from '@/components/GlassSurface'
+import { colors, shadows } from '@/design/tokens'
+import { useI18n } from '@/i18n'
+import { RemoteImage } from '@/components/RemoteImage'
 
 type Item = {
   _id: string
@@ -32,293 +42,661 @@ type Item = {
   createdAt: string
   likesCount?: number
   isLiked?: boolean
+  isWishlisted?: boolean
+  listingType?: 'trade' | 'sell' | 'both'
+  price?: number
+  tradeFor?: string
 }
 
-type FeedResponse = {
-  ok: boolean
-  data: Item[]
-  page: number
-  hasMore: boolean
+const conditionCopy = {
+  sr: {
+    new: 'Novo',
+    like_new: 'Kao novo',
+    good: 'Dobro',
+    fair: 'OK stanje',
+  },
+  en: {
+    new: 'New',
+    like_new: 'Like new',
+    good: 'Good',
+    fair: 'Fair',
+  },
+  ru: {
+    new: 'Новое',
+    like_new: 'Как новое',
+    good: 'Хорошее',
+    fair: 'Нормальное',
+  },
+} as const
+
+function dedupeItemsById(items: Item[]) {
+  const seen = new Set<string>()
+
+  return items.filter((item) => {
+    const itemId = String(item._id)
+    if (seen.has(itemId)) return false
+    seen.add(itemId)
+    return true
+  })
 }
 
 export default function FeedScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
+  const { height: windowHeight } = useWindowDimensions()
+  const { locale, t } = useI18n()
+
   const [items, setItems] = useState<Item[]>([])
-  const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [isFirstTime, setIsFirstTime] = useState(true)
+  const [actionItem, setActionItem] = useState<Item | null>(null)
 
-  const fetchFeed = async (pageNum: number, isRefresh = false) => {
-    try {
-      if (isRefresh) {
-        setIsRefreshing(true)
-      } else if (pageNum === 0) {
-        setIsLoading(true)
-      } else {
-        setIsLoadingMore(true)
-      }
+  const pageHeight = Math.max(windowHeight, 1)
 
-      const response = await client.get<FeedResponse>('/api/feed', {
-        params: { limit: 20, page: pageNum },
-      })
+  const fetchFeed = useCallback(
+    async (
+      pageNum: number,
+      mode: 'replace' | 'append' = 'replace',
+      excludeIds: string[] = []
+    ) => {
+      try {
+        if (pageNum === 0 && mode === 'replace') setIsLoading(true)
+        else setIsLoadingMore(true)
 
-      if (response.data.ok) {
-        if (isRefresh || pageNum === 0) {
-          setItems(response.data.data)
-        } else {
-          setItems((prev) => [...prev, ...response.data.data])
+        const params: Record<string, string | number> = {
+          limit: 10,
+          page: mode === 'append' ? 0 : pageNum,
         }
-        setHasMore(response.data.hasMore)
-        setPage(response.data.page)
+
+        if (pageNum === 0 && isFirstTime) {
+          params.firstTime = 'true'
+        }
+
+        if (mode === 'append' && excludeIds.length > 0) {
+          params.excludeIds = excludeIds.join(',')
+        }
+
+        const response = await client.get('/api/feed', { params })
+
+        if (response.data.ok) {
+          const nextItems = dedupeItemsById(response.data.data as Item[])
+          setItems((prev) =>
+            mode === 'append' ? dedupeItemsById([...prev, ...nextItems]) : nextItems
+          )
+          setHasMore(response.data.hasMore)
+
+          if (pageNum === 0 && isFirstTime) {
+            setIsFirstTime(false)
+          }
+        }
+      } catch {
+        if (pageNum === 0) {
+          setItems([])
+        }
+      } finally {
+        setIsLoading(false)
+        setIsLoadingMore(false)
+        setRefreshing(false)
       }
-    } catch (error: any) {
-      Alert.alert(
-        'Greska',
-        error.response?.data?.message || 'Nije moguce ucitati feed.'
-      )
-    } finally {
-      setIsLoading(false)
-      setIsLoadingMore(false)
-      setIsRefreshing(false)
-    }
-  }
+    },
+    [isFirstTime]
+  )
 
   useEffect(() => {
     fetchFeed(0)
+  }, [fetchFeed])
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await fetchFeed(0)
+  }, [fetchFeed])
+
+  const handleLoadMore = useCallback(() => {
+    if (isLoadingMore || !hasMore || items.length === 0) return
+    fetchFeed(0, 'append', items.map((item) => item._id))
+  }, [fetchFeed, hasMore, isLoadingMore, items])
+
+  const updateItem = useCallback((itemId: string, updater: (item: Item) => Item) => {
+    setItems((prev) => prev.map((item) => (item._id === itemId ? updater(item) : item)))
   }, [])
 
-  const handleRefresh = () => {
-    fetchFeed(0, true)
-  }
+  const handleLike = useCallback(
+    async (itemId: string, isLiked: boolean) => {
+      const previousLiked = isLiked
+      let previousCount = 0
 
-  const handleLoadMore = () => {
-    if (!isLoadingMore && hasMore) {
-      fetchFeed(page + 1)
-    }
-  }
+      updateItem(itemId, (item) => {
+        previousCount = item.likesCount ?? 0
+        return {
+          ...item,
+          isLiked: !isLiked,
+          likesCount: (item.likesCount ?? 0) + (isLiked ? -1 : 1),
+        }
+      })
 
-  const handleLike = useCallback(async (itemId: string) => {
+      try {
+        const response = isLiked
+          ? await client.delete(`/api/items/${itemId}/like`)
+          : await client.post(`/api/items/${itemId}/like`)
+
+        if (!isLiked && response.data.ok) {
+          updateItem(itemId, (item) => ({
+            ...item,
+            isLiked: response.data.isLiked,
+            likesCount: response.data.likesCount,
+          }))
+        }
+      } catch {
+        updateItem(itemId, (item) => ({
+          ...item,
+          isLiked: previousLiked,
+          likesCount: previousCount,
+        }))
+      }
+    },
+    [updateItem]
+  )
+
+  const handleWishlist = useCallback(
+    async (itemId: string, isWishlisted: boolean) => {
+      updateItem(itemId, (item) => ({ ...item, isWishlisted: !isWishlisted }))
+
+      try {
+        if (isWishlisted) {
+          await client.delete(`/api/wishlist/${itemId}`)
+        } else {
+          await client.post(`/api/wishlist/${itemId}`)
+        }
+      } catch {
+        updateItem(itemId, (item) => ({ ...item, isWishlisted }))
+      }
+    },
+    [updateItem]
+  )
+
+  const handleHideItem = useCallback(async (item: Item) => {
     try {
-      await client.post(`/api/items/${itemId}/like`)
-      setItems((prev) =>
-        prev.map((item) =>
-          item._id === itemId
-            ? {
-                ...item,
-                isLiked: !item.isLiked,
-                likesCount: item.isLiked
-                  ? (item.likesCount ?? 0) - 1
-                  : (item.likesCount ?? 0) + 1,
-              }
-            : item
-        )
-      )
-    } catch (error: any) {
-      Alert.alert('Greska', 'Nije moguce lajkovati item.')
+      await client.post(`/api/items/${item._id}/hide`, { reason: 'not_interested' })
+      setItems((prev) => prev.filter((entry) => entry._id !== item._id))
+      setActionItem(null)
+    } catch {
+      Alert.alert('Greška', 'Nije moguće sakriti ovu objavu.')
     }
   }, [])
 
-  const handleItemPress = useCallback((itemId: string) => {
-    router.push(`/items/${itemId}`)
-  }, [router])
+  const handleReportItem = useCallback(async (item: Item) => {
+    try {
+      await client.post(`/api/items/${item._id}/report`, { reason: 'community_report' })
+      setActionItem(null)
+      Alert.alert('Hvala', 'Prijava je poslata i pregledaćemo objavu.')
+    } catch {
+      Alert.alert('Greška', 'Nije moguće poslati prijavu trenutno.')
+    }
+  }, [])
 
-  const renderItem = ({ item }: { item: Item }) => (
-    <ItemCard
-      item={item}
-      onLike={() => handleLike(item._id)}
-      onPress={() => handleItemPress(item._id)}
-    />
+  const handleBlockSeller = useCallback(async (item: Item) => {
+    try {
+      await client.post(`/api/users/${item.userId._id}/block`)
+      setItems((prev) => prev.filter((entry) => entry.userId._id !== item.userId._id))
+      setActionItem(null)
+      Alert.alert(
+        'Korisnik blokiran',
+        `Sadržaj korisnika @${item.userId.displayName} više ti se neće prikazivati.`
+      )
+    } catch {
+      Alert.alert('Greška', 'Nije moguće blokirati korisnika trenutno.')
+    }
+  }, [])
+
+  const handleOpenMore = useCallback((item: Item) => {
+    setActionItem(item)
+  }, [])
+
+  const renderFeedItem = useCallback(
+    ({ item }: { item: Item }) => (
+      <FeedItem
+        item={item}
+        height={pageHeight}
+        locale={locale}
+        topInset={insets.top}
+        bottomInset={insets.bottom}
+        onLike={handleLike}
+        onWishlist={handleWishlist}
+        onMore={handleOpenMore}
+      />
+    ),
+    [handleLike, handleOpenMore, handleWishlist, insets.bottom, insets.top, locale, pageHeight]
   )
 
-  const renderFooter = () => {
-    if (!isLoadingMore) return null
-    return (
-      <View className="py-4">
-        <ActivityIndicator size="small" color="#431A43" />
-      </View>
-    )
-  }
-
-  const renderSkeleton = () => (
-    <View className="flex-1 bg-base-canvas px-4">
-      {[1, 2, 3].map((i) => (
-        <View key={i} className="bg-white rounded-2xl mb-4 p-4">
-          <View className="w-full h-80 bg-gray-200 rounded-xl mb-3" />
-          <View className="h-6 bg-gray-200 rounded mb-2 w-3/4" />
-          <View className="h-4 bg-gray-200 rounded mb-2 w-1/2" />
-          <View className="flex-row items-center mt-2">
-            <View className="w-8 h-8 rounded-full bg-gray-200 mr-2" />
-            <View className="h-4 bg-gray-200 rounded w-24" />
-          </View>
-        </View>
-      ))}
-    </View>
-  )
+  const feedKeyExtractor = useCallback((item: Item) => item._id, [])
 
   if (isLoading) {
-    return renderSkeleton()
-  }
-
-  if (items.length === 0) {
-    return (
-      <View className="flex-1 bg-base-canvas justify-center items-center px-6">
-        <Text className="font-display text-ink-dark text-2xl mb-2">Feed je prazan</Text>
-        <Text className="font-sans text-ink-dark opacity-60 text-center mb-6">
-          Budi prvi koji ce dodati garderobu!
-        </Text>
-        <TouchableOpacity
-          onPress={handleRefresh}
-          className="bg-brand-accent-deep rounded-full py-4 px-8"
-        >
-          <Text className="font-sans text-base-canvas font-semibold">Osvezi</Text>
-        </TouchableOpacity>
-      </View>
-    )
+    return <FeedSkeleton />
   }
 
   return (
-    <View className="flex-1 bg-base-canvas">
-      <FlashList
-        data={items}
-        renderItem={renderItem}
-        keyExtractor={(item) => item._id}
-        estimatedItemSize={450}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={renderFooter}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            tintColor="#431A43"
+    <View className="flex-1 bg-brand-accent-deep">
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+      {items.length === 0 ? (
+        <View className="flex-1 justify-center bg-base-canvas px-4 pt-20">
+          <EditorialEmptyState
+            icon="sparkles-outline"
+            title={t('feed.emptyTitle')}
+            description={t('feed.emptyDescription')}
+            actionLabel={t('common.refresh')}
+            onAction={() => fetchFeed(0)}
           />
-        }
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8 }}
-      />
+        </View>
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={feedKeyExtractor}
+          renderItem={renderFeedItem}
+          showsVerticalScrollIndicator={false}
+          pagingEnabled
+          decelerationRate="fast"
+          snapToInterval={pageHeight}
+          snapToAlignment="start"
+          disableIntervalMomentum
+          removeClippedSubviews
+          initialNumToRender={2}
+          maxToRenderPerBatch={2}
+          windowSize={3}
+          updateCellsBatchingPeriod={40}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.55}
+          getItemLayout={(_, index) => ({
+            length: pageHeight,
+            offset: pageHeight * index,
+            index,
+          })}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          ListFooterComponent={
+            isLoadingMore ? (
+              <View className="py-8">
+                <GlassSurface className="mx-auto rounded-pill px-5 py-3" dark>
+                  <Text className="font-sans text-sm text-base-canvas/82">Loading more...</Text>
+                </GlassSurface>
+              </View>
+            ) : null
+          }
+        />
+      )}
+
+      <View
+        className="absolute left-4 right-4 z-10"
+        style={{ top: insets.top + 10 }}
+        pointerEvents="box-none"
+      >
+        <View className="flex-row items-start justify-between">
+          <View className="flex-1 pr-4">
+          <Text className="font-sans text-[11px] uppercase tracking-[1.6px] text-base-canvas/70">
+              {t('feed.discovery')}
+            </Text>
+            <Text className="mt-1 max-w-[250px] font-display text-[30px] leading-[30px] text-base-canvas">
+              {t('feed.title')}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            className="rounded-pill border border-base-canvas/22 bg-brand-accent-deep/62 px-4 py-3"
+            activeOpacity={0.86}
+            style={shadows.glass}
+            onPress={() => router.push('/search')}
+          >
+            <View className="flex-row items-center gap-2">
+              <Ionicons name="search" size={16} color={colors.baseCanvas} />
+              <Text className="font-sans text-sm font-semibold text-base-canvas">
+                {t('common.search')}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <Modal
+        visible={!!actionItem}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActionItem(null)}
+      >
+        <Pressable className="flex-1 justify-end bg-black/55 px-4 py-4" onPress={() => setActionItem(null)}>
+          <Pressable className="rounded-editorial bg-surface-panel px-5 py-5">
+            <Text className="font-display text-[28px] text-ink-dark">
+              {actionItem ? `@${actionItem.userId.displayName}` : 'Opcije objave'}
+            </Text>
+            <Text className="mt-2 font-sans text-sm leading-6 text-ink-dark/62">
+              {t('feed.sheetSubtitle')}
+            </Text>
+
+            <SheetButton
+              label={t('feed.hideItem')}
+              icon="eye-off-outline"
+              onPress={() => actionItem && handleHideItem(actionItem)}
+            />
+            <SheetButton
+              label={t('feed.reportItem')}
+              icon="flag-outline"
+              onPress={() => actionItem && handleReportItem(actionItem)}
+            />
+            <SheetButton
+              label={t('feed.viewProfile')}
+              icon="person-outline"
+              onPress={() => {
+                if (!actionItem) return
+                router.push({ pathname: '/users/[id]', params: { id: actionItem.userId._id } })
+                setActionItem(null)
+              }}
+            />
+            <SheetButton
+              label={t('feed.blockUser')}
+              icon="ban-outline"
+              destructive
+              onPress={() => actionItem && handleBlockSeller(actionItem)}
+            />
+
+            <TouchableOpacity
+              className="mt-3 items-center rounded-pill bg-ink-dark/6 px-4 py-4"
+              activeOpacity={0.86}
+              onPress={() => setActionItem(null)}
+            >
+              <Text className="font-sans text-sm font-semibold text-ink-dark">
+                {t('common.close')}
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   )
 }
 
-type ItemCardProps = {
+type FeedItemProps = {
   item: Item
-  onLike: () => void
-  onPress: () => void
+  height: number
+  locale: 'sr' | 'en' | 'ru'
+  topInset: number
+  bottomInset: number
+  onLike: (itemId: string, isLiked: boolean) => void
+  onWishlist: (itemId: string, isWishlisted: boolean) => void
+  onMore: (item: Item) => void
 }
 
-const ItemCard = memo(function ItemCard({ item, onLike, onPress }: ItemCardProps) {
-  const scale = useRef(new Animated.Value(1)).current
-  const heartScale = useRef(new Animated.Value(0)).current
-  const [lastTap, setLastTap] = useState(0)
+const FeedItem = memo(function FeedItem({
+  item,
+  height,
+  locale,
+  topInset,
+  bottomInset,
+  onLike,
+  onWishlist,
+  onMore,
+}: FeedItemProps) {
+  const router = useRouter()
+  const { t, formatDate } = useI18n()
 
-  const handleDoubleTap = () => {
-    const now = Date.now()
-    if (now - lastTap < 300) {
-      onLike()
-      Animated.sequence([
-        Animated.spring(heartScale, { toValue: 1.2, useNativeDriver: true }),
-        Animated.spring(heartScale, { toValue: 0, useNativeDriver: true }),
-      ]).start()
-    }
-    setLastTap(now)
-  }
+  const imageUri = item.images?.[0]
+  const contentBottomOffset = Math.max(bottomInset, 10) + 28
 
-  const handlePressIn = () => {
-    Animated.spring(scale, { toValue: 0.98, useNativeDriver: true }).start()
-  }
+  const metaParts = [
+    item.brand,
+    item.size ? item.size.toUpperCase() : null,
+    conditionCopy[locale][item.condition],
+  ].filter(Boolean)
 
-  const handlePressOut = () => {
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start()
-  }
+  const metaLine = useMemo(
+    () => metaParts.join(' / '),
+    [metaParts]
+  )
 
-  const heroImage = item.images[0] || 'https://via.placeholder.com/400'
+  const showPrice =
+    (item.listingType === 'sell' || item.listingType === 'both') && item.price != null
+  const showTradeBtn =
+    !item.listingType || item.listingType === 'trade' || item.listingType === 'both'
+  const showBuyBtn = item.listingType === 'sell' || item.listingType === 'both'
 
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <Pressable
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        className="bg-white rounded-2xl mb-4 overflow-hidden shadow-sm"
+    <View style={{ height }} className="w-full bg-brand-accent-deep">
+      {imageUri ? (
+        <RemoteImage
+          uri={imageUri}
+          style={StyleSheet.absoluteFillObject}
+          fallback={
+            <View style={[StyleSheet.absoluteFillObject, styles.imageFallback]}>
+              <Ionicons name="shirt-outline" size={48} color={colors.baseCanvas} />
+            </View>
+          }
+        />
+      ) : (
+        <View style={[StyleSheet.absoluteFillObject, styles.imageFallback]}>
+          <Text className="max-w-[180px] text-center font-sans text-sm leading-6 text-base-canvas/78">
+            {t('feed.manualFallback')}
+          </Text>
+        </View>
+      )}
+
+      <TouchableOpacity
+        style={StyleSheet.absoluteFillObject}
+        activeOpacity={1}
+        onPress={() => router.push(`/items/${item._id}`)}
+      />
+      <View style={styles.topShade} />
+
+      <View className="absolute left-4 right-20" style={{ top: topInset + 96 }}>
+        <View className="self-start rounded-pill bg-black/16 px-3 py-2">
+          <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-base-canvas/78">
+            {formatDate(item.createdAt, { day: 'numeric', month: 'short' })}
+          </Text>
+        </View>
+
+        <Text className="mt-4 font-display text-[34px] leading-[33px] text-base-canvas" numberOfLines={2}>
+          {item.title}
+        </Text>
+
+        <Text className="mt-3 font-sans text-sm leading-6 text-base-canvas/80" numberOfLines={2}>
+          {metaLine}
+        </Text>
+      </View>
+
+      <View className="absolute right-3 items-center gap-3" style={{ bottom: contentBottomOffset + 104 }}>
+        <ActionButton
+          icon={item.isLiked ? 'heart' : 'heart-outline'}
+          iconColor={item.isLiked ? '#FF5F77' : colors.baseCanvas}
+          label={(item.likesCount ?? 0) > 0 ? String(item.likesCount) : undefined}
+          onPress={() => onLike(item._id, !!item.isLiked)}
+        />
+        <ActionButton
+          icon={item.isWishlisted ? 'bookmark' : 'bookmark-outline'}
+          iconColor={item.isWishlisted ? colors.highlight : colors.baseCanvas}
+          onPress={() => onWishlist(item._id, !!item.isWishlisted)}
+        />
+        <ActionButton
+          icon="paper-plane-outline"
+          iconColor={colors.baseCanvas}
+          onPress={() => router.push('/(tabs)/chat')}
+        />
+        <ActionButton
+          icon="ellipsis-horizontal"
+          iconColor={colors.baseCanvas}
+          onPress={() => onMore(item)}
+        />
+      </View>
+
+      <GlassSurface
+        dark
+        className="absolute left-4 right-4 px-4 py-4"
+        style={{ bottom: contentBottomOffset }}
       >
-        {/* Hero slika sa dupli-tap detektorom */}
-        <Pressable onPress={handleDoubleTap} className="relative">
-          <Image
-            source={{ uri: heroImage }}
-            className="w-full h-80"
-            resizeMode="cover"
-          />
-
-          {/* Status badge */}
-          {item.status && item.status !== 'available' && (
-            <View className="absolute top-3 right-3 bg-black/70 px-3 py-1 rounded-full">
-              <Text className="font-sans text-xs text-white font-semibold">
-                {item.status === 'traded' ? '✓ Razmenjeno' : '⏳ U razmeni'}
-              </Text>
-            </View>
-          )}
-
-          {/* Animirano srce za dupli tap */}
-          <Animated.View
-            style={{
-              transform: [{ scale: heartScale }],
-              opacity: heartScale,
-              position: 'absolute',
-              top: 0, left: 0, right: 0, bottom: 0,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-            pointerEvents="none"
+        <View className="flex-row items-center">
+          <TouchableOpacity
+            className="flex-1 flex-row items-center"
+            activeOpacity={0.88}
+            onPress={() => router.push({ pathname: '/users/[id]', params: { id: item.userId._id } })}
           >
-            <View className="w-24 h-24 bg-white rounded-full justify-center items-center opacity-90">
-              <Text className="text-6xl">❤️</Text>
-            </View>
-          </Animated.View>
-        </Pressable>
-
-        {/* Item Info */}
-        <View className="p-4">
-          <Text className="font-display text-ink-dark text-lg mb-1" numberOfLines={1}>
-            {item.title}
-          </Text>
-
-          <Text className="font-sans text-ink-dark opacity-60 text-sm mb-3">
-            {item.brand} • {(item.size || '').toUpperCase()}
-          </Text>
-
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center flex-1">
-              <Image
-                source={{
-                  uri: (typeof item.userId === 'object' && item.userId?.photoURL) || 'https://via.placeholder.com/30',
-                }}
-                className="w-8 h-8 rounded-full mr-2"
+            {item.userId?.photoURL ? (
+              <RemoteImage
+                uri={item.userId.photoURL}
+                className="h-11 w-11 rounded-full"
+                fallback={
+                  <View className="h-full w-full items-center justify-center rounded-full bg-brand-accent-light/35">
+                    <Text className="font-display text-2xl text-brand-accent-deep">
+                      {(item.userId?.displayName || '?').charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                }
               />
-              <Text className="font-sans text-ink-dark text-sm" numberOfLines={1}>
-                {typeof item.userId === 'object' ? item.userId?.displayName : 'Korisnik'}
+            ) : (
+              <View className="h-11 w-11 items-center justify-center rounded-full bg-brand-accent-light/35">
+                <Text className="font-display text-2xl text-brand-accent-deep">
+                  {(item.userId?.displayName || '?').charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
+
+            <View className="ml-3 flex-1 pr-3">
+              <Text className="font-sans text-[11px] uppercase tracking-[1.1px] text-base-canvas/55">
+                Seller
+              </Text>
+              <Text className="font-display text-2xl text-base-canvas" numberOfLines={1}>
+                @{item.userId.displayName}
               </Text>
             </View>
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={onLike}
-              className={`flex-row items-center px-3 py-2 rounded-full ${
-                item.isLiked ? 'bg-brand-accent-deep' : 'bg-brand-accent-light'
-              }`}
-              activeOpacity={0.7}
-            >
-              <Text className="text-base mr-1">{item.isLiked ? '❤️' : '🤍'}</Text>
-              <Text
-                className={`font-sans text-sm ${
-                  item.isLiked ? 'text-white' : 'text-ink-dark'
-                }`}
+          <View className="items-end gap-2">
+            {showPrice ? (
+              <View className="rounded-pill border border-brand-highlight/35 bg-brand-highlight/12 px-3 py-2">
+                <Text className="font-sans text-xs font-semibold text-brand-highlight">
+                  {item.price} EUR
+                </Text>
+              </View>
+            ) : null}
+
+            {showBuyBtn ? (
+              <TouchableOpacity
+                className="rounded-pill bg-brand-highlight px-4 py-3"
+                activeOpacity={0.86}
+                onPress={() => router.push(`/items/${item._id}`)}
               >
-                {item.likesCount ?? 0}
-              </Text>
-            </TouchableOpacity>
+                <Text className="font-sans text-sm font-semibold text-ink-dark">
+                  {t('feed.details')}
+                </Text>
+              </TouchableOpacity>
+            ) : showTradeBtn ? (
+              <TouchableOpacity
+                className="rounded-pill border border-base-canvas/18 bg-brand-accent-deep px-4 py-3"
+                activeOpacity={0.86}
+                onPress={() => router.push(`/items/${item._id}?openTrade=true`)}
+              >
+                <Text className="font-sans text-sm font-semibold text-base-canvas">
+                  {t('feed.trade')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         </View>
-      </Pressable>
-    </Animated.View>
+
+        {!!item.description ? (
+          <Text className="mt-4 font-sans text-sm leading-6 text-base-canvas/75" numberOfLines={3}>
+            {item.description}
+          </Text>
+        ) : null}
+      </GlassSurface>
+    </View>
   )
+},
+(prev, next) =>
+  prev.item === next.item &&
+  prev.height === next.height &&
+  prev.locale === next.locale &&
+  prev.topInset === next.topInset &&
+  prev.bottomInset === next.bottomInset &&
+  prev.onLike === next.onLike &&
+  prev.onWishlist === next.onWishlist &&
+  prev.onMore === next.onMore
+)
+
+function ActionButton({
+  icon,
+  iconColor,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap
+  iconColor: string
+  label?: string
+  onPress: () => void
+}) {
+  return (
+    <TouchableOpacity
+      className="w-[52px] items-center rounded-soft border border-base-canvas/14 bg-brand-accent-deep/55 px-2 py-3"
+      style={shadows.glass}
+      onPress={onPress}
+      activeOpacity={0.82}
+    >
+      <Ionicons name={icon} size={25} color={iconColor} />
+      {label ? (
+        <Text className="mt-1 font-sans text-xs font-semibold text-base-canvas">{label}</Text>
+      ) : null}
+    </TouchableOpacity>
+  )
+}
+
+function SheetButton({
+  label,
+  icon,
+  destructive,
+  onPress,
+}: {
+  label: string
+  icon: keyof typeof Ionicons.glyphMap
+  destructive?: boolean
+  onPress: () => void
+}) {
+  return (
+    <TouchableOpacity
+      className="mt-3 flex-row items-center rounded-soft bg-white px-4 py-4"
+      activeOpacity={0.86}
+      onPress={onPress}
+    >
+      <View
+        className={`h-10 w-10 items-center justify-center rounded-full ${
+          destructive ? 'bg-signal-danger/10' : 'bg-brand-accent-deep/8'
+        }`}
+      >
+        <Ionicons
+          name={icon}
+          size={18}
+          color={destructive ? colors.danger : colors.accentDeep}
+        />
+      </View>
+      <Text
+        className="ml-3 font-sans text-sm font-semibold"
+        style={{ color: destructive ? colors.danger : colors.inkDark }}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  )
+}
+
+const styles = StyleSheet.create({
+  imageFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accentDeep,
+    paddingHorizontal: 24,
+  },
+  topShade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 220,
+    backgroundColor: 'rgba(4,2,4,0.08)',
+  },
 })

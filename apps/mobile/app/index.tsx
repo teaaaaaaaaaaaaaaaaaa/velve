@@ -1,59 +1,111 @@
-import { useEffect, useState } from 'react'
-import { View, ActivityIndicator } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useEffect } from 'react'
+import { View, Text, TouchableOpacity } from 'react-native'
+import { useRouter, useSegments } from 'expo-router'
+
+import { BrandBackground } from '@/components/BrandBackground'
+import { BrandedLoader } from '@/components/BrandedLoader'
+import { GlassSurface } from '@/components/GlassSurface'
 import { useAuth } from '@/hooks/useAuth'
-import client from '@/api/client'
+import { useI18n } from '@/i18n'
 
 export default function Index() {
-  console.log('[Index] Rendering')
-  const { currentUser, loading: authLoading } = useAuth()
+  const {
+    currentUser,
+    dbUser,
+    loading: authLoading,
+    profileError,
+    refreshDbUser,
+    logout,
+  } = useAuth()
   const router = useRouter()
-  const [checkingOnboarding, setCheckingOnboarding] = useState(false)
+  const segments = useSegments()
+  const { locale } = useI18n()
+
+  const copy = {
+    sr: {
+      profileLoadTitle: 'Ne mozemo da ucitamo profil',
+      profileLoadDescription: 'Firebase prijava je prosla, ali backend profil nije stigao.',
+      retry: 'Pokusaj ponovo',
+      logout: 'Odjavi se',
+      loading: 'Velve proverava tvoj ulaz u aplikaciju',
+    },
+    en: {
+      profileLoadTitle: 'We could not load the profile',
+      profileLoadDescription: 'Firebase sign-in worked, but the backend profile did not arrive.',
+      retry: 'Try again',
+      logout: 'Log out',
+      loading: 'Velve is checking your app entry',
+    },
+    ru: {
+      profileLoadTitle: 'Не удается загрузить профиль',
+      profileLoadDescription: 'Вход через Firebase прошел, но backend-профиль не загрузился.',
+      retry: 'Попробовать снова',
+      logout: 'Выйти',
+      loading: 'Velve проверяет твой вход в приложение',
+    },
+  } as const
 
   useEffect(() => {
-    async function checkOnboardingStatus() {
-      console.log('[Index] Auth check:', { user: !!currentUser, loading: authLoading })
-      if (authLoading) return
+    if (authLoading) return
 
-      if (currentUser) {
-        try {
-          setCheckingOnboarding(true)
-          console.log('[Index] Checking onboarding status...')
+    const isOnValidRoute = segments.length > 0
+    if (isOnValidRoute) return
 
-          // Fetch user profile to check onboarding status
-          const response = await client.get('/api/users/me')
-          const userData = response.data?.data || response.data
-          const onboardingCompleted = userData?.onboardingCompleted || false
-
-          console.log('[Index] Onboarding completed:', onboardingCompleted)
-
-          if (onboardingCompleted) {
-            console.log('[Index] User logged in, redirecting to feed')
-            router.replace('/(tabs)/feed')
-          } else {
-            console.log('[Index] Onboarding not completed, redirecting to onboarding')
-            router.replace('/onboarding/welcome')
-          }
-        } catch (error) {
-          console.error('[Index] Error checking onboarding:', error)
-          // If error, assume onboarding needed
-          console.log('[Index] Error occurred, redirecting to onboarding')
-          router.replace('/onboarding/welcome')
-        } finally {
-          setCheckingOnboarding(false)
-        }
-      } else {
-        console.log('[Index] No user, redirecting to login')
-        router.replace('/(auth)/login')
-      }
+    if (!currentUser) {
+      // Not logged in - go to login
+      router.replace('/(auth)/login')
+      return
     }
 
-    checkOnboardingStatus()
-  }, [currentUser, authLoading])
+    // Wait for dbUser to load before redirecting
+    if (!dbUser) {
+      console.log('[Index] Waiting for dbUser to load. profileError =', profileError)
+      return
+    }
 
-  return (
-    <View className="flex-1 items-center justify-center bg-base-canvas">
-      <ActivityIndicator size="large" color="#431A43" />
-    </View>
-  )
+    // Both currentUser and dbUser loaded - safe to redirect
+    if (dbUser.onboardingCompleted) {
+      router.replace('/(tabs)/feed')
+    } else {
+      router.replace('/onboarding/welcome')
+    }
+  }, [currentUser, dbUser, authLoading, segments])
+
+  if (!authLoading && currentUser && !dbUser && profileError) {
+    return (
+      <View className="flex-1 bg-base-canvas px-gutter pt-20">
+        <BrandBackground />
+
+        <GlassSurface className="px-6 py-6">
+          <Text className="text-center font-display text-3xl text-ink-dark">
+            {copy[locale].profileLoadTitle}
+          </Text>
+          <Text className="mt-3 text-center font-sans text-sm leading-6 text-ink-dark/68">
+            {copy[locale].profileLoadDescription}
+          </Text>
+          <Text className="mt-5 text-center font-mono text-xs text-ink-dark/58">
+            {String(profileError)}
+          </Text>
+
+          <TouchableOpacity
+            className="mt-6 items-center rounded-pill bg-brand-accent-deep px-6 py-4"
+            onPress={refreshDbUser}
+          >
+            <Text className="font-sans text-base font-semibold text-base-canvas">
+              {copy[locale].retry}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className="mt-3 items-center rounded-pill border border-brand-accent-deep/12 bg-base-canvas/72 px-6 py-4"
+            onPress={logout}
+          >
+            <Text className="font-sans text-base text-ink-dark">{copy[locale].logout}</Text>
+          </TouchableOpacity>
+        </GlassSurface>
+      </View>
+    )
+  }
+
+  return <BrandedLoader label={copy[locale].loading} />
 }
