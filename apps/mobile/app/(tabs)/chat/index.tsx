@@ -75,7 +75,7 @@ function getTradeLabel(status?: string | null) {
 export default function ChatListScreen() {
   const router = useRouter()
   const { dbUser } = useAuth()
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
 
   const [chats, setChats] = useState<ChatRoom[]>([])
   const [loading, setLoading] = useState(true)
@@ -139,45 +139,22 @@ export default function ChatListScreen() {
             <Text className="font-display text-4xl text-ink-dark">{t('chat.title')}</Text>
           </View>
 
-          <TouchableOpacity
-            className="h-11 w-11 items-center justify-center rounded-full bg-white"
-            onPress={() => router.push('/(tabs)/trades')}
-          >
-              <Ionicons name="swap-horizontal" size={20} color={colors.accentDeep} />
-            </TouchableOpacity>
         </View>
 
-        <View className="mb-6 overflow-hidden rounded-[28px] border border-brand-accent-deep/10 bg-white px-4 py-4">
-          <Text className="font-display text-2xl text-ink-dark">{t('chat.tradePulse')}</Text>
-          <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/65">
-            Aktivni i pending trade razgovori ostaju uz chat, ali puni lifecycle sada imas u
-            posebnom trade desk ekranu.
-          </Text>
-
-          <View className="mt-4 flex-row gap-3">
-            <View className="flex-1 rounded-[22px] bg-base-canvas px-4 py-4">
-              <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
-                Pending
-              </Text>
-              <Text className="mt-1 font-display text-3xl text-ink-dark">{summary.pending}</Text>
-            </View>
-            <View className="flex-1 rounded-[22px] bg-base-canvas px-4 py-4">
-              <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
-                Active
-              </Text>
-              <Text className="mt-1 font-display text-3xl text-ink-dark">{summary.active}</Text>
-            </View>
-          </View>
-
+        {(summary.pending > 0 || summary.active > 0) && (
           <TouchableOpacity
-            className="mt-4 items-center rounded-full bg-brand-accent-deep px-4 py-3"
+            className="mb-4 flex-row items-center justify-between rounded-soft bg-brand-accent-deep px-4 py-3"
             onPress={() => router.push('/(tabs)/trades')}
           >
-            <Text className="font-sans text-sm font-semibold text-base-canvas">
-              {t('chat.openTradeDesk')}
-            </Text>
+            <View className="flex-row items-center gap-3">
+              <Ionicons name="swap-horizontal" size={18} color={colors.baseCanvas} />
+              <Text className="font-sans text-sm text-base-canvas">
+                {summary.pending > 0 ? `${summary.pending} pending` : ''}{summary.pending > 0 && summary.active > 0 ? ' · ' : ''}{summary.active > 0 ? `${summary.active} aktivnih` : ''} trade-ova
+              </Text>
+            </View>
+            <Text className="font-sans text-xs text-base-canvas/70">Trade desk →</Text>
           </TouchableOpacity>
-        </View>
+        )}
 
         {chats.length === 0 ? (
           <EditorialEmptyState
@@ -186,70 +163,72 @@ export default function ChatListScreen() {
             description={t('chat.emptyDescription')}
           />
         ) : (
-          chats.map((chat) => {
-            const other = getOtherParticipant(chat.participants)
-            const tradeLabel = getTradeLabel(chat.tradeRequestId?.status)
+          <View className="overflow-hidden rounded-soft bg-surface-panel">
+            {chats.map((chat, idx) => {
+              const other = getOtherParticipant(chat.participants)
+              const tradeLabel = getTradeLabel(chat.tradeRequestId?.status)
 
-            return (
-              <TouchableOpacity
-                key={chat._id}
-                activeOpacity={0.88}
-                onPress={() => router.push(`/(tabs)/chat/${chat._id}`)}
-                className="mb-4 overflow-hidden rounded-[28px] border border-ink-dark/8 bg-white px-4 py-4"
-              >
-                <View className="flex-row items-center">
-                  {other?.photoURL ? (
-                    <RemoteImage
-                      uri={other.photoURL}
-                      className="h-14 w-14 rounded-full"
-                      fallback={
-                        <View className="h-full w-full items-center justify-center rounded-full bg-brand-accent-light/35">
-                          <Text className="font-display text-2xl text-brand-accent-deep">
+              return (
+                <View key={chat._id}>
+                  <TouchableOpacity
+                    activeOpacity={0.88}
+                    onPress={() => router.push(`/(tabs)/chat/${chat._id}`)}
+                    className="mb-1 flex-row items-center px-4 py-3"
+                  >
+                    {/* Avatar */}
+                    <View className="mr-3">
+                      {other?.photoURL ? (
+                        <RemoteImage
+                          uri={other.photoURL}
+                          className="h-12 w-12 rounded-full"
+                          fallback={
+                            <View className="h-12 w-12 items-center justify-center rounded-full bg-brand-accent-light/40">
+                              <Text className="font-display text-xl text-brand-accent-deep">
+                                {(other?.displayName || '?').charAt(0).toUpperCase()}
+                              </Text>
+                            </View>
+                          }
+                        />
+                      ) : (
+                        <View className="h-12 w-12 items-center justify-center rounded-full bg-brand-accent-light/40">
+                          <Text className="font-display text-xl text-brand-accent-deep">
                             {(other?.displayName || '?').charAt(0).toUpperCase()}
                           </Text>
                         </View>
-                      }
-                    />
-                  ) : (
-                    <View className="h-14 w-14 items-center justify-center rounded-full bg-brand-accent-light/35">
-                      <Text className="font-display text-2xl text-brand-accent-deep">
-                        {(other?.displayName || '?').charAt(0).toUpperCase()}
-                      </Text>
+                      )}
                     </View>
+
+                    {/* Content */}
+                    <View className="flex-1">
+                      <View className="flex-row items-center justify-between">
+                        <Text className="font-sans text-sm font-semibold text-ink-dark" numberOfLines={1}>
+                          {other?.displayName || other?.email?.split('@')[0] || 'Korisnik'}
+                        </Text>
+                        <Text className="ml-2 font-sans text-xs text-ink-dark/40">
+                          {chat.lastMessage ? formatTime(chat.lastMessage.createdAt) : ''}
+                        </Text>
+                      </View>
+                      <View className="mt-0.5 flex-row items-center gap-2">
+                        <Text className="flex-1 font-sans text-sm text-ink-dark/55" numberOfLines={1}>
+                          {chat.lastMessage?.text || 'Zapocni razgovor...'}
+                        </Text>
+                        {tradeLabel && (
+                          <View className="rounded-full bg-brand-accent-light/25 px-2 py-0.5">
+                            <Text className="font-sans text-[10px] font-semibold text-brand-accent-deep">
+                              {tradeLabel}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                  {idx < chats.length - 1 && (
+                    <View className="mx-4 h-px bg-ink-dark/6" />
                   )}
-
-                  <View className="ml-4 flex-1 pr-4">
-                    <Text className="font-display text-2xl text-ink-dark" numberOfLines={1}>
-                      {other?.displayName || other?.email?.split('@')[0] || 'Korisnik'}
-                    </Text>
-                    <Text className="mt-1 font-sans text-sm text-ink-dark/60" numberOfLines={2}>
-                      {chat.lastMessage?.text || 'Započni razgovor i zatim ga vodi kroz uredan trade lifecycle.'}
-                    </Text>
-                  </View>
-
-                    <Text className="font-sans text-xs text-ink-dark/40">
-                    {chat.lastMessage ? formatTime(chat.lastMessage.createdAt) : ''}
-                  </Text>
                 </View>
-
-                <View className="mt-4 flex-row flex-wrap gap-2">
-                  <View className="rounded-full bg-base-canvas px-3 py-2">
-                    <Text className="font-sans text-xs text-ink-dark/70">
-                      {chat.messageCount} poruka
-                    </Text>
-                  </View>
-
-                  {tradeLabel ? (
-                    <View className="rounded-full bg-brand-accent-light/25 px-3 py-2">
-                      <Text className="font-sans text-xs font-semibold text-brand-accent-deep">
-                        {tradeLabel}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              </TouchableOpacity>
-            )
-          })
+              )
+            })}
+          </View>
         )}
       </View>
     </ScrollView>

@@ -11,8 +11,7 @@ const emailVerificationSchema = new mongoose.Schema(
   { timestamps: true }
 )
 
-// Index for token lookups
-emailVerificationSchema.index({ token: 1 })
+// `unique: true` on `token` already creates the lookup index.
 emailVerificationSchema.index({ userId: 1 })
 
 // TTL index to auto-delete expired tokens

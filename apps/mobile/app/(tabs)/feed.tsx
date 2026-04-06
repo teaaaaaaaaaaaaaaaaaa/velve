@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons'
+﻿import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import {
@@ -659,7 +659,7 @@ function SheetButton({
 }) {
   return (
     <TouchableOpacity
-      className="mt-3 flex-row items-center rounded-soft bg-white px-4 py-4"
+      className="mt-3 flex-row items-center rounded-soft bg-surface-panel px-4 py-4"
       activeOpacity={0.86}
       onPress={onPress}
     >

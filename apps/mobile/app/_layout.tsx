@@ -32,13 +32,14 @@ function AuthGate() {
     const inItems = segments[0] === 'items'
     const inUsers = segments[0] === 'users'
     const inSearch = segments[0] === 'search'
+    const inSettings = segments[0] === 'settings'
     const isIndex = false // TypeScript knows segments.length is never 0
 
     if (!currentUser && !inAuthGroup) {
       router.replace('/(auth)/login')
     } else if (currentUser && inAuthGroup) {
       router.replace('/')
-    } else if (currentUser && !inOnboarding && !inTabs && !inItems && !inUsers && !inSearch && !isIndex) {
+    } else if (currentUser && !inOnboarding && !inTabs && !inItems && !inUsers && !inSearch && !inSettings && !isIndex) {
       router.replace('/')
     }
   }, [currentUser, loading, segments])
@@ -56,6 +57,7 @@ function AuthGate() {
       <Stack.Screen name="items/[id]" />
       <Stack.Screen name="users/[id]" />
       <Stack.Screen name="search" />
+      <Stack.Screen name="settings" />
     </Stack>
   )
 }

@@ -19,11 +19,10 @@ import { BrandBackground } from '@/components/BrandBackground'
 import { BrandWordmark } from '@/components/BrandWordmark'
 import { GlassSurface } from '@/components/GlassSurface'
 import { ProfileSkeleton } from '@/components/BrandedLoader'
-import { DiscoveryCardItem, DiscoveryItemCard } from '@/components/DiscoveryItemCard'
+import { DiscoveryCardItem } from '@/components/DiscoveryItemCard'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { RemoteImage } from '@/components/RemoteImage'
 import { colors } from '@/design/tokens'
-import { useAuth } from '@/hooks/useAuth'
 import { useI18n } from '@/i18n'
 
 type ClosetCounts = {
@@ -55,10 +54,6 @@ type UserProfile = {
   location?: { city?: string; region?: string }
 }
 
-type ModulesPayload = {
-  recentlyViewed: DiscoveryCardItem[]
-  recommended: DiscoveryCardItem[]
-}
 
 function formatJoinedDate(
   date: string | undefined,
@@ -82,30 +77,6 @@ function getResponseRateLabel(rate: number | null, label: string, emptyLabel: st
   return label.replace('{{value}}', String(rate))
 }
 
-function TrustCard({
-  icon,
-  eyebrow,
-  value,
-  note,
-}: {
-  icon: keyof typeof Ionicons.glyphMap
-  eyebrow: string
-  value: string
-  note: string
-}) {
-  return (
-    <View className="mb-3 w-[48%] overflow-hidden rounded-[24px] border border-ink-dark/8 bg-white px-4 py-4">
-      <View className="mb-4 h-11 w-11 items-center justify-center rounded-full bg-brand-accent-deep/8">
-        <Ionicons name={icon} size={20} color={colors.accentDeep} />
-      </View>
-      <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
-        {eyebrow}
-      </Text>
-      <Text className="mt-1 font-display text-2xl text-ink-dark">{value}</Text>
-      <Text className="mt-1 font-sans text-xs leading-5 text-ink-dark/60">{note}</Text>
-    </View>
-  )
-}
 
 function SectionHeader({
   title,
@@ -135,61 +106,19 @@ function SectionHeader({
   )
 }
 
-function ModuleRail({
-  items,
-  emptyTitle,
-  emptyDescription,
-  onPressItem,
-  badgeText,
-}: {
-  items: DiscoveryCardItem[]
-  emptyTitle: string
-  emptyDescription: string
-  onPressItem: (itemId: string) => void
-  badgeText?: string
-}) {
-  if (items.length === 0) {
-    return (
-      <EditorialEmptyState
-        icon="sparkles-outline"
-        title={emptyTitle}
-        description={emptyDescription}
-      />
-    )
-  }
-
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: 12, paddingRight: 12 }}
-    >
-      {items.map((item) => (
-        <View key={item._id} style={{ width: 176 }}>
-          <DiscoveryItemCard
-            item={item}
-            badgeText={badgeText}
-            onPress={() => onPressItem(item._id)}
-          />
-        </View>
-      ))}
-    </ScrollView>
-  )
-}
 
 export default function ProfileScreen() {
   const router = useRouter()
-  const { logout } = useAuth()
-  const { locale, setLocale, t, formatDate } = useI18n()
+const { t, formatDate } = useI18n()
 
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [modules, setModules] = useState<ModulesPayload>({
-    recentlyViewed: [],
-    recommended: [],
-  })
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
+  const [activeTab, setActiveTab] = useState<'posts' | 'saved' | 'liked'>('posts')
+  const [closetItems, setClosetItems] = useState<any[]>([])
+  const [wishlistItems, setWishlistItems] = useState<DiscoveryCardItem[]>([])
+  const [tabLoading, setTabLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [editDisplayName, setEditDisplayName] = useState('')
   const [editBio, setEditBio] = useState('')
@@ -216,27 +145,13 @@ export default function ProfileScreen() {
   }, [])
 
   const loadProfile = useCallback(async () => {
-    const [profileResponse, modulesResponse] = await Promise.allSettled([
-      client.get('/api/users/me'),
-      client.get('/api/users/me/modules'),
-    ])
+    const profileResponse = await client.get('/api/users/me').catch((e) => ({ status: 'rejected' as const, reason: e }))
 
-    if (profileResponse.status === 'fulfilled' && profileResponse.value.data.ok) {
-      const nextProfile = profileResponse.value.data.data as UserProfile
+    if ('data' in profileResponse && profileResponse.data.ok) {
+      const nextProfile = profileResponse.data.data as UserProfile
       setProfile(nextProfile)
       hydrateEditState(nextProfile)
-    }
-
-    if (modulesResponse.status === 'fulfilled' && modulesResponse.value.data.ok) {
-      setModules(modulesResponse.value.data.data as ModulesPayload)
     } else {
-      setModules({
-        recentlyViewed: [],
-        recommended: [],
-      })
-    }
-
-    if (profileResponse.status !== 'fulfilled') {
       throw new Error('Profil trenutno nije moguce ucitati.')
     }
   }, [hydrateEditState])
@@ -267,23 +182,26 @@ export default function ProfileScreen() {
     }
   }, [loadProfile])
 
-  const handleLogout = useCallback(() => {
-    Alert.alert(t('profile.logout'), t('profile.logoutConfirm'), [
-      { text: t('profile.stay'), style: 'cancel' },
-      {
-        text: t('profile.logoutCta'),
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await logout()
-            router.replace('/(auth)/login')
-          } catch {
-            Alert.alert('Greska', 'Odjava trenutno nije uspela.')
-          }
-        },
-      },
-    ])
-  }, [logout, router, t])
+  const loadTabContent = useCallback(async (tab: 'posts' | 'saved' | 'liked') => {
+    setTabLoading(true)
+    try {
+      if (tab === 'posts') {
+        const res = await client.get('/api/items/closet')
+        if (res.data.ok) setClosetItems(res.data.data.live || [])
+      } else if (tab === 'saved') {
+        const res = await client.get('/api/wishlist')
+        if (res.data.ok) setWishlistItems(res.data.data || [])
+      }
+    } catch {
+      // silent fail
+    } finally {
+      setTabLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadTabContent('posts')
+  }, [loadTabContent])
 
   const handlePickImage = useCallback(async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -387,18 +305,14 @@ export default function ProfileScreen() {
               <Text className="font-display text-4xl text-ink-dark">{t('profile.title')}</Text>
             </View>
             <TouchableOpacity
-              className="h-11 w-11 items-center justify-center rounded-full bg-white"
-              onPress={handleLogout}
+              className="h-11 w-11 items-center justify-center rounded-full bg-surface-tint"
+              onPress={() => router.push('/settings')}
             >
-              <Ionicons name="log-out-outline" size={20} color={colors.accentDeep} />
+              <Ionicons name="settings-outline" size={20} color={colors.accentDeep} />
             </TouchableOpacity>
           </View>
 
           <GlassSurface className="overflow-hidden rounded-editorial px-5 pb-5 pt-6">
-            <View className="absolute -right-10 top-0 h-36 w-36 rounded-full bg-brand-accent-light/25" />
-            <View className="absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-brand-highlight/12" />
-            <View className="absolute left-10 top-10 h-16 w-16 rounded-full bg-brand-accent-deep/6" />
-
             <View className="flex-row items-center">
               <TouchableOpacity activeOpacity={0.88} onPress={() => setModalVisible(true)}>
                 {profile.photoURL ? (
@@ -451,14 +365,14 @@ export default function ProfileScreen() {
               </View>
             ) : null}
 
-            <View className="mt-5 rounded-[24px] bg-base-canvas px-4 py-4">
+            <View className="mt-4">
               <View className="mb-2 flex-row items-center justify-between">
                 <Text className="font-sans text-sm text-ink-dark/65">Kompletnost profila</Text>
                 <Text className="font-sans text-sm font-semibold text-brand-accent-deep">
                   {profile.profileCompleteness}%
                 </Text>
               </View>
-              <View className="h-2 overflow-hidden rounded-full bg-brand-accent-light/25">
+              <View className="h-1.5 overflow-hidden rounded-full bg-brand-accent-light/30">
                 <View
                   className="h-full rounded-full bg-brand-accent-deep"
                   style={{ width: `${profile.profileCompleteness}%` }}
@@ -479,6 +393,27 @@ export default function ProfileScreen() {
                 <Text className="font-display text-3xl text-ink-dark">{profile.closetCounts.live}</Text>
                 <Text className="font-sans text-xs text-ink-dark/50">{t('profile.active')}</Text>
               </View>
+            </View>
+
+            <View className="mt-4 flex-row flex-wrap gap-2">
+              {profile.averageRating > 0 && (
+                <View className="flex-row items-center gap-1 rounded-full bg-brand-highlight/30 px-3 py-1.5">
+                  <Ionicons name="star" size={12} color={colors.inkDark} />
+                  <Text className="font-sans text-xs font-semibold text-ink-dark">{profile.averageRating.toFixed(1)}</Text>
+                </View>
+              )}
+              {profile.successfulSwaps > 0 && (
+                <View className="flex-row items-center gap-1 rounded-full bg-brand-accent-light/30 px-3 py-1.5">
+                  <Ionicons name="repeat-outline" size={12} color={colors.accentDeep} />
+                  <Text className="font-sans text-xs text-brand-accent-deep">{profile.successfulSwaps} razmena</Text>
+                </View>
+              )}
+              {profile.responseRate != null && (
+                <View className="flex-row items-center gap-1 rounded-full bg-surface-soft px-3 py-1.5">
+                  <Ionicons name="time-outline" size={12} color={colors.inkDark} />
+                  <Text className="font-sans text-xs text-ink-dark/70">{profile.responseRate}% response</Text>
+                </View>
+              )}
             </View>
 
             <View className="mt-5 flex-row gap-3">
@@ -516,55 +451,9 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </GlassSurface>
 
-          <View className="mt-8">
-            <SectionHeader
-              title={t('profile.trust')}
-              description="Signal poverenja koji drugi vide kada otvore tvoj profil i tvoj trade flow."
-            />
-            <View className="flex-row flex-wrap justify-between">
-              <TrustCard
-                icon="star-outline"
-                eyebrow="Ocena"
-                value={
-                  profile.averageRating > 0 ? profile.averageRating.toFixed(1) : 'Novi profil'
-                }
-                note={
-                  profile.averageRating > 0
-                    ? `${profile.completedTrades} zavrsenih trade-ova`
-                    : 'Ocene se pojavljuju nakon prvih razmena.'
-                }
-              />
-              <TrustCard
-                icon="repeat-outline"
-                eyebrow="Uspesne razmene"
-                value={String(profile.successfulSwaps || 0)}
-                note="Jasan signal koliko puta je profil zatvorio trade do kraja."
-              />
-              <TrustCard
-                icon="time-outline"
-                eyebrow="Response rate"
-                value={profile.responseRate == null ? 'N/A' : `${profile.responseRate}%`}
-                note={getResponseRateLabel(
-                  profile.responseRate,
-                  t('profile.responseRate'),
-                  t('profile.responseRateEmpty')
-                )}
-              />
-              <TrustCard
-                icon="shield-checkmark-outline"
-                eyebrow="Clan od"
-                value={formatJoinedDate(
-                  profile.joinedAt,
-                  formatDate,
-                  t('profile.joinedPrefix'),
-                  t('profile.newMember')
-                ).replace(`${t('profile.joinedPrefix').replace('{{date}}', '').trim()} `, '')}
-                note="Poverenje raste kada profil deluje stabilno i prisutno kroz vreme."
-              />
-            </View>
-          </View>
-
-          <View className="mt-5 overflow-hidden rounded-[28px] border border-ink-dark/8 bg-white px-5 py-5">
+          <View className="mt-5 overflow-hidden rounded-[28px] bg-surface-panel px-5 py-5"
+            style={{ shadowColor: '#2B2A2B', shadowOpacity: 0.07, shadowRadius: 20, shadowOffset: { width: 0, height: 4 }, elevation: 5 }}
+          >
             <SectionHeader
               title="Wardrobe control"
               description="Draft, active i archive tok sada imaju odvojene lane-ove i bulk akcije."
@@ -572,7 +461,7 @@ export default function ProfileScreen() {
               onAction={() => router.push('/(tabs)/closet')}
             />
             <View className="flex-row gap-3">
-              <View className="flex-1 rounded-[22px] bg-base-canvas px-4 py-4">
+              <View className="flex-1 rounded-[22px] bg-surface-soft px-4 py-4">
                 <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
                   {t('profile.live')}
                 </Text>
@@ -580,7 +469,7 @@ export default function ProfileScreen() {
                   {profile.closetCounts.live}
                 </Text>
               </View>
-              <View className="flex-1 rounded-[22px] bg-base-canvas px-4 py-4">
+              <View className="flex-1 rounded-[22px] bg-surface-soft px-4 py-4">
                 <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
                   {t('profile.drafts')}
                 </Text>
@@ -588,7 +477,7 @@ export default function ProfileScreen() {
                   {profile.closetCounts.drafts}
                 </Text>
               </View>
-              <View className="flex-1 rounded-[22px] bg-base-canvas px-4 py-4">
+              <View className="flex-1 rounded-[22px] bg-surface-soft px-4 py-4">
                 <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
                   {t('profile.archive')}
                 </Text>
@@ -599,7 +488,7 @@ export default function ProfileScreen() {
             </View>
             <View className="mt-4 flex-row gap-3">
               <TouchableOpacity
-                className="flex-1 items-center rounded-full border border-ink-dark/10 bg-base-canvas px-4 py-3"
+                className="flex-1 items-center rounded-full border border-ink-dark/8 bg-base-canvas px-4 py-3"
                 onPress={() => router.push('/(tabs)/upload')}
               >
                 <Text className="font-sans text-sm font-semibold text-ink-dark">
@@ -607,7 +496,7 @@ export default function ProfileScreen() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                className="flex-1 items-center rounded-full border border-ink-dark/10 bg-base-canvas px-4 py-3"
+                className="flex-1 items-center rounded-full border border-ink-dark/8 bg-base-canvas px-4 py-3"
                 onPress={() => router.push('/(tabs)/wishlist')}
               >
                 <Text className="font-sans text-sm font-semibold text-ink-dark">
@@ -617,65 +506,128 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          <View className="mt-8">
-            <SectionHeader
-              title={t('profile.recentlyViewed')}
-              description="Komadi koje si skoro otvorila, da moodboard ostane pri ruci."
-            />
-            <ModuleRail
-              items={modules.recentlyViewed}
-              emptyTitle="Jos nema otvorenih komada"
-              emptyDescription="Kada budes istrazivala feed i detalje artikala, ovde ce ostati tvoja poslednja otvaranja."
-              onPressItem={(itemId) => router.push(`/items/${itemId}`)}
-              badgeText="Skoro gledano"
-            />
-          </View>
-
-          <View className="mt-8">
-            <SectionHeader
-              title={t('profile.recommended')}
-              description="Spoj ukusa, interakcija i visual signala iz discovery sloja."
-            />
-            <ModuleRail
-              items={modules.recommended}
-              emptyTitle="Preporuke jos rastu"
-              emptyDescription="Kako budes gledala, lajkovala i trgovala, preporuke ce postajati ostrije."
-              onPressItem={(itemId) => router.push(`/items/${itemId}`)}
-              badgeText="Za tvoj ukus"
-            />
-          </View>
-
-          <View className="mt-8 overflow-hidden rounded-[28px] border border-ink-dark/8 bg-white px-5 py-5">
-            <SectionHeader
-              title={t('profile.languageTitle')}
-              description={t('profile.languageDescription')}
-            />
-            <View className="flex-row gap-3">
-              {(['sr', 'en', 'ru'] as const).map((language) => {
-                const isActive = locale === language
-
-                return (
-                  <TouchableOpacity
-                    key={language}
-                    className={`flex-1 items-center rounded-full px-4 py-3 ${
-                      isActive
-                        ? 'bg-brand-accent-deep'
-                        : 'border border-ink-dark/10 bg-base-canvas'
+          {/* TikTok-style tabs */}
+          <View className="mt-6">
+            {/* Tab bar */}
+            <View className="flex-row border-b border-ink-dark/10">
+              {[
+                { key: 'posts', label: 'Objave', icon: 'grid-outline' },
+                { key: 'saved', label: 'Sacuvano', icon: 'bookmark-outline' },
+                { key: 'liked', label: 'Lajkovano', icon: 'heart-outline' },
+              ].map((tab) => (
+                <TouchableOpacity
+                  key={tab.key}
+                  className="flex-1 items-center py-3"
+                  onPress={() => {
+                    setActiveTab(tab.key as any)
+                    loadTabContent(tab.key as any)
+                  }}
+                >
+                  <Ionicons
+                    name={tab.icon as any}
+                    size={20}
+                    color={activeTab === tab.key ? colors.accentDeep : colors.mutedText}
+                  />
+                  <View
+                    className={`mt-2 h-0.5 w-8 rounded-full ${
+                      activeTab === tab.key ? 'bg-brand-accent-deep' : 'bg-transparent'
                     }`}
-                    onPress={() => setLocale(language)}
-                  >
-                    <Text
-                      className={`font-sans text-sm font-semibold ${
-                        isActive ? 'text-base-canvas' : 'text-ink-dark'
-                      }`}
-                    >
-                      {t(`language.${language}` as 'language.sr')}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              })}
+                  />
+                </TouchableOpacity>
+              ))}
             </View>
+
+            {/* Tab content */}
+            {tabLoading ? (
+              <View className="items-center py-12">
+                <ActivityIndicator color={colors.accentDeep} />
+              </View>
+            ) : activeTab === 'posts' ? (
+              closetItems.length === 0 ? (
+                <EditorialEmptyState
+                  icon="shirt-outline"
+                  title="Tvoj ormar je prazan"
+                  description="Dodaj prve komade i postavi ih u discovery."
+                  actionLabel="Dodaj komad"
+                  onAction={() => router.push('/(tabs)/upload')}
+                />
+              ) : (
+                <View className="mt-3 flex-row flex-wrap gap-2">
+                  {closetItems.map((item: any) => (
+                    <TouchableOpacity
+                      key={item._id}
+                      style={{ width: '48%' }}
+                      onPress={() => router.push(`/items/${item._id}`)}
+                      className="overflow-hidden rounded-card"
+                    >
+                      {item.images?.[0] ? (
+                        <RemoteImage
+                          uri={item.images[0]}
+                          className="aspect-[3/4] w-full rounded-card bg-surface-soft"
+                        />
+                      ) : (
+                        <View className="aspect-[3/4] w-full items-center justify-center rounded-card bg-surface-tint">
+                          <Ionicons name="image-outline" size={32} color={colors.mutedText} />
+                        </View>
+                      )}
+                      <Text className="mt-1.5 font-sans text-sm font-semibold text-ink-dark" numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                      {item.brand && (
+                        <Text className="font-sans text-xs text-ink-dark/50" numberOfLines={1}>
+                          {item.brand}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )
+            ) : activeTab === 'saved' ? (
+              wishlistItems.length === 0 ? (
+                <EditorialEmptyState
+                  icon="bookmark-outline"
+                  title="Nema sacuvanih komada"
+                  description="Sacuvaj komade iz feeda i nadi ih ovde."
+                  actionLabel="Idi na feed"
+                  onAction={() => router.push('/(tabs)/feed')}
+                />
+              ) : (
+                <View className="mt-3 flex-row flex-wrap gap-2">
+                  {wishlistItems.map((item: any) => (
+                    <TouchableOpacity
+                      key={item._id}
+                      style={{ width: '48%' }}
+                      onPress={() => router.push(`/items/${item._id}`)}
+                      className="overflow-hidden rounded-card"
+                    >
+                      {item.images?.[0] ? (
+                        <RemoteImage
+                          uri={item.images[0]}
+                          className="aspect-[3/4] w-full rounded-card bg-surface-soft"
+                        />
+                      ) : (
+                        <View className="aspect-[3/4] w-full items-center justify-center rounded-card bg-surface-tint">
+                          <Ionicons name="image-outline" size={32} color={colors.mutedText} />
+                        </View>
+                      )}
+                      <Text className="mt-1.5 font-sans text-sm font-semibold text-ink-dark" numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )
+            ) : (
+              <EditorialEmptyState
+                icon="heart-outline"
+                title="Nema lajkovanih komada"
+                description="Lajkuj komade u feedu i nadi ih ovde."
+                actionLabel="Idi na feed"
+                onAction={() => router.push('/(tabs)/feed')}
+              />
+            )}
           </View>
+
         </View>
       </ScrollView>
 
@@ -741,7 +693,7 @@ export default function ProfileScreen() {
                 maxLength={50}
                 placeholder="Tvoje ime"
                 placeholderTextColor="#2B2A2B66"
-                className="rounded-[22px] border border-ink-dark/10 bg-white px-4 py-4 font-sans text-sm text-ink-dark"
+                className="rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
               />
             </View>
 
@@ -757,7 +709,7 @@ export default function ProfileScreen() {
                 textAlignVertical="top"
                 placeholder="Par reci o svom ukusu, silueti i komadima koje volis."
                 placeholderTextColor="#2B2A2B66"
-                className="min-h-[140px] rounded-[22px] border border-ink-dark/10 bg-white px-4 py-4 font-sans text-sm leading-6 text-ink-dark"
+                className="min-h-[140px] rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm leading-6 text-ink-dark"
               />
               <Text className="mt-2 font-sans text-xs text-ink-dark/40">{editBio.length}/200</Text>
             </View>

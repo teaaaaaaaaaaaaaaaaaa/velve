@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons'
+﻿import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
@@ -61,14 +61,14 @@ function getStatusLabel(item: ClosetItem) {
 }
 
 function getStatusTone(item: ClosetItem) {
-  if (item.archiveStatus === 'deleted') return 'bg-white text-brand-accent-deep'
+  if (item.archiveStatus === 'deleted') return 'bg-surface-panel text-brand-accent-deep'
   if (item.archiveStatus === 'sold' || item.archiveStatus === 'swapped') {
     return 'bg-brand-highlight text-ink-dark'
   }
   if (item.status === 'pending_trade') return 'bg-brand-accent-light/30 text-brand-accent-deep'
   if (item.status === 'draft') return 'bg-base-canvas text-ink-dark'
   if (item.status === 'unavailable' || item.status === 'archived') {
-    return 'bg-white text-ink-dark'
+    return 'bg-surface-panel text-ink-dark'
   }
   return 'bg-brand-highlight text-ink-dark'
 }
@@ -101,7 +101,8 @@ function ClosetCard({
       activeOpacity={0.9}
       onPress={selectable ? onToggleSelect : onOpen}
       onLongPress={onToggleSelect}
-      className={`mb-4 overflow-hidden rounded-[28px] border px-4 py-4 ${selected ? 'border-brand-accent-deep bg-brand-accent-deep/5' : 'border-ink-dark/8 bg-white'}`}
+      className={`mb-4 overflow-hidden rounded-[28px] border px-4 py-4 ${selected ? 'border-brand-accent-deep bg-brand-accent-deep/5' : 'border-ink-dark/5 bg-surface-panel'}`}
+      style={selected ? undefined : { shadowColor: '#2B2A2B', shadowOpacity: 0.07, shadowRadius: 18, shadowOffset: { width: 0, height: 4 }, elevation: 5 }}
     >
       <View className="flex-row">
         <View className="relative mr-4 h-28 w-24 overflow-hidden rounded-[20px] bg-base-canvas">
@@ -387,14 +388,14 @@ export default function ClosetScreen() {
             <Text className="font-display text-4xl text-ink-dark">Moj closet</Text>
           </View>
           <TouchableOpacity
-            className="h-11 w-11 items-center justify-center rounded-full bg-white"
+            className="h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
             onPress={() => router.back()}
           >
             <Ionicons name="close" size={22} color="#2B2A2B" />
           </TouchableOpacity>
         </View>
 
-        <View className="mb-6 overflow-hidden rounded-[28px] border border-brand-accent-deep/10 bg-white px-4 py-4">
+        <View className="mb-6 overflow-hidden rounded-[28px] border border-brand-accent-deep/10 bg-surface-panel px-4 py-4">
           <Text className="font-sans text-sm leading-6 text-ink-dark/70">
             Draft, unavailable, active trade i archive sada imaju svoj cist lane, plus bulk akcije
             i jednostavan reorder unutar live i draft toka.
@@ -417,7 +418,7 @@ export default function ClosetScreen() {
           </View>
         </View>
 
-        <View className="mb-6 flex-row rounded-[24px] bg-white p-2">
+        <View className="mb-6 flex-row rounded-[24px] bg-surface-panel p-2">
           {(['live', 'drafts', 'archive'] as ClosetBucket[]).map((bucket) => (
             <TouchableOpacity
               key={bucket}
@@ -449,7 +450,7 @@ export default function ClosetScreen() {
         </View>
 
         {selectionMode && selectedIds.length > 0 ? (
-          <View className="mb-5 rounded-[24px] border border-brand-accent-deep/10 bg-white px-4 py-4">
+          <View className="mb-5 rounded-[24px] border border-brand-accent-deep/10 bg-surface-panel px-4 py-4">
             <Text className="font-sans text-sm text-ink-dark/70">
               Izabrano: {selectedIds.length} komada
             </Text>

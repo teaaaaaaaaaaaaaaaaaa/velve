@@ -8,39 +8,39 @@
  * These files are generated during `npx expo prebuild` from app.json
  */
 
-import firebaseAuth from '@react-native-firebase/auth';
+import { getApp } from '@react-native-firebase/app'
+import { getAuth } from '@react-native-firebase/auth'
 
-const auth = firebaseAuth();
+const firebaseApp = getApp()
+const auth = getAuth(firebaseApp)
+const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID?.trim() ?? ''
 
-console.log('[Firebase] React Native Firebase initialized');
+console.log('[Firebase] React Native Firebase initialized')
 
-// Validate Google OAuth configuration
-function validateGoogleOAuthConfig() {
-  const clientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
-
+function getGoogleOAuthConfigError(clientId: string) {
   if (!clientId) {
-    console.warn('[Firebase] WARNING: EXPO_PUBLIC_GOOGLE_CLIENT_ID is not defined. Google Sign-In will not work.');
-    return false;
+    return 'EXPO_PUBLIC_GOOGLE_CLIENT_ID is not defined. Google Sign-In will not work.'
   }
 
   if (!clientId.endsWith('.apps.googleusercontent.com')) {
-    console.warn('[Firebase] WARNING: EXPO_PUBLIC_GOOGLE_CLIENT_ID does not match expected format (.apps.googleusercontent.com)');
-    return false;
+    return 'EXPO_PUBLIC_GOOGLE_CLIENT_ID does not match expected format (.apps.googleusercontent.com).'
   }
 
-  // Check for placeholder/example values
-  if (clientId.includes('example') || clientId.includes('placeholder') || clientId.includes('YOUR_')) {
-    console.warn('[Firebase] WARNING: EXPO_PUBLIC_GOOGLE_CLIENT_ID appears to be a placeholder. Update .env with real credentials.');
-    return false;
+  if (/example|placeholder|YOUR_/i.test(clientId)) {
+    return 'EXPO_PUBLIC_GOOGLE_CLIENT_ID appears to be a placeholder. Update .env with real credentials.'
   }
 
-  console.log('[Firebase] Google OAuth config validated successfully');
-  return true;
+  return null
 }
 
-// Run validation
-validateGoogleOAuthConfig();
+const googleOAuthConfigError = getGoogleOAuthConfigError(googleClientId)
 
-console.log('[Firebase] Auth module ready');
+if (googleOAuthConfigError) {
+  console.warn(`[Firebase] WARNING: ${googleOAuthConfigError}`)
+} else {
+  console.log('[Firebase] Google OAuth config validated successfully')
+}
 
-export { auth };
+console.log('[Firebase] Auth module ready')
+
+export { auth, firebaseApp, googleClientId, googleOAuthConfigError }

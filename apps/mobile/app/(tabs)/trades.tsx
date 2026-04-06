@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons'
+﻿import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
@@ -86,7 +86,7 @@ function buildTradeStatusTone(status: TradeStatus) {
       return 'bg-brand-highlight text-ink-dark'
     case 'rejected':
     case 'cancelled':
-      return 'bg-white text-brand-accent-deep'
+      return 'bg-surface-panel text-brand-accent-deep'
     case 'expired':
       return 'bg-brand-accent-light/20 text-brand-accent-deep'
     default:
@@ -178,7 +178,9 @@ function TradeCard({
   const offeredItem = trade.offeredItemId
 
   return (
-    <View className="mb-4 overflow-hidden rounded-[28px] border border-ink-dark/8 bg-white px-4 py-4">
+    <View className="mb-4 overflow-hidden rounded-[28px] border border-ink-dark/5 bg-surface-panel px-4 py-4"
+      style={{ shadowColor: '#2B2A2B', shadowOpacity: 0.07, shadowRadius: 18, shadowOffset: { width: 0, height: 4 }, elevation: 5 }}
+    >
       <View className="mb-4 flex-row items-start justify-between">
         <View className="flex-row items-center pr-4">
           {trade.counterpart?.photoURL ? (
@@ -263,7 +265,7 @@ function TradeCard({
       ) : null}
 
       {trade.message ? (
-        <View className="mb-4 rounded-[22px] border border-ink-dark/8 bg-white px-4 py-3">
+        <View className="mb-4 rounded-[22px] border border-ink-dark/8 bg-surface-panel px-4 py-3">
           <Text className="font-sans text-[11px] uppercase tracking-[1.1px] text-ink-dark/45">
             Poruka
           </Text>
@@ -477,21 +479,21 @@ export default function TradesScreen() {
               <Text className="font-display text-4xl text-ink-dark">Trade desk</Text>
             </View>
             <TouchableOpacity
-              className="h-11 w-11 items-center justify-center rounded-full bg-white"
+              className="h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
               onPress={() => router.back()}
             >
               <Ionicons name="close" size={22} color="#2B2A2B" />
             </TouchableOpacity>
           </View>
 
-          <View className="mb-6 rounded-[28px] border border-brand-accent-deep/10 bg-white p-4">
+          <View className="mb-6 rounded-[28px] border border-brand-accent-deep/10 bg-surface-panel p-4">
             <Text className="font-sans text-sm leading-6 text-ink-dark/70">
               Pending, active i history sada zive odvojeno kako bi korisnik jasno video gde treba
               da reaguje, sta je u toku i sta je zatvoreno.
             </Text>
           </View>
 
-          <View className="mb-6 flex-row rounded-[24px] bg-white p-2">
+          <View className="mb-6 flex-row rounded-[24px] bg-surface-panel p-2">
             {(['pending', 'active', 'history'] as TradeBucket[]).map((bucket) => {
               const isActive = bucket === activeBucket
 
@@ -625,7 +627,7 @@ export default function TradesScreen() {
                 textAlignVertical="top"
                 placeholder="Kako je prosao trade, komunikacija i isporuka komada?"
                 placeholderTextColor="#2B2A2B66"
-                className="min-h-[160px] rounded-[24px] border border-ink-dark/10 bg-white px-4 py-4 font-sans text-sm leading-6 text-ink-dark"
+                className="min-h-[160px] rounded-[24px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm leading-6 text-ink-dark"
               />
               <Text className="mt-2 font-sans text-xs text-ink-dark/40">{ratingNote.length}/300</Text>
             </View>

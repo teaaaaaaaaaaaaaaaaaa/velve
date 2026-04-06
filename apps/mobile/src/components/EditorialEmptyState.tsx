@@ -3,7 +3,6 @@ import { ReactNode } from 'react'
 import { TouchableOpacity, View, Text } from 'react-native'
 
 import { BrandWordmark } from '@/components/BrandWordmark'
-import { GlassSurface } from '@/components/GlassSurface'
 import { colors } from '@/design/tokens'
 
 type Props = {
@@ -24,21 +23,17 @@ export function EditorialEmptyState({
   footer,
 }: Props) {
   return (
-    <GlassSurface className="items-center justify-center px-6 py-10">
-      <View className="absolute -left-10 top-0 h-32 w-32 rounded-full bg-brand-accent-light/25" />
-      <View className="absolute -right-12 bottom-0 h-36 w-36 rounded-full bg-brand-highlight/15" />
-      <View className="absolute left-12 top-10 h-14 w-14 rounded-full bg-brand-accent-deep/8" />
-
+    <View className="items-center justify-center px-6 py-10">
       <BrandWordmark width={120} />
 
-      <View className="mb-5 mt-4 h-16 w-16 items-center justify-center rounded-full bg-brand-accent-deep/8">
-        <Ionicons name={icon} size={30} color={colors.accentDeep} />
+      <View className="mb-5 mt-6 h-14 w-14 items-center justify-center rounded-2xl bg-surface-tint">
+        <Ionicons name={icon} size={26} color={colors.accentDeep} />
       </View>
 
       <Text className="mb-2 text-center font-display text-2xl text-ink-dark">
         {title}
       </Text>
-      <Text className="mb-6 text-center font-sans text-sm leading-6 text-ink-dark/65">
+      <Text className="mb-6 text-center font-sans text-sm leading-6 text-ink-dark/60">
         {description}
       </Text>
 
@@ -55,6 +50,6 @@ export function EditorialEmptyState({
       ) : null}
 
       {footer ? <View className="mt-4">{footer}</View> : null}
-    </GlassSurface>
+    </View>
   )
 }

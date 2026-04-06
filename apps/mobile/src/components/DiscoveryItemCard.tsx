@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+﻿import { Ionicons } from '@expo/vector-icons';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 import { RemoteImage } from '@/components/RemoteImage';
@@ -35,7 +35,8 @@ export function DiscoveryItemCard({ item, onPress, badgeText }: Props) {
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.86}
-      className="mb-4 flex-1 overflow-hidden rounded-[24px] border border-ink-dark/8 bg-white"
+      className="mb-4 flex-1 overflow-hidden rounded-[24px] border border-ink-dark/5 bg-surface-panel"
+      style={{ shadowColor: '#2B2A2B', shadowOpacity: 0.07, shadowRadius: 14, shadowOffset: { width: 0, height: 3 }, elevation: 4 }}
     >
       <View className="relative aspect-[0.82] bg-brand-accent-light/15">
         {imageUri ? (

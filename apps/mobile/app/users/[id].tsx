@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons'
+﻿import { Ionicons } from '@expo/vector-icons'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import {
@@ -201,22 +201,22 @@ export default function PublicProfileScreen() {
         <View className="mb-6 flex-row items-center justify-between">
           <TouchableOpacity
             onPress={() => router.back()}
-            className="h-11 w-11 items-center justify-center rounded-full bg-white"
+            className="h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
           >
             <Ionicons name="arrow-back" size={22} color="#2B2A2B" />
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={handleMoreOptions}
-            className="h-11 w-11 items-center justify-center rounded-full bg-white"
+            className="h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
           >
             <Ionicons name="ellipsis-horizontal" size={22} color="#2B2A2B" />
           </TouchableOpacity>
         </View>
 
-        <View className="overflow-hidden rounded-[34px] border border-brand-accent-deep/10 bg-white px-5 pb-5 pt-6">
-          <View className="absolute -right-10 top-0 h-36 w-36 rounded-full bg-brand-accent-light/25" />
-          <View className="absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-brand-highlight/12" />
+        <View className="overflow-hidden rounded-[34px] border border-ink-dark/6 bg-surface-panel px-5 pb-5 pt-6"
+          style={{ shadowColor: '#2B2A2B', shadowOpacity: 0.08, shadowRadius: 24, shadowOffset: { width: 0, height: 6 }, elevation: 6 }}
+        >
 
           <View className="flex-row items-center">
             {user.photoURL ? (

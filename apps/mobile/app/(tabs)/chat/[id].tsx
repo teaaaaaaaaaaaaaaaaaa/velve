@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons'
+﻿import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -141,7 +141,9 @@ function TradeMessageCard({
   onViewRequested: () => void
 }) {
   return (
-    <View className="mx-4 my-2 overflow-hidden rounded-[24px] border border-brand-accent-deep/10 bg-white px-4 py-4">
+    <View className="mx-4 my-2 overflow-hidden rounded-[24px] border border-brand-accent-deep/8 bg-surface-panel px-4 py-4"
+      style={{ shadowColor: '#431A43', shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 3 }, elevation: 4 }}
+    >
       <Text className="font-display text-2xl text-ink-dark">Trade proposal</Text>
       <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/65">
         Editorial preview oba komada unutar iste poruke.
@@ -181,7 +183,7 @@ function BuyMessageCard({
   onViewRequested: () => void
 }) {
   return (
-    <View className="mx-4 my-2 overflow-hidden rounded-[24px] border border-brand-accent-deep/10 bg-white px-4 py-4">
+    <View className="mx-4 my-2 overflow-hidden rounded-[24px] border border-brand-accent-deep/10 bg-surface-panel px-4 py-4">
       <Text className="font-display text-2xl text-ink-dark">Buy request</Text>
       <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/65">
         Kupovina ulazi kroz isti premium thread kao trade.
@@ -213,7 +215,7 @@ function TradeStatusTicket({
   onOpenDesk: () => void
 }) {
   return (
-    <View className="mx-4 my-2 overflow-hidden rounded-[22px] border border-ink-dark/8 bg-white px-4 py-4">
+    <View className="mx-4 my-2 overflow-hidden rounded-[22px] border border-ink-dark/8 bg-surface-panel px-4 py-4">
       <View className="flex-row items-center">
         <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-accent-light/25">
           <Ionicons name="sparkles-outline" size={18} color="#431A43" />
@@ -405,7 +407,7 @@ export default function ChatScreen() {
           ) : (
             <View className={`mb-1 px-4 ${isMine ? 'items-end' : 'items-start'}`}>
               <View
-                className={`max-w-[82%] rounded-[22px] px-4 py-3 ${isMine ? 'bg-brand-accent-deep' : 'border border-ink-dark/8 bg-white'}`}
+                className={`max-w-[82%] rounded-[22px] px-4 py-3 ${isMine ? 'bg-brand-accent-deep' : 'border border-ink-dark/8 bg-surface-panel'}`}
               >
                 <Text
                   className={`font-sans text-[15px] leading-6 ${isMine ? 'text-base-canvas' : 'text-ink-dark'}`}
@@ -437,7 +439,7 @@ export default function ChatScreen() {
       <View className="flex-row items-center border-b border-ink-dark/8 px-4 pb-4 pt-14">
         <TouchableOpacity
           onPress={() => router.back()}
-          className="mr-3 h-11 w-11 items-center justify-center rounded-full bg-white"
+          className="mr-3 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
         >
           <Ionicons name="arrow-back" size={22} color={colors.inkDark} />
         </TouchableOpacity>
@@ -476,14 +478,14 @@ export default function ChatScreen() {
 
         <TouchableOpacity
           onPress={() => router.push('/(tabs)/trades')}
-          className="h-11 w-11 items-center justify-center rounded-full bg-white"
+          className="h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
         >
           <Ionicons name="swap-horizontal" size={20} color={colors.accentDeep} />
         </TouchableOpacity>
       </View>
 
       {tradeStatus ? (
-        <View className="mx-4 mt-4 rounded-[22px] border border-brand-accent-deep/10 bg-white px-4 py-4">
+        <View className="mx-4 mt-4 rounded-[22px] border border-brand-accent-deep/10 bg-surface-panel px-4 py-4">
           <Text className="font-sans text-[11px] uppercase tracking-[1.1px] text-ink-dark/45">
             {t('chat.lifecycle')}
           </Text>
@@ -527,7 +529,7 @@ export default function ChatScreen() {
           placeholderTextColor={colors.mutedText}
           multiline
           maxLength={1000}
-          className="max-h-[120px] flex-1 rounded-[24px] border border-ink-dark/10 bg-white px-4 py-3 font-sans text-[15px] leading-6 text-ink-dark"
+          className="max-h-[120px] flex-1 rounded-[24px] border border-ink-dark/10 bg-surface-panel px-4 py-3 font-sans text-[15px] leading-6 text-ink-dark"
         />
         <TouchableOpacity
           onPress={handleSend}

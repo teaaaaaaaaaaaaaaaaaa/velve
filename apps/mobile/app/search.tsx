@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -129,7 +129,7 @@ export default function SearchScreen() {
             <View className="mb-5 flex-row items-start">
               <TouchableOpacity
                 onPress={() => router.back()}
-                className="mt-1 h-11 w-11 items-center justify-center rounded-full bg-white"
+                className="mt-1 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
               >
                 <Ionicons name="arrow-back" size={22} color="#2B2A2B" />
               </TouchableOpacity>
@@ -142,9 +142,9 @@ export default function SearchScreen() {
               </View>
             </View>
 
-            <View className="overflow-hidden rounded-[32px] border border-brand-accent-deep/10 bg-white px-4 py-4">
-              <View className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-brand-accent-light/30" />
-              <View className="absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-brand-highlight/20" />
+            <View className="overflow-hidden rounded-[32px] border border-ink-dark/6 bg-surface-panel px-4 py-4"
+              style={{ shadowColor: '#2B2A2B', shadowOpacity: 0.08, shadowRadius: 24, shadowOffset: { width: 0, height: 6 }, elevation: 6 }}
+            >
 
               <View className="mb-4 flex-row items-center rounded-full bg-base-canvas px-4 py-3">
                 <Ionicons name="search" size={18} color="#431A43" />
@@ -204,7 +204,7 @@ export default function SearchScreen() {
                     Stanje
                   </Text>
                   {hasActiveFilters ? (
-                    <TouchableOpacity onPress={clearFilters} className="rounded-full bg-white px-3 py-1.5">
+                    <TouchableOpacity onPress={clearFilters} className="rounded-full bg-surface-panel px-3 py-1.5">
                       <Text className="font-sans text-xs font-semibold text-brand-accent-deep">
                         Ocisti sve
                       </Text>
@@ -220,7 +220,7 @@ export default function SearchScreen() {
                       <TouchableOpacity
                         key={option.value || 'all-condition'}
                         onPress={() => setCondition(option.value)}
-                        className={`rounded-full px-4 py-2.5 ${isActive ? 'bg-brand-accent-deep' : 'bg-white'}`}
+                        className={`rounded-full px-4 py-2.5 ${isActive ? 'bg-brand-accent-deep' : 'bg-surface-panel'}`}
                       >
                         <Text className={`font-sans text-sm ${isActive ? 'text-base-canvas' : 'text-ink-dark'}`}>
                           {option.label}
@@ -244,7 +244,7 @@ export default function SearchScreen() {
                       <TouchableOpacity
                         key={option.value || 'all-listing'}
                         onPress={() => setListingType(option.value)}
-                        className={`rounded-full border px-4 py-2.5 ${isActive ? 'border-brand-highlight bg-brand-highlight' : 'border-ink-dark/10 bg-white'}`}
+                        className={`rounded-full border px-4 py-2.5 ${isActive ? 'border-brand-highlight bg-brand-highlight' : 'border-ink-dark/10 bg-surface-panel'}`}
                       >
                         <Text className="font-sans text-sm text-ink-dark">{option.label}</Text>
                       </TouchableOpacity>

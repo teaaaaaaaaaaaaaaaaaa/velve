@@ -16,6 +16,10 @@ dist/
 build/
 .output/
 
+# Android build cache
+.gradle-local/
+.gradle/
+
 # Expo / React Native
 .expo/
 *.jks

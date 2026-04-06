@@ -19,7 +19,12 @@ import { useI18n } from '@/i18n'
 
 export default function LoginScreen() {
   const router = useRouter()
-  const { signInWithGoogle, signInWithEmail } = useAuth()
+  const {
+    signInWithGoogle,
+    signInWithEmail,
+    googleSignInAvailable,
+    googleSignInUnavailableReason,
+  } = useAuth()
   const { t } = useI18n()
 
   const [showEmailLogin, setShowEmailLogin] = useState(false)
@@ -65,7 +70,11 @@ export default function LoginScreen() {
       let title = 'Google prijava'
       let message = 'Došlo je do greške. Pokušaj ponovo.'
 
-      if (e.message.includes('CLIENT_ID')) {
+      if (e.message === 'GOOGLE_SIGNIN_UNAVAILABLE') {
+        message =
+          googleSignInUnavailableReason ||
+          'Google prijava zahteva development build ili novu native instalaciju aplikacije.'
+      } else if (e.message?.includes('CLIENT_ID')) {
         message = 'Aplikacija nije pravilno konfigurisana. Kontaktiraj podršku.'
       } else if (e.message === 'NETWORK_ERROR') {
         message = 'Proveri internet konekciju i pokušaj ponovo.'
@@ -156,19 +165,46 @@ export default function LoginScreen() {
             ) : (
               <View>
                 <TouchableOpacity
-                  className="items-center rounded-pill bg-brand-accent-deep px-4 py-4"
+                  className={
+                    googleSignInAvailable
+                      ? 'items-center rounded-pill bg-brand-accent-deep px-4 py-4'
+                      : 'items-center rounded-pill bg-ink-dark/10 px-4 py-4'
+                  }
                   onPress={handleGoogleLogin}
+                  disabled={!googleSignInAvailable}
                 >
-                  <Text className="font-sans text-base font-semibold text-base-canvas">
+                  <Text
+                    className={
+                      googleSignInAvailable
+                        ? 'font-sans text-base font-semibold text-base-canvas'
+                        : 'font-sans text-base font-semibold text-ink-dark/45'
+                    }
+                  >
                     {t('auth.google')}
                   </Text>
                 </TouchableOpacity>
 
+                {!googleSignInAvailable && googleSignInUnavailableReason ? (
+                  <Text className="mt-3 font-sans text-sm leading-6 text-ink-dark/60">
+                    {googleSignInUnavailableReason}
+                  </Text>
+                ) : null}
+
                 <TouchableOpacity
-                  className="mt-3 items-center rounded-pill border border-base-canvas/70 bg-base-canvas/70 px-4 py-4"
+                  className={
+                    googleSignInAvailable
+                      ? 'mt-3 items-center rounded-pill border border-base-canvas/70 bg-base-canvas/70 px-4 py-4'
+                      : 'mt-3 items-center rounded-pill bg-brand-accent-deep px-4 py-4'
+                  }
                   onPress={() => setShowEmailLogin(true)}
                 >
-                  <Text className="font-sans text-base font-medium text-ink-dark">
+                  <Text
+                    className={
+                      googleSignInAvailable
+                        ? 'font-sans text-base font-medium text-ink-dark'
+                        : 'font-sans text-base font-semibold text-base-canvas'
+                    }
+                  >
                     {t('auth.email')}
                   </Text>
                 </TouchableOpacity>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import {
   View,
   Text,
@@ -101,7 +101,7 @@ export default function SizesScreen() {
             <Text className="text-lg font-sans font-semibold text-ink-dark mb-4">
               Broj cipela
             </Text>
-            <View className="flex-row items-center bg-white rounded-2xl border-2 border-ink-dark/20 px-5 py-4">
+            <View className="flex-row items-center bg-surface-panel rounded-2xl border-2 border-ink-dark/20 px-5 py-4">
               <Ionicons name="footsteps-outline" size={24} color="#2B2A2B" style={{ marginRight: 12 }} />
               <TextInput
                 className="flex-1 font-sans text-lg text-ink-dark"

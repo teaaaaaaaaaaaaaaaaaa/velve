@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+﻿import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -448,7 +448,7 @@ export default function ItemDetailsScreen() {
             <TouchableOpacity
               key={entry._id}
               onPress={() => setSelectedItemId(entry._id)}
-              className={`mb-3 flex-row items-center rounded-[22px] border px-3 py-3 ${selectedItemId === entry._id ? 'border-brand-accent-deep bg-brand-accent-deep/5' : 'border-ink-dark/10 bg-white'}`}
+              className={`mb-3 flex-row items-center rounded-[22px] border px-3 py-3 ${selectedItemId === entry._id ? 'border-brand-accent-deep bg-brand-accent-deep/5' : 'border-ink-dark/10 bg-surface-panel'}`}
             >
               <View
                 className={`mr-3 h-6 w-6 items-center justify-center rounded-full border ${selectedItemId === entry._id ? 'border-brand-accent-deep' : 'border-ink-dark/25'}`}
@@ -489,7 +489,7 @@ export default function ItemDetailsScreen() {
                 placeholder="Dodaj poruku..."
                 placeholderTextColor="#2B2A2B66"
                 multiline
-                className="min-h-[110px] rounded-[24px] border border-ink-dark/10 bg-white px-4 py-4 font-sans text-sm text-ink-dark"
+                className="min-h-[110px] rounded-[24px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
               />
             </>
           ) : null}
@@ -542,7 +542,7 @@ export default function ItemDetailsScreen() {
             onChangeText={setEditTitle}
             placeholder="Naslov..."
             placeholderTextColor="#2B2A2B66"
-            className="rounded-[22px] border border-ink-dark/10 bg-white px-4 py-4 font-sans text-sm text-ink-dark"
+            className="rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
           />
           <Text className="mb-2 mt-4 font-sans text-xs uppercase text-ink-dark/45">Kategorija</Text>
           <TextInput
@@ -550,7 +550,7 @@ export default function ItemDetailsScreen() {
             onChangeText={setEditCategory}
             placeholder="Kategorija..."
             placeholderTextColor="#2B2A2B66"
-            className="rounded-[22px] border border-ink-dark/10 bg-white px-4 py-4 font-sans text-sm text-ink-dark"
+            className="rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
           />
           <Text className="mb-2 mt-4 font-sans text-xs uppercase text-ink-dark/45">Opis</Text>
           <TextInput
@@ -559,7 +559,7 @@ export default function ItemDetailsScreen() {
             placeholder="Opis..."
             placeholderTextColor="#2B2A2B66"
             multiline
-            className="min-h-[110px] rounded-[22px] border border-ink-dark/10 bg-white px-4 py-4 font-sans text-sm text-ink-dark"
+            className="min-h-[110px] rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
           />
           <View className="mt-4 flex-row gap-3">
             <View className="flex-1">
@@ -569,7 +569,7 @@ export default function ItemDetailsScreen() {
                 onChangeText={setEditBrand}
                 placeholder="Brand..."
                 placeholderTextColor="#2B2A2B66"
-                className="rounded-[22px] border border-ink-dark/10 bg-white px-4 py-4 font-sans text-sm text-ink-dark"
+                className="rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
               />
             </View>
             <View className="flex-1">
@@ -579,7 +579,7 @@ export default function ItemDetailsScreen() {
                 onChangeText={setEditSize}
                 placeholder="Velicina..."
                 placeholderTextColor="#2B2A2B66"
-                className="rounded-[22px] border border-ink-dark/10 bg-white px-4 py-4 font-sans text-sm text-ink-dark"
+                className="rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
               />
             </View>
           </View>
@@ -589,7 +589,7 @@ export default function ItemDetailsScreen() {
               <TouchableOpacity
                 key={type}
                 onPress={() => setEditListingType(type)}
-                className={`rounded-full px-4 py-2 ${editListingType === type ? 'bg-brand-accent-deep' : 'bg-white'}`}
+                className={`rounded-full px-4 py-2 ${editListingType === type ? 'bg-brand-accent-deep' : 'bg-surface-panel'}`}
               >
                 <Text
                   className={`font-sans text-sm ${editListingType === type ? 'text-base-canvas' : 'text-ink-dark'}`}
@@ -608,7 +608,7 @@ export default function ItemDetailsScreen() {
                 keyboardType="numeric"
                 placeholder="npr. 24"
                 placeholderTextColor="#2B2A2B66"
-                className="rounded-[22px] border border-ink-dark/10 bg-white px-4 py-4 font-sans text-sm text-ink-dark"
+                className="rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
               />
             </>
           ) : null}
@@ -623,7 +623,7 @@ export default function ItemDetailsScreen() {
                 placeholder="npr. oversized jakna"
                 placeholderTextColor="#2B2A2B66"
                 multiline
-                className="min-h-[100px] rounded-[22px] border border-ink-dark/10 bg-white px-4 py-4 font-sans text-sm text-ink-dark"
+                className="min-h-[100px] rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
               />
             </>
           ) : null}
@@ -633,7 +633,7 @@ export default function ItemDetailsScreen() {
               <TouchableOpacity
                 key={cond}
                 onPress={() => setEditCondition(cond)}
-                className={`rounded-full px-4 py-2 ${editCondition === cond ? 'bg-brand-accent-deep' : 'bg-white'}`}
+                className={`rounded-full px-4 py-2 ${editCondition === cond ? 'bg-brand-accent-deep' : 'bg-surface-panel'}`}
               >
                 <Text
                   className={`font-sans text-sm ${editCondition === cond ? 'text-base-canvas' : 'text-ink-dark'}`}
@@ -812,7 +812,7 @@ export default function ItemDetailsScreen() {
               'Ovaj komad jos nema opis, ali slicni predlozi i seller signal ispod daju dodatni kontekst.'}
           </Text>
           {showTradeFor ? (
-            <View className="mt-4 rounded-[22px] bg-white px-4 py-4">
+            <View className="mt-4 rounded-[22px] bg-surface-panel px-4 py-4">
               <Text className="font-sans text-[11px] uppercase text-ink-dark/45">
                 Trazi za razmenu
               </Text>
@@ -820,7 +820,7 @@ export default function ItemDetailsScreen() {
             </View>
           ) : null}
           {owner ? (
-            <View className="mt-4 rounded-[22px] bg-white px-4 py-4">
+            <View className="mt-4 rounded-[22px] bg-surface-panel px-4 py-4">
               <Text className="font-sans text-[11px] uppercase text-ink-dark/45">
                 Seller signal
               </Text>

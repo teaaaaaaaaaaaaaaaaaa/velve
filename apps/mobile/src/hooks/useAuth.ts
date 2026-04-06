@@ -1,18 +1,24 @@
-import { createContext, useContext, useState, useEffect } from 'react'
-import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth'
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin'
-import client from '@/api/client'
+import { createContext, useContext, useEffect, useState } from 'react'
+import {
+  GoogleAuthProvider,
+  type FirebaseAuthTypes,
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithCredential,
+  signInWithEmailAndPassword,
+  signOut,
+} from '@react-native-firebase/auth'
 
-GoogleSignin.configure({
-  webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
-  scopes: ['profile', 'email'],
-})
+import client from '@/api/client'
+import { auth, googleClientId, googleOAuthConfigError } from '@/config/firebase'
 
 type AuthContextType = {
   currentUser: FirebaseAuthTypes.User | null
   dbUser: DbUser | null
   loading: boolean
   profileError: string | null
+  googleSignInAvailable: boolean
+  googleSignInUnavailableReason: string | null
   refreshDbUser: () => Promise<void>
   signInWithGoogle: () => Promise<void>
   signInWithEmail: (email: string, password: string) => Promise<any>
@@ -46,13 +52,81 @@ type DbUser = {
   closetCounts?: { live: number; drafts: number; archive: number }
 }
 
+type GoogleSignInModule = {
+  GoogleSignin: {
+    configure: (options: { webClientId: string; scopes: string[] }) => void
+    hasPlayServices: (options: { showPlayServicesUpdateDialog: boolean }) => Promise<boolean>
+    signIn: () => Promise<
+      | { type: 'success'; data: { idToken: string | null } }
+      | { type: 'cancelled' }
+    >
+  }
+  statusCodes?: {
+    SIGN_IN_CANCELLED?: string
+  }
+}
+
 const AuthContext = createContext<AuthContextType | null>(null)
+
+const GOOGLE_SIGNIN_UNAVAILABLE = 'GOOGLE_SIGNIN_UNAVAILABLE'
+const NETWORK_ERROR = 'NETWORK_ERROR'
+const OAUTH_FAILED = 'OAUTH_FAILED'
+const USER_CANCELLED = 'USER_CANCELLED'
+
+let cachedGoogleSignInModule: GoogleSignInModule | null | undefined
+let hasConfiguredGoogleSignin = false
+
+function getGoogleSignInSupport() {
+  if (googleOAuthConfigError) {
+    return {
+      available: false,
+      module: null,
+      unavailableReason:
+        'Google prijava nije konfigurirana. Proveri EXPO_PUBLIC_GOOGLE_CLIENT_ID.',
+    }
+  }
+
+  if (cachedGoogleSignInModule === undefined) {
+    try {
+      cachedGoogleSignInModule = require('@react-native-google-signin/google-signin') as GoogleSignInModule
+    } catch {
+      console.warn(
+        '[Google Auth] Native Google Sign-In module is unavailable in this binary. Rebuild the Android app or open a dev build.'
+      )
+      cachedGoogleSignInModule = null
+    }
+  }
+
+  if (!cachedGoogleSignInModule) {
+    return {
+      available: false,
+      module: null,
+      unavailableReason:
+        'Ova instalacija nema Google Sign-In native modul. Koristi email prijavu ili instaliraj novu build varijantu.',
+    }
+  }
+
+  if (!hasConfiguredGoogleSignin) {
+    cachedGoogleSignInModule.GoogleSignin.configure({
+      webClientId: googleClientId,
+      scopes: ['profile', 'email'],
+    })
+    hasConfiguredGoogleSignin = true
+  }
+
+  return {
+    available: true,
+    module: cachedGoogleSignInModule,
+    unavailableReason: null,
+  }
+}
 
 export function useAuthProvider() {
   const [currentUser, setCurrentUser] = useState<FirebaseAuthTypes.User | null>(null)
   const [dbUser, setDbUser] = useState<DbUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [profileError, setProfileError] = useState<string | null>(null)
+  const googleSignInSupport = getGoogleSignInSupport()
 
   async function loadDbUser(user: FirebaseAuthTypes.User) {
     console.log('[Auth] Loading dbUser for Firebase UID:', user.uid)
@@ -69,7 +143,7 @@ export function useAuthProvider() {
             firebaseUid: user.uid,
             dbUserFirebaseUid: fetchedDbUser.firebaseUid,
           })
-          await auth().signOut()
+          await signOut(auth)
           setCurrentUser(null)
           setDbUser(null)
           setProfileError('USER_MISMATCH')
@@ -85,10 +159,7 @@ export function useAuthProvider() {
       setDbUser(null)
       setProfileError('INVALID_PROFILE_RESPONSE')
     } catch (error: any) {
-      const message =
-        error?.response?.data?.error ||
-        error?.message ||
-        'UNKNOWN_PROFILE_ERROR'
+      const message = error?.response?.data?.error || error?.message || 'UNKNOWN_PROFILE_ERROR'
 
       console.error('[Auth] Failed to fetch dbUser:', message)
       setDbUser(null)
@@ -97,7 +168,7 @@ export function useAuthProvider() {
   }
 
   async function refreshDbUser() {
-    const user = auth().currentUser
+    const user = auth.currentUser
     if (!user) {
       console.log('[Auth] refreshDbUser skipped - no signed in user')
       return
@@ -109,7 +180,7 @@ export function useAuthProvider() {
   }
 
   useEffect(() => {
-    const unsubscribe = auth().onAuthStateChanged(async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log('[Auth] onAuthStateChanged:', user ? user.uid : 'signed-out')
       setCurrentUser(user)
       setLoading(true)
@@ -127,28 +198,49 @@ export function useAuthProvider() {
   }, [])
 
   async function signInWithGoogle() {
-    try {
-      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true })
-      const userInfo = await GoogleSignin.signIn()
-      const idToken = userInfo.data?.idToken
+    if (!googleSignInSupport.available || !googleSignInSupport.module) {
+      throw new Error(GOOGLE_SIGNIN_UNAVAILABLE)
+    }
 
-      if (!idToken) {
-        throw new Error('OAUTH_FAILED: No ID token received')
+    try {
+      await googleSignInSupport.module.GoogleSignin.hasPlayServices({
+        showPlayServicesUpdateDialog: true,
+      })
+
+      const userInfo = await googleSignInSupport.module.GoogleSignin.signIn()
+
+      if (userInfo.type !== 'success') {
+        throw new Error(USER_CANCELLED)
       }
 
-      const credential = auth.GoogleAuthProvider.credential(idToken)
-      await auth().signInWithCredential(credential)
+      const idToken = userInfo.data?.idToken
+      if (!idToken) {
+        throw new Error(OAUTH_FAILED)
+      }
+
+      const credential = GoogleAuthProvider.credential(idToken)
+      await signInWithCredential(auth, credential)
 
       // onAuthStateChanged will automatically fetch dbUser
     } catch (error: any) {
       console.error('[Google Auth] Error:', error)
 
-      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        throw new Error('USER_CANCELLED')
+      if (
+        error?.message === USER_CANCELLED ||
+        error?.code === googleSignInSupport.module.statusCodes?.SIGN_IN_CANCELLED
+      ) {
+        throw new Error(USER_CANCELLED)
       }
 
-      if (error.message?.toLowerCase().includes('network') || error.code === 'auth/network-request-failed') {
-        throw new Error('NETWORK_ERROR')
+      if (error?.message === GOOGLE_SIGNIN_UNAVAILABLE) {
+        throw error
+      }
+
+      if (
+        error?.message?.toLowerCase().includes('network') ||
+        error?.code === 'auth/network-request-failed'
+      ) {
+        throw new Error(NETWORK_ERROR)
       }
 
       throw error
@@ -156,15 +248,15 @@ export function useAuthProvider() {
   }
 
   async function signInWithEmail(email: string, password: string) {
-    return auth().signInWithEmailAndPassword(email, password)
+    return signInWithEmailAndPassword(auth, email, password)
   }
 
   async function registerWithEmail(email: string, password: string) {
-    return auth().createUserWithEmailAndPassword(email, password)
+    return createUserWithEmailAndPassword(auth, email, password)
   }
 
   async function logout() {
-    return auth().signOut()
+    return signOut(auth)
   }
 
   return {
@@ -172,6 +264,8 @@ export function useAuthProvider() {
     dbUser,
     loading,
     profileError,
+    googleSignInAvailable: googleSignInSupport.available,
+    googleSignInUnavailableReason: googleSignInSupport.unavailableReason,
     refreshDbUser,
     signInWithGoogle,
     signInWithEmail,
