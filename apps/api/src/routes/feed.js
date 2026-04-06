@@ -15,6 +15,11 @@ router.get('/', requireAuth, async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 20, 50)
     const page = Math.max(parseInt(req.query.page) || 0, 0)
     const isFirstTime = req.query.firstTime === 'true'
+    const excludeIds = String(req.query.excludeIds || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+    const excludedIdSet = new Set(excludeIds)
     const signals = await getDiscoverySignals(req.dbUser._id)
 
     // Fetch MORE items (3x) for better personalization after ranking
@@ -60,8 +65,20 @@ router.get('/', requireAuth, async (req, res) => {
     // Sort by personalized score
     ranked.sort((a, b) => b.personalizedScore - a.personalizedScore)
 
+    if (excludedIdSet.size > 0) {
+      ranked = ranked.filter((item) => !excludedIdSet.has(String(item._id)))
+    }
+
+    const seenIds = new Set()
+    ranked = ranked.filter((item) => {
+      const itemId = String(item._id)
+      if (seenIds.has(itemId)) return false
+      seenIds.add(itemId)
+      return true
+    })
+
     // Paginate AFTER ranking
-    const start = page * limit
+    const start = excludedIdSet.size > 0 ? 0 : page * limit
     const end = start + limit
     const data = ranked.slice(start, end)
     const hasMore = ranked.length > end
@@ -69,7 +86,7 @@ router.get('/', requireAuth, async (req, res) => {
     // Enrich with user-specific fields (isLiked, isWishlisted, likesCount)
     const enriched = await enrichItems(data, req.dbUser._id)
 
-    res.json({ ok: true, data: enriched, page, hasMore })
+    res.json({ ok: true, data: enriched, page: excludedIdSet.size > 0 ? 0 : page, hasMore })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

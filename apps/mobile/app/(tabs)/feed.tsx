@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   FlatList,
@@ -69,6 +69,17 @@ const conditionCopy = {
   },
 } as const
 
+function dedupeItemsById(items: Item[]) {
+  const seen = new Set<string>()
+
+  return items.filter((item) => {
+    const itemId = String(item._id)
+    if (seen.has(itemId)) return false
+    seen.add(itemId)
+    return true
+  })
+}
+
 export default function FeedScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
@@ -76,7 +87,6 @@ export default function FeedScreen() {
   const { locale, t } = useI18n()
 
   const [items, setItems] = useState<Item[]>([])
-  const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
@@ -87,24 +97,36 @@ export default function FeedScreen() {
   const pageHeight = Math.max(windowHeight, 1)
 
   const fetchFeed = useCallback(
-    async (pageNum: number, mode: 'replace' | 'append' = 'replace') => {
+    async (
+      pageNum: number,
+      mode: 'replace' | 'append' = 'replace',
+      excludeIds: string[] = []
+    ) => {
       try {
         if (pageNum === 0 && mode === 'replace') setIsLoading(true)
         else setIsLoadingMore(true)
 
-        const params: Record<string, string | number> = { limit: 10, page: pageNum }
+        const params: Record<string, string | number> = {
+          limit: 10,
+          page: mode === 'append' ? 0 : pageNum,
+        }
 
         if (pageNum === 0 && isFirstTime) {
           params.firstTime = 'true'
         }
 
+        if (mode === 'append' && excludeIds.length > 0) {
+          params.excludeIds = excludeIds.join(',')
+        }
+
         const response = await client.get('/api/feed', { params })
 
         if (response.data.ok) {
-          const nextItems = response.data.data as Item[]
-          setItems((prev) => (mode === 'append' ? [...prev, ...nextItems] : nextItems))
+          const nextItems = dedupeItemsById(response.data.data as Item[])
+          setItems((prev) =>
+            mode === 'append' ? dedupeItemsById([...prev, ...nextItems]) : nextItems
+          )
           setHasMore(response.data.hasMore)
-          setPage(response.data.page)
 
           if (pageNum === 0 && isFirstTime) {
             setIsFirstTime(false)
@@ -131,6 +153,11 @@ export default function FeedScreen() {
     setRefreshing(true)
     await fetchFeed(0)
   }, [fetchFeed])
+
+  const handleLoadMore = useCallback(() => {
+    if (isLoadingMore || !hasMore || items.length === 0) return
+    fetchFeed(0, 'append', items.map((item) => item._id))
+  }, [fetchFeed, hasMore, isLoadingMore, items])
 
   const updateItem = useCallback((itemId: string, updater: (item: Item) => Item) => {
     setItems((prev) => prev.map((item) => (item._id === itemId ? updater(item) : item)))
@@ -224,6 +251,28 @@ export default function FeedScreen() {
     }
   }, [])
 
+  const handleOpenMore = useCallback((item: Item) => {
+    setActionItem(item)
+  }, [])
+
+  const renderFeedItem = useCallback(
+    ({ item }: { item: Item }) => (
+      <FeedItem
+        item={item}
+        height={pageHeight}
+        locale={locale}
+        topInset={insets.top}
+        bottomInset={insets.bottom}
+        onLike={handleLike}
+        onWishlist={handleWishlist}
+        onMore={handleOpenMore}
+      />
+    ),
+    [handleLike, handleOpenMore, handleWishlist, insets.bottom, insets.top, locale, pageHeight]
+  )
+
+  const feedKeyExtractor = useCallback((item: Item) => item._id, [])
+
   if (isLoading) {
     return <FeedSkeleton />
   }
@@ -245,34 +294,21 @@ export default function FeedScreen() {
       ) : (
         <FlatList
           data={items}
-          keyExtractor={(item) => item._id}
-          renderItem={({ item }) => (
-            <FeedItem
-              item={item}
-              height={pageHeight}
-              locale={locale}
-              topInset={insets.top}
-              bottomInset={insets.bottom}
-              onOpen={() => router.push(`/items/${item._id}`)}
-              onLike={() => handleLike(item._id, !!item.isLiked)}
-              onWishlist={() => handleWishlist(item._id, !!item.isWishlisted)}
-              onSellerPress={() =>
-                router.push({ pathname: '/users/[id]', params: { id: item.userId._id } })
-              }
-              onMore={() => setActionItem(item)}
-            />
-          )}
+          keyExtractor={feedKeyExtractor}
+          renderItem={renderFeedItem}
           showsVerticalScrollIndicator={false}
+          pagingEnabled
           decelerationRate="fast"
           snapToInterval={pageHeight}
           snapToAlignment="start"
           disableIntervalMomentum
-          onEndReached={() => {
-            if (!isLoadingMore && hasMore) {
-              fetchFeed(page + 1, 'append')
-            }
-          }}
-          onEndReachedThreshold={0.7}
+          removeClippedSubviews
+          initialNumToRender={2}
+          maxToRenderPerBatch={2}
+          windowSize={3}
+          updateCellsBatchingPeriod={40}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.55}
           getItemLayout={(_, index) => ({
             length: pageHeight,
             offset: pageHeight * index,
@@ -385,30 +421,26 @@ type FeedItemProps = {
   locale: 'sr' | 'en' | 'ru'
   topInset: number
   bottomInset: number
-  onOpen: () => void
-  onLike: () => void
-  onWishlist: () => void
-  onSellerPress: () => void
-  onMore: () => void
+  onLike: (itemId: string, isLiked: boolean) => void
+  onWishlist: (itemId: string, isWishlisted: boolean) => void
+  onMore: (item: Item) => void
 }
 
-function FeedItem({
+const FeedItem = memo(function FeedItem({
   item,
   height,
   locale,
   topInset,
   bottomInset,
-  onOpen,
   onLike,
   onWishlist,
-  onSellerPress,
   onMore,
 }: FeedItemProps) {
   const router = useRouter()
   const { t, formatDate } = useI18n()
 
   const imageUri = item.images?.[0]
-  const contentBottomOffset = Math.max(bottomInset, 10) + 64
+  const contentBottomOffset = Math.max(bottomInset, 10) + 28
 
   const metaParts = [
     item.brand,
@@ -447,9 +479,12 @@ function FeedItem({
         </View>
       )}
 
-      <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={onOpen} />
+      <TouchableOpacity
+        style={StyleSheet.absoluteFillObject}
+        activeOpacity={1}
+        onPress={() => router.push(`/items/${item._id}`)}
+      />
       <View style={styles.topShade} />
-      <View style={styles.bottomShade} />
 
       <View className="absolute left-4 right-20" style={{ top: topInset + 96 }}>
         <View className="self-start rounded-pill bg-black/16 px-3 py-2">
@@ -467,17 +502,17 @@ function FeedItem({
         </Text>
       </View>
 
-      <View className="absolute right-3 items-center gap-3" style={{ bottom: contentBottomOffset + 118 }}>
+      <View className="absolute right-3 items-center gap-3" style={{ bottom: contentBottomOffset + 104 }}>
         <ActionButton
           icon={item.isLiked ? 'heart' : 'heart-outline'}
           iconColor={item.isLiked ? '#FF5F77' : colors.baseCanvas}
           label={(item.likesCount ?? 0) > 0 ? String(item.likesCount) : undefined}
-          onPress={onLike}
+          onPress={() => onLike(item._id, !!item.isLiked)}
         />
         <ActionButton
           icon={item.isWishlisted ? 'bookmark' : 'bookmark-outline'}
           iconColor={item.isWishlisted ? colors.highlight : colors.baseCanvas}
-          onPress={onWishlist}
+          onPress={() => onWishlist(item._id, !!item.isWishlisted)}
         />
         <ActionButton
           icon="paper-plane-outline"
@@ -487,7 +522,7 @@ function FeedItem({
         <ActionButton
           icon="ellipsis-horizontal"
           iconColor={colors.baseCanvas}
-          onPress={onMore}
+          onPress={() => onMore(item)}
         />
       </View>
 
@@ -500,7 +535,7 @@ function FeedItem({
           <TouchableOpacity
             className="flex-1 flex-row items-center"
             activeOpacity={0.88}
-            onPress={onSellerPress}
+            onPress={() => router.push({ pathname: '/users/[id]', params: { id: item.userId._id } })}
           >
             {item.userId?.photoURL ? (
               <RemoteImage
@@ -545,7 +580,7 @@ function FeedItem({
               <TouchableOpacity
                 className="rounded-pill bg-brand-highlight px-4 py-3"
                 activeOpacity={0.86}
-                onPress={onOpen}
+                onPress={() => router.push(`/items/${item._id}`)}
               >
                 <Text className="font-sans text-sm font-semibold text-ink-dark">
                   {t('feed.details')}
@@ -573,7 +608,17 @@ function FeedItem({
       </GlassSurface>
     </View>
   )
-}
+},
+(prev, next) =>
+  prev.item === next.item &&
+  prev.height === next.height &&
+  prev.locale === next.locale &&
+  prev.topInset === next.topInset &&
+  prev.bottomInset === next.bottomInset &&
+  prev.onLike === next.onLike &&
+  prev.onWishlist === next.onWishlist &&
+  prev.onMore === next.onMore
+)
 
 function ActionButton({
   icon,
@@ -647,15 +692,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   topShade: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(4,2,4,0.12)',
-  },
-  bottomShade: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 0,
-    height: 360,
-    backgroundColor: colors.overlayStrong,
+    top: 0,
+    height: 220,
+    backgroundColor: 'rgba(4,2,4,0.08)',
   },
 })
