@@ -1,12 +1,26 @@
 import { useState } from 'react'
-import { View, Text, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native'
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 import { useRouter } from 'expo-router'
+
+import { BrandBackground } from '@/components/BrandBackground'
+import { BrandWordmark } from '@/components/BrandWordmark'
+import { GlassSurface } from '@/components/GlassSurface'
+import { colors } from '@/design/tokens'
 import { useAuth } from '@/hooks/useAuth'
+import { useI18n } from '@/i18n'
 
 export default function LoginScreen() {
-  console.log('[LoginScreen] Rendering')
   const router = useRouter()
   const { signInWithGoogle, signInWithEmail } = useAuth()
+  const { t } = useI18n()
 
   const [showEmailLogin, setShowEmailLogin] = useState(false)
   const [email, setEmail] = useState('')
@@ -15,7 +29,6 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false)
 
   async function handleEmailLogin() {
-    console.log('[LoginScreen] handleEmailLogin called with:', email)
     setError('')
 
     if (!email || !password) {
@@ -26,9 +39,7 @@ export default function LoginScreen() {
     setLoading(true)
     try {
       await signInWithEmail(email, password)
-      console.log('[LoginScreen] Email login successful')
     } catch (e: any) {
-      console.log('[LoginScreen] Email login error:', e.code, e.message)
       if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
         setError('Pogrešan email ili lozinka.')
       } else if (e.code === 'auth/wrong-password') {
@@ -44,18 +55,13 @@ export default function LoginScreen() {
   }
 
   async function handleGoogleLogin() {
-    console.log('[LoginScreen] Google login pressed')
     try {
       await signInWithGoogle()
     } catch (e: any) {
-      console.log('[LoginScreen] Google login error:', e.message)
-
-      // User cancelled - silent return
       if (e.message === 'USER_CANCELLED') {
         return
       }
 
-      // Specific error messages
       let title = 'Google prijava'
       let message = 'Došlo je do greške. Pokušaj ponovo.'
 
@@ -71,110 +77,115 @@ export default function LoginScreen() {
     }
   }
 
-  // Email login form
-  if (showEmailLogin) {
-    return (
-      <KeyboardAvoidingView
-        className="flex-1 bg-base-canvas"
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <View className="flex-1 justify-center items-center px-6">
-          <Text className="font-logo text-brand-accent-deep text-5xl mb-2">Velve</Text>
-          <Text className="font-sans text-ink-dark text-base mb-12 opacity-60">
-            Prijavi se
-          </Text>
-
-          <TextInput
-            className="w-full border border-ink-dark rounded-2xl px-4 py-4 font-sans text-ink-dark text-base mb-4"
-            placeholder="Email"
-            placeholderTextColor="#2B2A2B80"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            value={email}
-            onChangeText={setEmail}
-          />
-
-          <TextInput
-            className="w-full border border-ink-dark rounded-2xl px-4 py-4 font-sans text-ink-dark text-base mb-2"
-            placeholder="Lozinka"
-            placeholderTextColor="#2B2A2B80"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
-
-          {error ? (
-            <Text className="font-sans text-sm mb-4 text-center" style={{ color: '#C0392B' }}>
-              {error}
-            </Text>
-          ) : (
-            <View className="mb-4" />
-          )}
-
-          <TouchableOpacity
-            className="w-full bg-brand-accent-deep py-4 rounded-full items-center mb-4"
-            onPress={handleEmailLogin}
-            disabled={loading}
-          >
-            <Text className="font-sans text-base-canvas font-semibold text-base">
-              {loading ? 'Prijavljujem...' : 'Prijavi se'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            className="mb-6"
-            onPress={() => { setShowEmailLogin(false); setError('') }}
-          >
-            <Text className="font-sans text-ink-dark text-sm opacity-60">
-              Nazad
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-            <Text className="font-sans text-brand-accent-deep text-sm font-semibold">
-              Nemas nalog? Registruj se
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-    )
-  }
-
-  // Main login screen
   return (
-    <View className="flex-1 bg-base-canvas justify-center items-center px-6">
-      <Text className="font-logo text-brand-accent-deep text-5xl mb-2">Velve</Text>
-      <Text className="font-sans text-ink-dark text-base mb-12 opacity-60">
-        Razmeni garderobu. Otkrij stil.
-      </Text>
+    <KeyboardAvoidingView
+      className="flex-1 bg-base-canvas"
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <BrandBackground />
 
-      {/* Google Sign-In — PRIMARY */}
-      <TouchableOpacity
-        className="w-full bg-brand-accent-deep py-4 rounded-full items-center mb-4"
-        onPress={handleGoogleLogin}
-      >
-        <Text className="font-sans text-base-canvas font-semibold text-base">
-          Nastavi sa Google
-        </Text>
-      </TouchableOpacity>
+      <View className="flex-1 px-gutter pb-10 pt-16">
+        <View className="flex-1 justify-between">
+          <View className="pt-4">
+            <BrandWordmark width={190} />
+            <Text className="mt-5 font-logo text-[34px] leading-none text-brand-accent-deep/70">
+              {t('onboarding.welcomeMood')}
+            </Text>
+            <Text className="mt-4 font-display text-[42px] leading-[44px] text-ink-dark">
+              {showEmailLogin ? t('auth.signIn') : t('auth.loginTitle')}
+            </Text>
+            <Text className="mt-4 max-w-[320px] font-sans text-base leading-7 text-ink-dark/68">
+              {showEmailLogin ? t('auth.tagline') : t('auth.loginDescription')}
+            </Text>
+          </View>
 
-      {/* Email Login — SECONDARY */}
-      <TouchableOpacity
-        className="w-full border border-ink-dark py-4 rounded-full items-center mb-6"
-        onPress={() => setShowEmailLogin(true)}
-      >
-        <Text className="font-sans text-ink-dark text-base">
-          Nastavi sa emailom
-        </Text>
-      </TouchableOpacity>
+          <GlassSurface className="px-5 py-5">
+            {showEmailLogin ? (
+              <View>
+                <TextInput
+                  className="mb-4 rounded-soft border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-base text-ink-dark"
+                  placeholder={t('auth.emailPlaceholder')}
+                  placeholderTextColor={colors.mutedText}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={email}
+                  onChangeText={setEmail}
+                />
 
-      {/* Register link */}
-      <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-        <Text className="font-sans text-brand-accent-deep text-sm font-semibold">
-          Nemas nalog? Registruj se
-        </Text>
-      </TouchableOpacity>
-    </View>
+                <TextInput
+                  className="rounded-soft border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-base text-ink-dark"
+                  placeholder={t('auth.passwordPlaceholder')}
+                  placeholderTextColor={colors.mutedText}
+                  secureTextEntry
+                  value={password}
+                  onChangeText={setPassword}
+                />
+
+                {error ? (
+                  <Text
+                    className="mt-4 font-sans text-sm leading-6"
+                    style={{ color: colors.danger }}
+                  >
+                    {error}
+                  </Text>
+                ) : null}
+
+                <TouchableOpacity
+                  className="mt-5 items-center rounded-pill bg-brand-accent-deep px-4 py-4"
+                  onPress={handleEmailLogin}
+                  disabled={loading}
+                >
+                  <Text className="font-sans text-base font-semibold text-base-canvas">
+                    {loading ? `${t('auth.signIn')}...` : t('auth.signIn')}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  className="mt-3 items-center rounded-pill border border-ink-dark/10 bg-base-canvas/70 px-4 py-4"
+                  onPress={() => {
+                    setShowEmailLogin(false)
+                    setError('')
+                  }}
+                >
+                  <Text className="font-sans text-base font-medium text-ink-dark">
+                    {t('common.close')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View>
+                <TouchableOpacity
+                  className="items-center rounded-pill bg-brand-accent-deep px-4 py-4"
+                  onPress={handleGoogleLogin}
+                >
+                  <Text className="font-sans text-base font-semibold text-base-canvas">
+                    {t('auth.google')}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  className="mt-3 items-center rounded-pill border border-base-canvas/70 bg-base-canvas/70 px-4 py-4"
+                  onPress={() => setShowEmailLogin(true)}
+                >
+                  <Text className="font-sans text-base font-medium text-ink-dark">
+                    {t('auth.email')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View className="mt-5 flex-row items-center justify-between">
+              <Text className="font-sans text-sm text-ink-dark/50">{t('auth.tagline')}</Text>
+              <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+                <Text className="font-sans text-sm font-semibold text-brand-accent-deep">
+                  {showEmailLogin ? t('auth.noAccount') : t('auth.register')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </GlassSurface>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
   )
 }

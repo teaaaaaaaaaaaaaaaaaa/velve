@@ -1,154 +1,171 @@
-import { useState, useEffect } from 'react'
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StatusBar,
-  FlatList,
-  Image,
-  ActivityIndicator,
-  Dimensions,
-} from 'react-native'
+import { useEffect, useState } from 'react'
+import { ScrollView, StatusBar, Text, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+
 import client from '@/api/client'
+import { BrandBackground } from '@/components/BrandBackground'
+import { BrandWordmark } from '@/components/BrandWordmark'
+import { BrandedLoader } from '@/components/BrandedLoader'
+import { GlassSurface } from '@/components/GlassSurface'
+import { RemoteImage } from '@/components/RemoteImage'
+import { colors } from '@/design/tokens'
+import { useI18n } from '@/i18n'
 
-const { width } = Dimensions.get('window')
-const CARD_WIDTH = width * 0.7
-
-type FeedItem = {
+type PreviewItem = {
   _id: string
   title: string
-  brand: string
-  size: string
-  imageUrl: string
-  price?: number
-  user: {
-    displayName: string
+  brand?: string
+  size?: string
+  imageUrl?: string
+  user?: {
+    displayName?: string
   }
 }
 
+const COPY = {
+  sr: {
+    loading: 'Velve sprema tvoj prvi discovery kadar',
+    mood: 'soft launch',
+    title: 'Profil je spreman. Discovery sada izgleda kao tvoj prostor.',
+    description:
+      'Pre nego sto udjes u feed, evo nekoliko komada koji odgovaraju signalima koje si upravo ostavila.',
+    emptyTitle: 'Discovery je spreman za prvi refresh',
+    emptyDescription:
+      'I bez preview selekcije, feed je sada konfigurisan da krene iz tvog modnog ritma.',
+    cta: 'Udji u feed',
+  },
+  en: {
+    loading: 'Velve is preparing your first discovery frame',
+    mood: 'soft launch',
+    title: 'Your profile is ready. Discovery now feels like your own space.',
+    description:
+      'Before you enter the feed, here are a few pieces that match the signals you just left behind.',
+    emptyTitle: 'Discovery is ready for its first refresh',
+    emptyDescription:
+      'Even without a preview selection, the feed is now configured to start from your fashion rhythm.',
+    cta: 'Enter feed',
+  },
+  ru: {
+    loading: 'Velve готовит твой первый discovery-кадр',
+    mood: 'soft launch',
+    title: 'Профиль готов. Discovery теперь ощущается как твое собственное пространство.',
+    description:
+      'Перед входом в ленту вот несколько вещей, которые совпадают с сигналами, которые ты только что оставила.',
+    emptyTitle: 'Discovery готов к первому refresh',
+    emptyDescription:
+      'Даже без preview-подборки лента уже настроена стартовать из твоего модного ритма.',
+    cta: 'Войти в ленту',
+  },
+} as const
+
 export default function SuccessScreen() {
   const router = useRouter()
-  const [items, setItems] = useState<FeedItem[]>([])
+  const { locale } = useI18n()
+  const [items, setItems] = useState<PreviewItem[]>([])
   const [loading, setLoading] = useState(true)
 
+  const copy = COPY[locale]
+
   useEffect(() => {
-    fetchPersonalizedItems()
+    const loadPreview = async () => {
+      try {
+        const response = await client.get('/api/feed?limit=3')
+        if (response.data.ok) {
+          setItems(response.data.data ?? [])
+        }
+      } catch (error) {
+        console.error('[Success] Failed to fetch preview items', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadPreview()
   }, [])
 
-  const fetchPersonalizedItems = async () => {
-    try {
-      const response = await client.get('/api/feed?limit=3')
-      if (response.data.ok) {
-        setItems(response.data.data)
-      }
-    } catch (error) {
-      console.error('[Success] Failed to fetch items:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleExplore = () => {
-    router.replace('/(tabs)/feed')
+  if (loading) {
+    return <BrandedLoader label={copy.loading} />
   }
 
   return (
     <View className="flex-1 bg-base-canvas">
       <StatusBar barStyle="dark-content" />
+      <BrandBackground />
 
-      {/* Progress Bar - 100% */}
-      <View className="px-6 pt-16 pb-4">
-        <View className="h-2 bg-ink-dark/10 rounded-full overflow-hidden">
-          <View className="h-full bg-brand-accent-deep rounded-full" style={{ width: '100%' }} />
-        </View>
-      </View>
-
-      <View className="flex-1 px-6 py-8">
-        {/* Hero Section */}
-        <View className="items-center mb-8">
-          <View className="bg-brand-highlight rounded-full w-20 h-20 items-center justify-center mb-4">
-            <Ionicons name="checkmark" size={48} color="#2B2A2B" />
-          </View>
-          <Text className="text-4xl font-display text-ink-dark mb-3 text-center">
-            Tvoj profil je spreman! 🎉
+      <ScrollView
+        className="flex-1 px-gutter"
+        contentContainerStyle={{ paddingBottom: 32, paddingTop: 70 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="items-start">
+          <BrandWordmark width={210} />
+          <Text className="mt-5 font-logo text-[34px] leading-none text-brand-accent-deep/72">
+            {copy.mood}
           </Text>
-          <Text className="text-base font-sans text-ink-dark/70 text-center px-4">
-            Evo nekoliko garderobi koje smo odabrali baš za tebe
+          <Text className="mt-5 font-display text-[42px] leading-[44px] text-ink-dark">
+            {copy.title}
+          </Text>
+          <Text className="mt-4 max-w-[344px] font-sans text-base leading-7 text-ink-dark/68">
+            {copy.description}
           </Text>
         </View>
 
-        {/* Personalized Items Preview */}
-        {loading ? (
-          <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color="#431A43" />
-          </View>
-        ) : items.length > 0 ? (
-          <FlatList
-            data={items}
+        {items.length ? (
+          <ScrollView
             horizontal
-            pagingEnabled
             showsHorizontalScrollIndicator={false}
-            snapToInterval={CARD_WIDTH + 16}
-            decelerationRate="fast"
-            contentContainerStyle={{
-              paddingHorizontal: (width - CARD_WIDTH) / 2,
-            }}
-            keyExtractor={(item) => item._id}
-            renderItem={({ item }) => (
-              <View
-                className="bg-white rounded-3xl overflow-hidden mr-4 shadow-lg"
-                style={{ width: CARD_WIDTH }}
+            className="mt-8"
+            contentContainerStyle={{ paddingRight: 8 }}
+          >
+            {items.map((item, index) => (
+              <GlassSurface
+                key={item._id}
+                className="mr-4 overflow-hidden"
+                style={{ width: 252, transform: [{ translateY: index === 1 ? 16 : 0 }] }}
               >
-                <Image
-                  source={{ uri: item.imageUrl }}
-                  className="w-full bg-ink-dark/5"
-                  style={{ height: CARD_WIDTH * 1.3 }}
-                  resizeMode="cover"
+                <RemoteImage
+                  uri={item.imageUrl}
+                  style={{ height: 320 }}
+                  loaderColor={colors.accentDeep}
+                  fallback={
+                    <View className="h-[320px] items-center justify-center bg-brand-accent-deep">
+                      <Ionicons name="sparkles-outline" size={30} color={colors.baseCanvas} />
+                    </View>
+                  }
                 />
-                <View className="p-4">
-                  <Text className="text-xl font-display text-ink-dark mb-2">
+                <View className="px-4 py-4">
+                  <Text className="font-display text-[28px] leading-7 text-ink-dark">
                     {item.title}
                   </Text>
-                  <View className="flex-row items-center justify-between">
-                    <View>
-                      <Text className="text-sm font-sans text-ink-dark/70">
-                        {item.brand} • {item.size}
-                      </Text>
-                      <Text className="text-xs font-sans text-ink-dark/50 mt-1">
-                        {item.user.displayName}
-                      </Text>
-                    </View>
-                    {item.price && (
-                      <Text className="text-lg font-sans font-bold text-brand-accent-deep">
-                        {item.price} RSD
-                      </Text>
-                    )}
-                  </View>
+                  <Text className="mt-2 font-sans text-sm text-ink-dark/64">
+                    {[item.brand, item.size].filter(Boolean).join(' · ')}
+                  </Text>
+                  <Text className="mt-3 font-sans text-xs uppercase tracking-[1px] text-ink-dark/46">
+                    {item.user?.displayName || 'Velve'}
+                  </Text>
                 </View>
-              </View>
-            )}
-          />
+              </GlassSurface>
+            ))}
+          </ScrollView>
         ) : (
-          <View className="flex-1 items-center justify-center">
-            <Ionicons name="sparkles-outline" size={64} color="#2B2A2B" />
-            <Text className="text-lg font-sans text-ink-dark/70 mt-4 text-center">
-              Spremni smo da te povežemo sa najboljim ponudama!
+          <GlassSurface className="mt-8 px-5 py-6">
+            <Text className="font-display text-[28px] leading-7 text-ink-dark">
+              {copy.emptyTitle}
             </Text>
-          </View>
+            <Text className="mt-3 font-sans text-sm leading-6 text-ink-dark/68">
+              {copy.emptyDescription}
+            </Text>
+          </GlassSurface>
         )}
-      </View>
+      </ScrollView>
 
-      {/* CTA Button */}
-      <View className="px-6 pb-12 pt-4">
+      <View className="px-gutter pb-10 pt-4">
         <TouchableOpacity
-          className="bg-brand-accent-deep rounded-full py-5 items-center shadow-lg"
-          onPress={handleExplore}
+          className="items-center rounded-pill bg-brand-accent-deep px-5 py-4"
+          onPress={() => router.replace('/(tabs)/feed')}
         >
-          <Text className="font-sans text-lg font-bold text-base-canvas">
-            Istraži Sve ✨
-          </Text>
+          <Text className="font-sans text-base font-semibold text-base-canvas">{copy.cta}</Text>
         </TouchableOpacity>
       </View>
     </View>

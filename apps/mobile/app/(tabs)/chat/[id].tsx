@@ -1,104 +1,278 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { Ionicons } from '@expo/vector-icons'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  View,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
+  View,
   ActivityIndicator,
-  StyleSheet,
 } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
 import { io, Socket } from 'socket.io-client'
-import { useAuth } from '@/hooks/useAuth'
-import { auth as firebaseAuth } from '@/config/firebase'
+
 import client from '@/api/client'
+import { BrandBackground } from '@/components/BrandBackground'
+import { ChatSkeleton } from '@/components/BrandedLoader'
+import { RemoteImage } from '@/components/RemoteImage'
+import { BrandWordmark } from '@/components/BrandWordmark'
+import { colors } from '@/design/tokens'
+import { useAuth } from '@/hooks/useAuth'
+import { API_URL } from '@/config/api'
+import { auth as firebaseAuth } from '@/config/firebase'
+import { useI18n } from '@/i18n'
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
-
-interface Participant {
+type Participant = {
   _id: string
   displayName: string
-  photoURL: string
+  photoURL?: string
   email?: string
 }
 
-interface TradeData {
+type TradeData = {
   offeredItemId: string
   offeredItemTitle: string
-  offeredItemImage: string
+  offeredItemImage?: string
   requestedItemId: string
   requestedItemTitle: string
-  requestedItemImage: string
+  requestedItemImage?: string
 }
 
-interface BuyData {
+type BuyData = {
   requestedItemId: string
   requestedItemTitle: string
-  requestedItemImage: string
+  requestedItemImage?: string
 }
 
-interface Message {
+type StatusData = {
+  tradeRequestId: string
+  status: string
+  label: string
+}
+
+type MessageRecord = {
   _id: string
   chatId: string
-  senderId: { _id: string; displayName: string; photoURL: string } | string
+  senderId: { _id: string; displayName: string; photoURL?: string } | string
   text: string
-  type?: 'text' | 'trade' | 'buy'
+  type?: 'text' | 'trade' | 'buy' | 'trade_update'
   tradeData?: TradeData
   buyData?: BuyData
+  statusData?: StatusData
   createdAt: string
 }
 
-function getDisplayName(p: Participant | null | undefined): string {
-  if (!p) return 'Korisnik'
-  if (p.displayName) return p.displayName
-  if (p.email) return p.email.split('@')[0]
-  return 'Korisnik'
+type ChatPayload = {
+  participants: Participant[]
+  tradeRequestId?: { _id: string; status?: string } | null
+  messages: MessageRecord[]
+}
+
+function getDisplayName(participant: Participant | null) {
+  if (!participant) return 'Korisnik'
+  return participant.displayName || participant.email?.split('@')[0] || 'Korisnik'
+}
+
+function formatTime(dateStr: string) {
+  return new Date(dateStr).toLocaleTimeString('sr-Latn', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatDate(dateStr: string) {
+  const date = new Date(dateStr)
+  const diffDays = Math.floor((Date.now() - date.getTime()) / 86400000)
+  if (diffDays === 0) return 'Danas'
+  if (diffDays === 1) return 'Juce'
+  return date.toLocaleDateString('sr-Latn', { day: 'numeric', month: 'long' })
+}
+
+function isSameDay(a?: string, b?: string) {
+  if (!a || !b) return false
+  return new Date(a).toDateString() === new Date(b).toDateString()
+}
+
+function ItemMiniCard({
+  title,
+  imageUri,
+  eyebrow,
+}: {
+  title: string
+  imageUri?: string
+  eyebrow: string
+}) {
+  return (
+    <View className="flex-1">
+      <View className="overflow-hidden rounded-[16px] bg-base-canvas">
+        {imageUri ? (
+          <RemoteImage
+            uri={imageUri}
+            className="aspect-square w-full"
+            fallback={
+              <View className="aspect-square w-full items-center justify-center bg-brand-accent-light/20">
+                <Ionicons name="shirt-outline" size={24} color="#431A43" />
+              </View>
+            }
+          />
+        ) : (
+          <View className="aspect-square w-full items-center justify-center bg-brand-accent-light/20">
+            <Ionicons name="shirt-outline" size={24} color="#431A43" />
+          </View>
+        )}
+      </View>
+      <Text className="mt-2 font-sans text-[11px] uppercase tracking-[1.1px] text-ink-dark/45">
+        {eyebrow}
+      </Text>
+      <Text className="font-sans text-sm font-semibold leading-5 text-ink-dark" numberOfLines={2}>
+        {title}
+      </Text>
+    </View>
+  )
+}
+
+function TradeMessageCard({
+  tradeData,
+  onViewRequested,
+}: {
+  tradeData: TradeData
+  onViewRequested: () => void
+}) {
+  return (
+    <View className="mx-4 my-2 overflow-hidden rounded-[24px] border border-brand-accent-deep/10 bg-white px-4 py-4">
+      <Text className="font-display text-2xl text-ink-dark">Trade proposal</Text>
+      <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/65">
+        Editorial preview oba komada unutar iste poruke.
+      </Text>
+
+      <View className="mt-4 flex-row items-center gap-3">
+        <ItemMiniCard
+          title={tradeData.offeredItemTitle}
+          imageUri={tradeData.offeredItemImage}
+          eyebrow="Nudi"
+        />
+        <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-accent-deep/8">
+          <Ionicons name="swap-horizontal" size={18} color="#431A43" />
+        </View>
+        <ItemMiniCard
+          title={tradeData.requestedItemTitle}
+          imageUri={tradeData.requestedItemImage}
+          eyebrow="Trazi"
+        />
+      </View>
+
+      <TouchableOpacity
+        onPress={onViewRequested}
+        className="mt-4 items-center rounded-full bg-base-canvas px-4 py-3"
+      >
+        <Text className="font-sans text-sm font-semibold text-ink-dark">Otvori trazeni predmet</Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+function BuyMessageCard({
+  buyData,
+  onViewRequested,
+}: {
+  buyData: BuyData
+  onViewRequested: () => void
+}) {
+  return (
+    <View className="mx-4 my-2 overflow-hidden rounded-[24px] border border-brand-accent-deep/10 bg-white px-4 py-4">
+      <Text className="font-display text-2xl text-ink-dark">Buy request</Text>
+      <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/65">
+        Kupovina ulazi kroz isti premium thread kao trade.
+      </Text>
+
+      <View className="mt-4">
+        <ItemMiniCard
+          title={buyData.requestedItemTitle}
+          imageUri={buyData.requestedItemImage}
+          eyebrow="Predmet"
+        />
+      </View>
+
+      <TouchableOpacity
+        onPress={onViewRequested}
+        className="mt-4 items-center rounded-full bg-base-canvas px-4 py-3"
+      >
+        <Text className="font-sans text-sm font-semibold text-ink-dark">Otvori predmet</Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+function TradeStatusTicket({
+  statusData,
+  onOpenDesk,
+}: {
+  statusData: StatusData
+  onOpenDesk: () => void
+}) {
+  return (
+    <View className="mx-4 my-2 overflow-hidden rounded-[22px] border border-ink-dark/8 bg-white px-4 py-4">
+      <View className="flex-row items-center">
+        <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-accent-light/25">
+          <Ionicons name="sparkles-outline" size={18} color="#431A43" />
+        </View>
+        <View className="ml-3 flex-1">
+          <Text className="font-sans text-[11px] uppercase tracking-[1.1px] text-ink-dark/45">
+            Trade update
+          </Text>
+          <Text className="font-sans text-sm leading-6 text-ink-dark/75">{statusData.label}</Text>
+        </View>
+      </View>
+
+      <TouchableOpacity
+        onPress={onOpenDesk}
+        className="mt-4 items-center rounded-full bg-base-canvas px-4 py-3"
+      >
+        <Text className="font-sans text-sm font-semibold text-ink-dark">Otvori trade desk</Text>
+      </TouchableOpacity>
+    </View>
+  )
 }
 
 export default function ChatScreen() {
   const { id: chatId } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const { dbUser } = useAuth()
+  const { t } = useI18n()
 
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<MessageRecord[]>([])
   const [inputText, setInputText] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [otherUser, setOtherUser] = useState<Participant | null>(null)
   const [typingUser, setTypingUser] = useState<string | null>(null)
+  const [tradeStatus, setTradeStatus] = useState<string | null>(null)
 
   const socketRef = useRef<Socket | null>(null)
-  const flatListRef = useRef<FlatList>(null)
+  const flatListRef = useRef<FlatList<MessageRecord>>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchChat = useCallback(async () => {
-    try {
-      const response = await client.get(`/api/chat/${chatId}`)
-      if (response.data.ok) {
-        const data = response.data.data
-        setMessages(data.messages || [])
+    const response = await client.get(`/api/chat/${chatId}`)
+    if (response.data.ok) {
+      const data = response.data.data as ChatPayload
+      setMessages(data.messages || [])
+      setTradeStatus(data.tradeRequestId?.status || null)
 
-        if (data.participants && dbUser) {
-          const other = data.participants.find(
-            (p: Participant) => p._id !== dbUser._id
-          )
-          setOtherUser(other || null)
-        }
+      if (data.participants && dbUser) {
+        const participant =
+          data.participants.find((entry) => entry._id !== dbUser._id) || data.participants[0] || null
+        setOtherUser(participant)
       }
-    } catch (error: any) {
-      console.error('[Chat] Error fetching chat:', error.message)
-    } finally {
-      setLoading(false)
     }
   }, [chatId, dbUser])
 
   useEffect(() => {
     fetchChat()
+      .catch(() => undefined)
+      .finally(() => setLoading(false))
   }, [fetchChat])
 
   useEffect(() => {
@@ -107,8 +281,8 @@ export default function ChatScreen() {
     async function connectSocket() {
       const user = firebaseAuth.currentUser
       if (!user) return
-      const token = await user.getIdToken()
 
+      const token = await user.getIdToken()
       socket = io(API_URL, {
         auth: { token },
         transports: ['websocket'],
@@ -121,39 +295,44 @@ export default function ChatScreen() {
         socket?.emit('join_chat', chatId)
       })
 
-      socket.on('new_message', (data: { chatId: string; message: Message }) => {
-        if (data.chatId === chatId) {
-          setMessages((prev) => {
-            if (prev.some((m) => m._id === data.message._id)) return prev
-            return [...prev, data.message]
-          })
-        }
+      socket.on('new_message', (payload: { chatId: string; message: MessageRecord }) => {
+        if (payload.chatId !== chatId) return
+
+        setMessages((prev) => {
+          if (prev.some((message) => message._id === payload.message._id)) {
+            return prev
+          }
+          return [...prev, payload.message]
+        })
       })
 
-      socket.on('user_typing', (data: { chatId: string; displayName: string }) => {
-        if (data.chatId === chatId) {
-          setTypingUser(data.displayName)
-          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-          typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 3000)
-        }
+      socket.on('user_typing', (payload: { chatId: string; displayName: string }) => {
+        if (payload.chatId !== chatId) return
+
+        setTypingUser(payload.displayName)
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+        typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 3000)
       })
 
       socketRef.current = socket
     }
 
-    connectSocket()
+    connectSocket().catch(() => undefined)
 
     return () => {
       if (socket) {
         socket.emit('leave_chat', chatId)
         socket.disconnect()
-        socketRef.current = null
       }
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+      socketRef.current = null
+
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+      }
     }
   }, [chatId])
 
-  const handleSend = async () => {
+  const handleSend = useCallback(async () => {
     const text = inputText.trim()
     if (!text || sending) return
 
@@ -166,130 +345,154 @@ export default function ChatScreen() {
       } else {
         const response = await client.post(`/api/chat/${chatId}/message`, { text })
         if (response.data.ok) {
+          const nextMessage = response.data.data as MessageRecord
           setMessages((prev) => {
-            if (prev.some((m) => m._id === response.data.data._id)) return prev
-            return [...prev, response.data.data]
+            if (prev.some((message) => message._id === nextMessage._id)) {
+              return prev
+            }
+            return [...prev, nextMessage]
           })
         }
       }
-    } catch (error: any) {
-      console.error('[Chat] Error sending message:', error.message)
+    } catch {
+      setInputText(text)
     } finally {
       setSending(false)
     }
-  }
+  }, [chatId, inputText, sending])
 
-  const handleTyping = () => {
+  const handleTyping = useCallback(() => {
     if (socketRef.current?.connected) {
       socketRef.current.emit('typing', chatId)
     }
-  }
+  }, [chatId])
 
-  const getSenderId = (msg: Message): string => {
-    if (typeof msg.senderId === 'object' && msg.senderId?._id) return msg.senderId._id
-    return msg.senderId as string
-  }
+  const getSenderId = useCallback((message: MessageRecord) => {
+    if (typeof message.senderId === 'object' && message.senderId?._id) {
+      return message.senderId._id
+    }
+    return message.senderId
+  }, [])
 
-  const isMyMessage = (msg: Message): boolean => {
-    return getSenderId(msg) === dbUser?._id
-  }
+  const renderMessage = useCallback(
+    ({ item, index }: { item: MessageRecord; index: number }) => {
+      const isMine = getSenderId(item) === dbUser?._id
+      const showDate = index === 0 || !isSameDay(item.createdAt, messages[index - 1]?.createdAt)
 
-  const renderMessage = ({ item, index }: { item: Message; index: number }) => {
-    const isMine = isMyMessage(item)
-    const showDate = index === 0 || !isSameDay(item.createdAt, messages[index - 1]?.createdAt)
-
-    if (item.type === 'trade' && item.tradeData) {
       return (
         <View>
-          {showDate && (
-            <Text style={styles.dateLabel}>{formatDate(item.createdAt)}</Text>
-          )}
-          <TradeCard
-            tradeData={item.tradeData}
-            text={item.text}
-            onViewItem={() =>
-              router.push(`/items/${item.tradeData!.offeredItemId}?viewOnly=true`)
-            }
-          />
-        </View>
-      )
-    }
-
-    if (item.type === 'buy' && item.buyData) {
-      return (
-        <View>
-          {showDate && (
-            <Text style={styles.dateLabel}>{formatDate(item.createdAt)}</Text>
-          )}
-          <BuyCard
-            buyData={item.buyData}
-            text={item.text}
-            onViewItem={() =>
-              router.push(`/items/${item.buyData!.requestedItemId}?viewOnly=true`)
-            }
-          />
-        </View>
-      )
-    }
-
-    return (
-      <View>
-        {showDate && (
-          <Text style={styles.dateLabel}>{formatDate(item.createdAt)}</Text>
-        )}
-        <View style={[styles.msgRow, isMine ? styles.msgRowMine : styles.msgRowTheirs]}>
-          <View
-            style={[
-              styles.bubble,
-              isMine ? styles.bubbleMine : styles.bubbleTheirs,
-            ]}
-          >
-            <Text style={[styles.bubbleText, isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs]}>
-              {item.text}
+          {showDate ? (
+            <Text className="my-3 text-center font-sans text-xs text-ink-dark/35">
+              {formatDate(item.createdAt)}
             </Text>
-          </View>
-          <Text style={styles.timeLabel}>{formatTime(item.createdAt)}</Text>
+          ) : null}
+
+          {item.type === 'trade' && item.tradeData ? (
+            <TradeMessageCard
+              tradeData={item.tradeData}
+              onViewRequested={() => router.push(`/items/${item.tradeData?.requestedItemId}`)}
+            />
+          ) : item.type === 'buy' && item.buyData ? (
+            <BuyMessageCard
+              buyData={item.buyData}
+              onViewRequested={() => router.push(`/items/${item.buyData?.requestedItemId}`)}
+            />
+          ) : item.type === 'trade_update' && item.statusData ? (
+            <TradeStatusTicket
+              statusData={item.statusData}
+              onOpenDesk={() => router.push('/(tabs)/trades')}
+            />
+          ) : (
+            <View className={`mb-1 px-4 ${isMine ? 'items-end' : 'items-start'}`}>
+              <View
+                className={`max-w-[82%] rounded-[22px] px-4 py-3 ${isMine ? 'bg-brand-accent-deep' : 'border border-ink-dark/8 bg-white'}`}
+              >
+                <Text
+                  className={`font-sans text-[15px] leading-6 ${isMine ? 'text-base-canvas' : 'text-ink-dark'}`}
+                >
+                  {item.text}
+                </Text>
+              </View>
+              <Text className="mt-1 px-1 font-sans text-[10px] text-ink-dark/30">
+                {formatTime(item.createdAt)}
+              </Text>
+            </View>
+          )}
         </View>
-      </View>
-    )
-  }
+      )
+    },
+    [dbUser?._id, getSenderId, messages, router]
+  )
 
   if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#431A43" />
-      </View>
-    )
+    return <ChatSkeleton />
   }
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      className="flex-1 bg-base-canvas"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color="#2B2A2B" />
+      <BrandBackground />
+      <View className="flex-row items-center border-b border-ink-dark/8 px-4 pb-4 pt-14">
+        <TouchableOpacity
+          onPress={() => router.back()}
+          className="mr-3 h-11 w-11 items-center justify-center rounded-full bg-white"
+        >
+          <Ionicons name="arrow-back" size={22} color={colors.inkDark} />
         </TouchableOpacity>
 
         {otherUser?.photoURL ? (
-          <Image source={{ uri: otherUser.photoURL }} style={styles.headerAvatar} />
+          <RemoteImage
+            uri={otherUser.photoURL}
+            className="h-12 w-12 rounded-full"
+            fallback={
+              <View className="h-full w-full items-center justify-center rounded-full bg-brand-accent-light/35">
+                <Text className="font-display text-2xl text-brand-accent-deep">
+                  {getDisplayName(otherUser).charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            }
+          />
         ) : (
-          <View style={[styles.headerAvatar, styles.headerAvatarPlaceholder]}>
-            <Text style={styles.headerAvatarText}>
+          <View className="h-12 w-12 items-center justify-center rounded-full bg-brand-accent-light/35">
+            <Text className="font-display text-2xl text-brand-accent-deep">
               {getDisplayName(otherUser).charAt(0).toUpperCase()}
             </Text>
           </View>
         )}
 
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerName}>{getDisplayName(otherUser)}</Text>
-          {typingUser && <Text style={styles.typingText}>piše...</Text>}
+        <View className="ml-3 flex-1">
+          <BrandWordmark width={90} />
+          <Text className="font-display text-3xl text-ink-dark">{getDisplayName(otherUser)}</Text>
+          <Text className="font-sans text-xs text-ink-dark/55">
+            {typingUser
+              ? t('chat.typeStatus', { name: typingUser })
+              : tradeStatus
+                ? t('chat.tradeStatusLabel', { status: tradeStatus })
+                : t('chat.directConversation')}
+          </Text>
         </View>
+
+        <TouchableOpacity
+          onPress={() => router.push('/(tabs)/trades')}
+          className="h-11 w-11 items-center justify-center rounded-full bg-white"
+        >
+          <Ionicons name="swap-horizontal" size={20} color={colors.accentDeep} />
+        </TouchableOpacity>
       </View>
 
-      {/* Messages */}
+      {tradeStatus ? (
+        <View className="mx-4 mt-4 rounded-[22px] border border-brand-accent-deep/10 bg-white px-4 py-4">
+          <Text className="font-sans text-[11px] uppercase tracking-[1.1px] text-ink-dark/45">
+            {t('chat.lifecycle')}
+          </Text>
+          <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/70">
+            {t('chat.tradeStatusPanel', { status: tradeStatus })}
+          </Text>
+        </View>
+      ) : null}
+
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -299,312 +502,45 @@ export default function ChatScreen() {
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
         onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="chatbubble-outline" size={48} color="#2B2A2B" style={{ opacity: 0.15 }} />
-            <Text style={styles.emptyText}>Započni razgovor</Text>
+          <View className="items-center justify-center px-6 py-20">
+            <Ionicons
+              name="chatbubble-outline"
+              size={48}
+              color={colors.inkDark}
+              style={{ opacity: 0.15 }}
+            />
+            <Text className="mt-4 font-sans text-sm text-ink-dark/45">
+              {t('chat.threadEmpty')}
+            </Text>
           </View>
         }
       />
 
-      {/* Input */}
-      <View style={styles.inputRow}>
+      <View className="flex-row items-end border-t border-ink-dark/8 px-4 py-3">
         <TextInput
-          style={styles.input}
-          placeholder="Napiši poruku..."
-          placeholderTextColor="#2B2A2B50"
           value={inputText}
-          onChangeText={(text) => { setInputText(text); handleTyping() }}
+          onChangeText={(text) => {
+            setInputText(text)
+            handleTyping()
+          }}
+          placeholder={t('chat.placeholder')}
+          placeholderTextColor={colors.mutedText}
           multiline
           maxLength={1000}
+          className="max-h-[120px] flex-1 rounded-[24px] border border-ink-dark/10 bg-white px-4 py-3 font-sans text-[15px] leading-6 text-ink-dark"
         />
         <TouchableOpacity
           onPress={handleSend}
           disabled={!inputText.trim() || sending}
-          style={[styles.sendBtn, inputText.trim() && !sending ? styles.sendBtnActive : styles.sendBtnDisabled]}
+          className={`ml-3 h-12 w-12 items-center justify-center rounded-full ${inputText.trim() && !sending ? 'bg-brand-accent-deep' : 'bg-ink-dark/10'}`}
         >
           <Ionicons
             name="send"
-            size={20}
-            color={inputText.trim() && !sending ? '#F6F8ED' : '#2B2A2B50'}
+            size={18}
+            color={inputText.trim() && !sending ? colors.baseCanvas : colors.mutedText}
           />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   )
-}
-
-function TradeCard({
-  tradeData,
-  text,
-  onViewItem,
-}: {
-  tradeData: TradeData
-  text: string
-  onViewItem: () => void
-}) {
-  return (
-    <View style={styles.tradeCard}>
-      <Text style={styles.tradeCardTitle}>Predlog razmene</Text>
-
-      {/* Two items side by side */}
-      <View style={styles.tradeItems}>
-        {/* Offered item (sender's) */}
-        <View style={styles.tradeItem}>
-          <Image
-            source={{ uri: tradeData.offeredItemImage || '' }}
-            style={styles.tradeItemImage}
-            resizeMode="cover"
-          />
-          <Text style={styles.tradeItemLabel} numberOfLines={2}>
-            {tradeData.offeredItemTitle}
-          </Text>
-          <Text style={styles.tradeItemRole}>Nudi</Text>
-        </View>
-
-        {/* Arrow */}
-        <View style={styles.tradeArrow}>
-          <Ionicons name="swap-horizontal" size={24} color="#431A43" />
-        </View>
-
-        {/* Requested item (receiver's) */}
-        <View style={styles.tradeItem}>
-          <Image
-            source={{ uri: tradeData.requestedItemImage || '' }}
-            style={styles.tradeItemImage}
-            resizeMode="cover"
-          />
-          <Text style={styles.tradeItemLabel} numberOfLines={2}>
-            {tradeData.requestedItemTitle}
-          </Text>
-          <Text style={styles.tradeItemRole}>Za tvoj</Text>
-        </View>
-      </View>
-
-      {/* View button */}
-      <TouchableOpacity style={styles.tradeViewBtn} onPress={onViewItem} activeOpacity={0.8}>
-        <Text style={styles.tradeViewBtnText}>Vidi predloženi predmet</Text>
-        <Ionicons name="arrow-forward" size={16} color="#431A43" />
-      </TouchableOpacity>
-    </View>
-  )
-}
-
-function BuyCard({
-  buyData,
-  text,
-  onViewItem,
-}: {
-  buyData: BuyData
-  text: string
-  onViewItem: () => void
-}) {
-  return (
-    <View style={styles.buyCard}>
-      <Text style={styles.buyCardTitle}>Zahtev za kupovinu</Text>
-
-      <View style={styles.buyItemRow}>
-        <Image
-          source={{ uri: buyData.requestedItemImage || '' }}
-          style={styles.buyItemImage}
-          resizeMode="cover"
-        />
-        <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={styles.buyItemLabel} numberOfLines={2}>
-            {buyData.requestedItemTitle}
-          </Text>
-          <Text style={styles.buyItemSubtext}>želi da kupi ovaj item</Text>
-        </View>
-      </View>
-
-      <TouchableOpacity style={styles.tradeViewBtn} onPress={onViewItem} activeOpacity={0.8}>
-        <Text style={styles.tradeViewBtnText}>Vidi item</Text>
-        <Ionicons name="arrow-forward" size={16} color="#431A43" />
-      </TouchableOpacity>
-    </View>
-  )
-}
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F6F8ED' },
-  centered: { flex: 1, backgroundColor: '#F6F8ED', justifyContent: 'center', alignItems: 'center' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 56,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(43,42,43,0.05)',
-    backgroundColor: '#F6F8ED',
-  },
-  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', marginRight: 4 },
-  headerAvatar: { width: 40, height: 40, borderRadius: 20, marginRight: 12 },
-  headerAvatarPlaceholder: { backgroundColor: '#9DD3E4', justifyContent: 'center', alignItems: 'center' },
-  headerAvatarText: { fontFamily: 'AlteHaasGrotesk-Bold', fontSize: 18, color: '#431A43' },
-  headerName: { fontFamily: 'Inter', fontSize: 15, fontWeight: '700', color: '#2B2A2B' },
-  typingText: { fontFamily: 'Inter', fontSize: 12, color: '#431A43' },
-  dateLabel: {
-    fontFamily: 'Inter',
-    fontSize: 11,
-    color: 'rgba(43,42,43,0.4)',
-    textAlign: 'center',
-    marginVertical: 12,
-  },
-  msgRow: { paddingHorizontal: 16, marginBottom: 4 },
-  msgRowMine: { alignItems: 'flex-end' },
-  msgRowTheirs: { alignItems: 'flex-start' },
-  bubble: { maxWidth: '80%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
-  bubbleMine: { backgroundColor: '#431A43', borderBottomRightRadius: 4 },
-  bubbleTheirs: { backgroundColor: 'white', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: 'rgba(43,42,43,0.08)' },
-  bubbleText: { fontFamily: 'Inter', fontSize: 15, lineHeight: 21 },
-  bubbleTextMine: { color: '#F6F8ED' },
-  bubbleTextTheirs: { color: '#2B2A2B' },
-  timeLabel: { fontFamily: 'Inter', fontSize: 10, color: 'rgba(43,42,43,0.3)', marginTop: 2, paddingHorizontal: 4 },
-  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
-  emptyText: { fontFamily: 'Inter', fontSize: 13, color: 'rgba(43,42,43,0.4)', marginTop: 12 },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(43,42,43,0.05)',
-    backgroundColor: '#F6F8ED',
-  },
-  input: {
-    flex: 1,
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: 'rgba(43,42,43,0.15)',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontFamily: 'Inter',
-    fontSize: 15,
-    color: '#2B2A2B',
-    maxHeight: 120,
-  },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, marginLeft: 10, justifyContent: 'center', alignItems: 'center' },
-  sendBtnActive: { backgroundColor: '#431A43' },
-  sendBtnDisabled: { backgroundColor: 'rgba(43,42,43,0.1)' },
-  // Trade card
-  tradeCard: {
-    marginHorizontal: 16,
-    marginVertical: 8,
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(67,26,67,0.15)',
-  },
-  tradeCardTitle: {
-    fontFamily: 'AlteHaasGrotesk-Bold',
-    fontSize: 15,
-    color: '#431A43',
-    marginBottom: 14,
-    textAlign: 'center',
-  },
-  tradeItems: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  tradeItem: { flex: 1, alignItems: 'center' },
-  tradeItemImage: {
-    width: '100%',
-    aspectRatio: 1,
-    borderRadius: 12,
-    backgroundColor: '#E8F7FB',
-    marginBottom: 6,
-  },
-  tradeItemLabel: {
-    fontFamily: 'Inter',
-    fontSize: 12,
-    color: '#2B2A2B',
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-  tradeItemRole: {
-    fontFamily: 'Inter',
-    fontSize: 10,
-    color: 'rgba(43,42,43,0.5)',
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  tradeArrow: { paddingHorizontal: 10 },
-  tradeViewBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(67,26,67,0.06)',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    gap: 6,
-  },
-  tradeViewBtnText: {
-    fontFamily: 'Inter',
-    fontSize: 13,
-    color: '#431A43',
-    fontWeight: '700',
-  },
-  // Buy card
-  buyCard: {
-    marginHorizontal: 16,
-    marginVertical: 8,
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(203,218,99,0.4)',
-  },
-  buyCardTitle: {
-    fontFamily: 'AlteHaasGrotesk-Bold',
-    fontSize: 15,
-    color: '#2B2A2B',
-    marginBottom: 14,
-    textAlign: 'center',
-  },
-  buyItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  buyItemImage: {
-    width: 72,
-    height: 72,
-    borderRadius: 12,
-    backgroundColor: '#E8F7FB',
-  },
-  buyItemLabel: {
-    fontFamily: 'Inter',
-    fontSize: 14,
-    color: '#2B2A2B',
-    fontWeight: '600',
-    lineHeight: 19,
-  },
-  buyItemSubtext: {
-    fontFamily: 'Inter',
-    fontSize: 12,
-    color: 'rgba(43,42,43,0.5)',
-    marginTop: 4,
-  },
-})
-
-function formatTime(dateStr: string) {
-  return new Date(dateStr).toLocaleTimeString('sr-Latn', { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatDate(dateStr: string) {
-  const date = new Date(dateStr)
-  const diffDays = Math.floor((Date.now() - date.getTime()) / 86400000)
-  if (diffDays === 0) return 'Danas'
-  if (diffDays === 1) return 'Juče'
-  return date.toLocaleDateString('sr-Latn', { day: 'numeric', month: 'long' })
-}
-
-function isSameDay(a: string, b: string) {
-  if (!a || !b) return false
-  return new Date(a).toDateString() === new Date(b).toDateString()
 }

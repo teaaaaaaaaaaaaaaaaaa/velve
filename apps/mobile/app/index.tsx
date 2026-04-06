@@ -1,7 +1,12 @@
 import { useEffect } from 'react'
-import { View, ActivityIndicator, Text, TouchableOpacity } from 'react-native'
+import { View, Text, TouchableOpacity } from 'react-native'
 import { useRouter, useSegments } from 'expo-router'
+
+import { BrandBackground } from '@/components/BrandBackground'
+import { BrandedLoader } from '@/components/BrandedLoader'
+import { GlassSurface } from '@/components/GlassSurface'
 import { useAuth } from '@/hooks/useAuth'
+import { useI18n } from '@/i18n'
 
 export default function Index() {
   const {
@@ -14,6 +19,31 @@ export default function Index() {
   } = useAuth()
   const router = useRouter()
   const segments = useSegments()
+  const { locale } = useI18n()
+
+  const copy = {
+    sr: {
+      profileLoadTitle: 'Ne mozemo da ucitamo profil',
+      profileLoadDescription: 'Firebase prijava je prosla, ali backend profil nije stigao.',
+      retry: 'Pokusaj ponovo',
+      logout: 'Odjavi se',
+      loading: 'Velve proverava tvoj ulaz u aplikaciju',
+    },
+    en: {
+      profileLoadTitle: 'We could not load the profile',
+      profileLoadDescription: 'Firebase sign-in worked, but the backend profile did not arrive.',
+      retry: 'Try again',
+      logout: 'Log out',
+      loading: 'Velve is checking your app entry',
+    },
+    ru: {
+      profileLoadTitle: 'Не удается загрузить профиль',
+      profileLoadDescription: 'Вход через Firebase прошел, но backend-профиль не загрузился.',
+      retry: 'Попробовать снова',
+      logout: 'Выйти',
+      loading: 'Velve проверяет твой вход в приложение',
+    },
+  } as const
 
   useEffect(() => {
     if (authLoading) return
@@ -43,41 +73,39 @@ export default function Index() {
 
   if (!authLoading && currentUser && !dbUser && profileError) {
     return (
-      <View className="flex-1 items-center justify-center bg-base-canvas px-6">
-        <Text className="mb-3 text-center font-display text-2xl text-ink-dark">
-          Ne mozemo da ucitamo profil
-        </Text>
-        <Text className="mb-6 text-center font-sans text-sm text-ink-dark/70">
-          Firebase prijava je prosla, ali backend profil nije stigao.
-        </Text>
-        <Text className="mb-8 text-center font-mono text-xs text-ink-dark/60">
-          {String(profileError)}
-        </Text>
+      <View className="flex-1 bg-base-canvas px-gutter pt-20">
+        <BrandBackground />
 
-        <TouchableOpacity
-          className="mb-3 w-full items-center rounded-full bg-brand-accent-deep px-6 py-4"
-          onPress={refreshDbUser}
-        >
-          <Text className="font-sans text-base font-semibold text-base-canvas">
-            Pokusaj ponovo
+        <GlassSurface className="px-6 py-6">
+          <Text className="text-center font-display text-3xl text-ink-dark">
+            {copy[locale].profileLoadTitle}
           </Text>
-        </TouchableOpacity>
+          <Text className="mt-3 text-center font-sans text-sm leading-6 text-ink-dark/68">
+            {copy[locale].profileLoadDescription}
+          </Text>
+          <Text className="mt-5 text-center font-mono text-xs text-ink-dark/58">
+            {String(profileError)}
+          </Text>
 
-        <TouchableOpacity
-          className="w-full items-center rounded-full border border-ink-dark px-6 py-4"
-          onPress={logout}
-        >
-          <Text className="font-sans text-base text-ink-dark">
-            Odjavi se
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            className="mt-6 items-center rounded-pill bg-brand-accent-deep px-6 py-4"
+            onPress={refreshDbUser}
+          >
+            <Text className="font-sans text-base font-semibold text-base-canvas">
+              {copy[locale].retry}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className="mt-3 items-center rounded-pill border border-brand-accent-deep/12 bg-base-canvas/72 px-6 py-4"
+            onPress={logout}
+          >
+            <Text className="font-sans text-base text-ink-dark">{copy[locale].logout}</Text>
+          </TouchableOpacity>
+        </GlassSurface>
       </View>
     )
   }
 
-  return (
-    <View className="flex-1 items-center justify-center bg-base-canvas">
-      <ActivityIndicator size="large" color="#431A43" />
-    </View>
-  )
+  return <BrandedLoader label={copy[locale].loading} />
 }

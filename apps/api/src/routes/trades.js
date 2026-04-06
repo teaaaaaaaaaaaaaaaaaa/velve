@@ -5,21 +5,277 @@ const { requireAuth } = require('../middleware/auth')
 const TradeRequest = require('../models/TradeRequest')
 const Item = require('../models/Item')
 const Chat = require('../models/Chat')
+const Message = require('../models/Message')
 const { sendPushToUser } = require('../lib/pushNotifications')
+
+const TRADE_EXPIRY_HOURS = Math.max(Number(process.env.TRADE_EXPIRY_HOURS) || 72, 1)
+const FINAL_ITEM_STATUSES = new Set(['sold', 'swapped', 'archived', 'traded'])
+
+function getTradeExpiryDate(fromDate = new Date()) {
+  return new Date(new Date(fromDate).getTime() + TRADE_EXPIRY_HOURS * 60 * 60 * 1000)
+}
+
+function isPendingTradeExpired(trade) {
+  return trade.status === 'pending' && trade.expiresAt && new Date(trade.expiresAt).getTime() <= Date.now()
+}
+
+function getTradeRole(trade, userId) {
+  return String(trade.senderId?._id || trade.senderId) === String(userId) ? 'sender' : 'receiver'
+}
+
+function getTradeKind(trade) {
+  if (trade.type) return trade.type
+  return trade.offeredItemId ? 'trade' : 'buy'
+}
+
+function getLifecycleBucket(trade) {
+  if (trade.completedAt) return 'history'
+  if (trade.status === 'accepted') return 'active'
+  if (trade.status === 'pending') return 'pending'
+  return 'history'
+}
+
+async function findTradeChat(trade) {
+  return Chat.findOne({
+    participants: { $all: [trade.senderId, trade.receiverId], $size: 2 },
+  })
+}
+
+async function appendTradeStatusMessage(trade, actorId, status, label) {
+  const chat = await findTradeChat(trade)
+  if (!chat) return null
+
+  const message = await Message.create({
+    chatId: chat._id,
+    senderId: actorId,
+    text: label,
+    type: 'trade_update',
+    statusData: {
+      tradeRequestId: trade._id,
+      status,
+      label,
+    },
+  })
+
+  await Chat.findByIdAndUpdate(chat._id, { lastMessageAt: message.createdAt })
+  return chat
+}
+
+async function syncItemTradeAvailability(itemIds = []) {
+  const normalizedItemIds = [
+    ...new Set(itemIds.filter(Boolean).map((itemId) => String(itemId))),
+  ].filter((itemId) => mongoose.Types.ObjectId.isValid(itemId))
+
+  if (normalizedItemIds.length === 0) return
+
+  const objectIds = normalizedItemIds.map((itemId) => new mongoose.Types.ObjectId(itemId))
+  const [items, acceptedTrades] = await Promise.all([
+    Item.find({ _id: { $in: objectIds } }).select('_id status isDeleted').lean(),
+    TradeRequest.find({
+      status: 'accepted',
+      completedAt: { $exists: false },
+      $or: [
+        { offeredItemId: { $in: objectIds } },
+        { requestedItemId: { $in: objectIds } },
+      ],
+    })
+      .select('offeredItemId requestedItemId')
+      .lean(),
+  ])
+
+  const lockedItemIds = new Set()
+  for (const trade of acceptedTrades) {
+    if (trade.offeredItemId) lockedItemIds.add(String(trade.offeredItemId))
+    if (trade.requestedItemId) lockedItemIds.add(String(trade.requestedItemId))
+  }
+
+  const updates = []
+  for (const item of items) {
+    if (!item || item.isDeleted || FINAL_ITEM_STATUSES.has(item.status)) {
+      continue
+    }
+
+    const itemId = String(item._id)
+    if (lockedItemIds.has(itemId) && item.status !== 'pending_trade') {
+      updates.push(
+        Item.findByIdAndUpdate(item._id, {
+          status: 'pending_trade',
+          unavailableReason: '',
+        })
+      )
+      continue
+    }
+
+    if (!lockedItemIds.has(itemId) && item.status === 'pending_trade') {
+      updates.push(
+        Item.findByIdAndUpdate(item._id, {
+          status: 'available',
+        })
+      )
+    }
+  }
+
+  if (updates.length > 0) {
+    await Promise.all(updates)
+  }
+}
+
+async function expirePendingTrades(baseQuery = {}) {
+  const now = new Date()
+  const expiringTrades = await TradeRequest.find({
+    ...baseQuery,
+    status: 'pending',
+    expiresAt: { $lte: now },
+  }).lean()
+
+  if (expiringTrades.length === 0) {
+    return []
+  }
+
+  const expiringIds = expiringTrades.map((trade) => trade._id)
+  await TradeRequest.updateMany(
+    { _id: { $in: expiringIds }, status: 'pending' },
+    {
+      status: 'expired',
+      expiredAt: now,
+      respondedAt: now,
+    }
+  )
+
+  for (const trade of expiringTrades) {
+    const chat = await appendTradeStatusMessage(
+      trade,
+      trade.receiverId,
+      'expired',
+      'Zahtev je istekao bez odgovora.'
+    )
+
+    sendPushToUser(trade.senderId, {
+      title: 'Zahtev je istekao',
+      body: 'Trade zahtev nije dobio odgovor na vreme.',
+      data: {
+        type: 'trade_expired',
+        tradeId: String(trade._id),
+        chatId: chat?._id ? String(chat._id) : '',
+      },
+    })
+  }
+
+  return expiringIds
+}
+
+function serializeTrade(trade, viewerId) {
+  const userRole = getTradeRole(trade, viewerId)
+  const counterpart = userRole === 'sender' ? trade.receiverId : trade.senderId
+  const kind = getTradeKind(trade)
+  const bucket = getLifecycleBucket(trade)
+  const isCompleted = Boolean(trade.completedAt)
+  const canRate =
+    isCompleted &&
+    ((userRole === 'sender' && !trade.senderRating) ||
+      (userRole === 'receiver' && !trade.receiverRating))
+
+  return {
+    ...trade,
+    kind,
+    userRole,
+    counterpart,
+    bucket,
+    isCompleted,
+    canAccept: userRole === 'receiver' && trade.status === 'pending',
+    canReject: userRole === 'receiver' && trade.status === 'pending',
+    canCancel:
+      ['pending', 'accepted'].includes(trade.status) &&
+      !trade.completedAt &&
+      ((userRole === 'sender' && trade.status === 'pending') ||
+        (userRole === 'receiver' && trade.status === 'accepted') ||
+        (userRole === 'sender' && trade.status === 'accepted')),
+    canComplete: trade.status === 'accepted' && !trade.completedAt,
+    canRate,
+  }
+}
+
+function matchesTradeFilters(trade, { bucket, role, status }) {
+  if (status && trade.status !== status) return false
+  if (role && trade.userRole !== role) return false
+  if (bucket && trade.bucket !== bucket) return false
+  return true
+}
+
+async function updateUserRating(userId) {
+  try {
+    const User = require('../models/User')
+
+    const trades = await TradeRequest.find({
+      $or: [{ senderId: userId }, { receiverId: userId }],
+      status: 'accepted',
+      completedAt: { $exists: true },
+    })
+
+    const ratings = []
+    for (const trade of trades) {
+      if (trade.senderId.equals(userId) && trade.receiverRating) {
+        ratings.push(trade.receiverRating)
+      }
+      if (trade.receiverId.equals(userId) && trade.senderRating) {
+        ratings.push(trade.senderRating)
+      }
+    }
+
+    const avgRating =
+      ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0
+
+    await User.findByIdAndUpdate(userId, {
+      averageRating: Math.round(avgRating * 10) / 10,
+      totalRatings: ratings.length,
+      completedTrades: trades.length,
+    })
+  } catch (err) {
+    console.error(`Failed to update user rating for ${userId}:`, err.message)
+  }
+}
+
+async function buildTradeQueryPayload(req) {
+  await expirePendingTrades({
+    $or: [{ senderId: req.dbUser._id }, { receiverId: req.dbUser._id }],
+  })
+
+  const trades = await TradeRequest.find({
+    $or: [{ senderId: req.dbUser._id }, { receiverId: req.dbUser._id }],
+  })
+    .sort({ updatedAt: -1, _id: -1 })
+    .populate('senderId', 'displayName photoURL averageRating completedTrades')
+    .populate('receiverId', 'displayName photoURL averageRating completedTrades')
+    .populate('offeredItemId', 'title images status listingType')
+    .populate('requestedItemId', 'title images status listingType')
+    .lean()
+
+  return trades
+    .map((trade) => serializeTrade(trade, req.dbUser._id))
+    .filter((trade) =>
+      matchesTradeFilters(trade, {
+        bucket: req.query.bucket,
+        role: req.query.role,
+        status: req.query.status,
+      })
+    )
+}
 
 // GET /api/trades — lista trade requestova korisnika (sent + received)
 router.get('/', requireAuth, async (req, res) => {
   try {
-    const trades = await TradeRequest.find({
-      $or: [{ senderId: req.dbUser._id }, { receiverId: req.dbUser._id }],
-    })
-      .sort({ _id: -1 })
-      .populate('senderId', 'displayName photoURL')
-      .populate('receiverId', 'displayName photoURL')
-      .populate('offeredItemId', 'title images')
-      .populate('requestedItemId', 'title images')
-      .lean()
+    const trades = await buildTradeQueryPayload(req)
+    res.json({ ok: true, data: trades })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
 
+// GET /api/trades/history — Get completed/finalized trades with ratings
+router.get('/history', requireAuth, async (req, res) => {
+  try {
+    req.query.bucket = 'history'
+    const trades = await buildTradeQueryPayload(req)
     res.json({ ok: true, data: trades })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -30,41 +286,57 @@ router.get('/', requireAuth, async (req, res) => {
 router.post('/', requireAuth, async (req, res) => {
   try {
     const { offeredItemId, requestedItemId, message } = req.body
+    const isBuyRequest = !offeredItemId
 
-    if (!offeredItemId || !requestedItemId) {
-      return res.status(400).json({ error: 'offeredItemId and requestedItemId are required' })
+    if (!requestedItemId) {
+      return res.status(400).json({ error: 'requestedItemId is required' })
     }
 
-    // Validate ObjectIds
-    if (!mongoose.Types.ObjectId.isValid(offeredItemId)) {
+    if (!isBuyRequest && !mongoose.Types.ObjectId.isValid(offeredItemId)) {
       return res.status(400).json({ error: 'Invalid offeredItemId' })
     }
     if (!mongoose.Types.ObjectId.isValid(requestedItemId)) {
       return res.status(400).json({ error: 'Invalid requestedItemId' })
     }
 
-    // Validate items exist
     const [offeredItem, requestedItem] = await Promise.all([
-      Item.findById(offeredItemId),
+      isBuyRequest ? Promise.resolve(null) : Item.findById(offeredItemId),
       Item.findById(requestedItemId),
     ])
 
-    if (!offeredItem) return res.status(404).json({ error: 'Offered item not found' })
-    if (!requestedItem) return res.status(404).json({ error: 'Requested item not found' })
+    if (!isBuyRequest && !offeredItem) {
+      return res.status(404).json({ error: 'Offered item not found' })
+    }
+    if (!requestedItem) {
+      return res.status(404).json({ error: 'Requested item not found' })
+    }
 
-    // Sender must own the offered item
-    if (!offeredItem.userId.equals(req.dbUser._id)) {
+    if (!isBuyRequest && !offeredItem.userId.equals(req.dbUser._id)) {
       return res.status(403).json({ error: 'You can only offer your own items' })
     }
 
-    // Cannot trade with yourself
     if (requestedItem.userId.equals(req.dbUser._id)) {
       return res.status(400).json({ error: 'Cannot trade with yourself' })
     }
 
-    const receiverId = requestedItem.userId
+    if (requestedItem.status !== 'available') {
+      return res.status(400).json({ error: 'Requested item is not currently available' })
+    }
 
-    // Check for existing pending trade for this item
+    if (!isBuyRequest && offeredItem.status !== 'available') {
+      return res.status(400).json({ error: 'Offered item is not currently available' })
+    }
+
+    if (isBuyRequest && !['sell', 'both'].includes(requestedItem.listingType)) {
+      return res.status(400).json({ error: 'This item is not available for purchase' })
+    }
+
+    const receiverId = requestedItem.userId
+    await expirePendingTrades({
+      senderId: req.dbUser._id,
+      requestedItemId,
+    })
+
     const existingTrade = await TradeRequest.findOne({
       senderId: req.dbUser._id,
       requestedItemId,
@@ -72,26 +344,26 @@ router.post('/', requireAuth, async (req, res) => {
     })
 
     if (existingTrade) {
-      // Vrati postojeći chat ako postoji
       const existingChat = await Chat.findOne({
         participants: { $all: [req.dbUser._id, receiverId], $size: 2 },
       })
       if (existingChat) {
         return res.json({ ok: true, data: { trade: existingTrade, chatId: existingChat._id } })
       }
+
       return res.status(400).json({ error: 'You already have a pending trade request for this item' })
     }
 
-    // Create trade request
     const trade = await TradeRequest.create({
       senderId: req.dbUser._id,
       receiverId,
-      offeredItemId,
+      type: isBuyRequest ? 'buy' : 'trade',
+      ...(offeredItem ? { offeredItemId: offeredItem._id } : {}),
       requestedItemId,
       message: (message || '').slice(0, 300),
+      expiresAt: getTradeExpiryDate(),
     })
 
-    // Reuse existing chat between these two users, or create new one
     let chat = await Chat.findOne({
       participants: { $all: [req.dbUser._id, receiverId], $size: 2 },
     })
@@ -102,24 +374,18 @@ router.post('/', requireAuth, async (req, res) => {
         tradeRequestId: trade._id,
       })
     } else {
-      // Update tradeRequestId to latest trade
       await Chat.findByIdAndUpdate(chat._id, { tradeRequestId: trade._id })
     }
 
-    // Send automatic trade card message
-    const Message = require('../models/Message')
     const senderName = req.dbUser.displayName || 'Korisnik'
-
-    // Ako je requestedItem listingType 'sell' — ovo je kupovina, ne razmena
-    const isBuyRequest = requestedItem.listingType === 'sell'
 
     if (isBuyRequest) {
       await Message.create({
         chatId: chat._id,
         senderId: req.dbUser._id,
         type: 'buy',
-        text: `${senderName} želi da kupi "${requestedItem.title}"`,
-        tradeData: {
+        text: `${senderName} zeli da kupi "${requestedItem.title}"`,
+        buyData: {
           requestedItemId: requestedItem._id,
           requestedItemTitle: requestedItem.title,
           requestedItemImage: requestedItem.images[0] || '',
@@ -130,7 +396,7 @@ router.post('/', requireAuth, async (req, res) => {
         chatId: chat._id,
         senderId: req.dbUser._id,
         type: 'trade',
-        text: `${senderName} želi da zameni "${offeredItem.title}" za "${requestedItem.title}"`,
+        text: `${senderName} zeli da zameni "${offeredItem.title}" za "${requestedItem.title}"`,
         tradeData: {
           offeredItemId: offeredItem._id,
           offeredItemTitle: offeredItem.title,
@@ -144,15 +410,18 @@ router.post('/', requireAuth, async (req, res) => {
 
     await Chat.findByIdAndUpdate(chat._id, { lastMessageAt: new Date() })
 
-    // Push notification to receiver
     const pushBody = isBuyRequest
-      ? `${senderName} želi da kupi "${requestedItem.title}"`
-      : `${senderName} želi da zameni "${offeredItem.title}" za tvoj predmet`
+      ? `${senderName} zeli da kupi "${requestedItem.title}"`
+      : `${senderName} zeli da zameni "${offeredItem.title}" za tvoj predmet`
 
     sendPushToUser(receiverId, {
-      title: isBuyRequest ? 'Novi zahtev za kupovinu!' : 'Novi zahtev za razmenu!',
+      title: isBuyRequest ? 'Novi zahtev za kupovinu' : 'Novi zahtev za razmenu',
       body: pushBody,
-      data: { type: 'trade_request', tradeId: trade._id.toString(), chatId: chat._id.toString() },
+      data: {
+        type: 'trade_request',
+        tradeId: trade._id.toString(),
+        chatId: chat._id.toString(),
+      },
     })
 
     res.status(201).json({ ok: true, data: { trade, chatId: chat._id } })
@@ -173,44 +442,132 @@ router.put('/:id', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'status must be "accepted" or "rejected"' })
     }
 
-    // First fetch to validate receiver
-    const trade = await TradeRequest.findById(req.params.id)
-    if (!trade) return res.status(404).json({ error: 'Trade request not found' })
+    await expirePendingTrades({ _id: req.params.id })
 
-    // Only the receiver can accept/reject
+    const trade = await TradeRequest.findById(req.params.id)
+    if (!trade) {
+      return res.status(404).json({ error: 'Trade request not found' })
+    }
+
     if (!trade.receiverId.equals(req.dbUser._id)) {
       return res.status(403).json({ error: 'Only the receiver can accept or reject' })
     }
 
-    // Atomic update: only update if status is still 'pending'
-    // This prevents race conditions where two concurrent requests try to accept/reject
-    const updated = await TradeRequest.findOneAndUpdate(
-      { _id: req.params.id, status: 'pending' },
-      { status },
-      { new: true }
-    )
-
-    if (!updated) {
+    if (trade.status !== 'pending') {
       return res.status(400).json({ error: 'Trade already processed' })
     }
 
-    // If accepted, mark both items as traded
-    if (status === 'accepted') {
-      await Promise.all([
-        Item.findByIdAndUpdate(trade.offeredItemId, { status: 'traded' }),
-        Item.findByIdAndUpdate(trade.requestedItemId, { status: 'traded' }),
-      ])
+    const [requestedItem, offeredItem] = await Promise.all([
+      Item.findById(trade.requestedItemId),
+      trade.offeredItemId ? Item.findById(trade.offeredItemId) : Promise.resolve(null),
+    ])
+
+    if (!requestedItem || requestedItem.isDeleted) {
+      return res.status(400).json({ error: 'Requested item is no longer available' })
     }
 
-    // Push notification to sender
-    const action = status === 'accepted' ? 'accepted' : 'declined'
+    if (status === 'accepted') {
+      if (requestedItem.status !== 'available') {
+        return res.status(400).json({ error: 'Requested item is no longer available' })
+      }
+
+      if (offeredItem) {
+        if (offeredItem.isDeleted || !offeredItem.userId.equals(trade.senderId) || offeredItem.status !== 'available') {
+          return res.status(400).json({ error: 'Offered item is no longer available' })
+        }
+      }
+    }
+
+    trade.status = status
+    trade.respondedAt = new Date()
+    if (status === 'accepted') {
+      trade.acceptedAt = new Date()
+    }
+    await trade.save()
+
+    if (status === 'accepted') {
+      await syncItemTradeAvailability([trade.requestedItemId, trade.offeredItemId])
+    }
+
+    const actionLabel =
+      status === 'accepted'
+        ? 'Zahtev je prihvacen i komadi su sada u aktivnom trade toku.'
+        : 'Zahtev je odbijen.'
+
+    const chat = await appendTradeStatusMessage(trade, req.dbUser._id, status, actionLabel)
+
     sendPushToUser(trade.senderId, {
-      title: `Trade ${action}!`,
-      body: `${req.dbUser.displayName || 'Someone'} ${action} your trade request`,
-      data: { type: 'trade_update', tradeId: updated._id.toString(), status },
+      title: status === 'accepted' ? 'Trade prihvacen' : 'Trade odbijen',
+      body:
+        status === 'accepted'
+          ? `${req.dbUser.displayName || 'Korisnik'} je prihvatio tvoj zahtev`
+          : `${req.dbUser.displayName || 'Korisnik'} je odbio tvoj zahtev`,
+      data: {
+        type: 'trade_update',
+        tradeId: trade._id.toString(),
+        status,
+        chatId: chat?._id ? String(chat._id) : '',
+      },
     })
 
-    res.json({ ok: true, data: updated })
+    res.json({ ok: true, data: serializeTrade(trade.toObject(), req.dbUser._id) })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/trades/:id/cancel — cancel a pending or active trade
+router.post('/:id/cancel', requireAuth, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid trade ID' })
+    }
+
+    const trade = await TradeRequest.findById(req.params.id)
+    if (!trade) {
+      return res.status(404).json({ error: 'Trade not found' })
+    }
+
+    const isSender = trade.senderId.equals(req.dbUser._id)
+    const isReceiver = trade.receiverId.equals(req.dbUser._id)
+    if (!isSender && !isReceiver) {
+      return res.status(403).json({ error: 'Not authorized to cancel this trade' })
+    }
+
+    if (!['pending', 'accepted'].includes(trade.status) || trade.completedAt) {
+      return res.status(400).json({ error: 'Only pending or active trades can be cancelled' })
+    }
+
+    trade.status = 'cancelled'
+    trade.cancelledAt = new Date()
+    trade.cancelledBy = isSender ? 'sender' : 'receiver'
+    trade.cancelledReason = String(req.body.reason || '').slice(0, 200)
+    trade.respondedAt = trade.respondedAt || new Date()
+    await trade.save()
+
+    await syncItemTradeAvailability([trade.requestedItemId, trade.offeredItemId])
+
+    const actorName = req.dbUser.displayName || 'Korisnik'
+    const label =
+      trade.status === 'cancelled'
+        ? `${actorName} je otkazao trade zahtev.`
+        : `${actorName} je zatvorio trade zahtev.`
+
+    const chat = await appendTradeStatusMessage(trade, req.dbUser._id, 'cancelled', label)
+    const recipientId = isSender ? trade.receiverId : trade.senderId
+
+    sendPushToUser(recipientId, {
+      title: 'Trade je otkazan',
+      body: `${actorName} je otkazao trade tok`,
+      data: {
+        type: 'trade_cancelled',
+        tradeId: trade._id.toString(),
+        status: 'cancelled',
+        chatId: chat?._id ? String(chat._id) : '',
+      },
+    })
+
+    res.json({ ok: true, data: serializeTrade(trade.toObject(), req.dbUser._id) })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -224,14 +581,14 @@ router.put('/:id/complete', requireAuth, async (req, res) => {
     }
 
     const trade = await TradeRequest.findById(req.params.id)
-    if (!trade) return res.status(404).json({ error: 'Trade not found' })
+    if (!trade) {
+      return res.status(404).json({ error: 'Trade not found' })
+    }
 
-    // Only accepted trades can be completed
     if (trade.status !== 'accepted') {
       return res.status(400).json({ error: 'Only accepted trades can be completed' })
     }
 
-    // Only sender or receiver can mark as complete
     const isSender = trade.senderId.equals(req.dbUser._id)
     const isReceiver = trade.receiverId.equals(req.dbUser._id)
 
@@ -239,17 +596,58 @@ router.put('/:id/complete', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to complete this trade' })
     }
 
-    // If already completed, return
     if (trade.completedAt) {
-      return res.json({ ok: true, data: trade, message: 'Trade already completed' })
+      return res.json({
+        ok: true,
+        data: serializeTrade(trade.toObject(), req.dbUser._id),
+        message: 'Trade already completed',
+      })
     }
 
-    // Mark as completed
     trade.completedAt = new Date()
     trade.completedBy = isSender ? 'sender' : 'receiver'
     await trade.save()
 
-    res.json({ ok: true, data: trade })
+    const requestedItemStatus = trade.offeredItemId ? 'swapped' : 'sold'
+    const requestedItemUpdate = Item.findByIdAndUpdate(trade.requestedItemId, {
+      status: requestedItemStatus,
+      archivedAt: new Date(),
+      archivedReason: requestedItemStatus,
+    })
+
+    const updates = [requestedItemUpdate]
+    if (trade.offeredItemId) {
+      updates.push(
+        Item.findByIdAndUpdate(trade.offeredItemId, {
+          status: 'swapped',
+          archivedAt: new Date(),
+          archivedReason: 'swapped',
+        })
+      )
+    }
+    await Promise.all(updates)
+
+    const actorName = req.dbUser.displayName || 'Korisnik'
+    const chat = await appendTradeStatusMessage(
+      trade,
+      req.dbUser._id,
+      'completed',
+      `${actorName} je oznacio trade kao zavrsen.`
+    )
+
+    const recipientId = isSender ? trade.receiverId : trade.senderId
+    sendPushToUser(recipientId, {
+      title: 'Trade je zavrsen',
+      body: `${actorName} je oznacio trade kao zavrsen`,
+      data: {
+        type: 'trade_complete',
+        tradeId: trade._id.toString(),
+        status: 'completed',
+        chatId: chat?._id ? String(chat._id) : '',
+      },
+    })
+
+    res.json({ ok: true, data: serializeTrade(trade.toObject(), req.dbUser._id) })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -264,20 +662,19 @@ router.post('/:id/rate', requireAuth, async (req, res) => {
 
     const { rating, review } = req.body
 
-    // Validate rating
     if (!rating || typeof rating !== 'number' || rating < 1 || rating > 5) {
       return res.status(400).json({ error: 'Rating must be a number between 1 and 5' })
     }
 
     const trade = await TradeRequest.findById(req.params.id)
-    if (!trade) return res.status(404).json({ error: 'Trade not found' })
+    if (!trade) {
+      return res.status(404).json({ error: 'Trade not found' })
+    }
 
-    // Can only rate completed trades
     if (!trade.completedAt) {
       return res.status(400).json({ error: 'Can only rate completed trades' })
     }
 
-    // Determine if user is sender or receiver
     const isSender = trade.senderId.equals(req.dbUser._id)
     const isReceiver = trade.receiverId.equals(req.dbUser._id)
 
@@ -285,7 +682,6 @@ router.post('/:id/rate', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to rate this trade' })
     }
 
-    // Check if already rated
     if (isSender && trade.senderRating) {
       return res.status(400).json({ error: 'You have already rated this trade' })
     }
@@ -293,7 +689,6 @@ router.post('/:id/rate', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'You have already rated this trade' })
     }
 
-    // Save rating
     if (isSender) {
       trade.senderRating = rating
       trade.senderReview = review ? String(review).slice(0, 300) : ''
@@ -306,80 +701,22 @@ router.post('/:id/rate', requireAuth, async (req, res) => {
 
     await trade.save()
 
-    // Update the rated user's average rating
     const ratedUserId = isSender ? trade.receiverId : trade.senderId
     await updateUserRating(ratedUserId)
 
-    res.json({ ok: true, data: trade })
+    sendPushToUser(ratedUserId, {
+      title: 'Nova ocena',
+      body: `${req.dbUser.displayName || 'Korisnik'} je ostavio ocenu nakon trade-a`,
+      data: {
+        type: 'trade_rating',
+        tradeId: trade._id.toString(),
+      },
+    })
+
+    res.json({ ok: true, data: serializeTrade(trade.toObject(), req.dbUser._id) })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
-
-// GET /api/trades/history — Get completed trades with ratings
-router.get('/history', requireAuth, async (req, res) => {
-  try {
-    const role = req.query.role // 'sender' or 'receiver'
-
-    const query = {
-      completedAt: { $exists: true },
-    }
-
-    if (role === 'sender') {
-      query.senderId = req.dbUser._id
-    } else if (role === 'receiver') {
-      query.receiverId = req.dbUser._id
-    } else {
-      query.$or = [{ senderId: req.dbUser._id }, { receiverId: req.dbUser._id }]
-    }
-
-    const trades = await TradeRequest.find(query)
-      .sort({ completedAt: -1 })
-      .populate('senderId', 'displayName photoURL averageRating')
-      .populate('receiverId', 'displayName photoURL averageRating')
-      .populate('offeredItemId', 'title images')
-      .populate('requestedItemId', 'title images')
-      .lean()
-
-    res.json({ ok: true, data: trades })
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// Helper function to update user's average rating
-async function updateUserRating(userId) {
-  try {
-    const User = require('../models/User')
-
-    const trades = await TradeRequest.find({
-      $or: [{ senderId: userId }, { receiverId: userId }],
-      status: 'accepted',
-      completedAt: { $exists: true },
-    })
-
-    const ratings = []
-    for (const trade of trades) {
-      // If user was sender, get receiver's rating of them
-      if (trade.senderId.equals(userId) && trade.receiverRating) {
-        ratings.push(trade.receiverRating)
-      }
-      // If user was receiver, get sender's rating of them
-      if (trade.receiverId.equals(userId) && trade.senderRating) {
-        ratings.push(trade.senderRating)
-      }
-    }
-
-    const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0
-
-    await User.findByIdAndUpdate(userId, {
-      averageRating: Math.round(avgRating * 10) / 10, // Round to 1 decimal
-      totalRatings: ratings.length,
-      completedTrades: trades.length,
-    })
-  } catch (err) {
-    console.error(`Failed to update user rating for ${userId}:`, err.message)
-  }
-}
 
 module.exports = router

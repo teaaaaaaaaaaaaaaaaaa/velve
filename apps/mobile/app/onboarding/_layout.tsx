@@ -10,7 +10,10 @@ export default function OnboardingLayout() {
     >
       <Stack.Screen name="welcome" />
       <Stack.Screen name="style" />
+      <Stack.Screen name="categories" />
       <Stack.Screen name="brands" />
+      <Stack.Screen name="about" />
+      <Stack.Screen name="success" />
       <Stack.Screen name="sizes" />
       <Stack.Screen name="location" />
     </Stack>

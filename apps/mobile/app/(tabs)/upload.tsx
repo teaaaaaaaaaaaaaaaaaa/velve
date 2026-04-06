@@ -14,6 +14,7 @@ import {
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
 import client from '@/api/client'
+import { useI18n } from '@/i18n'
 
 type Condition = 'new' | 'like_new' | 'good' | 'fair'
 type ListingType = 'trade' | 'sell' | 'both'
@@ -52,6 +53,7 @@ const TRADE_FOR_CHIPS = [
 
 export default function UploadScreen() {
   const router = useRouter()
+  const { locale, t } = useI18n()
 
   // Image state
   const [images, setImages] = useState<string[]>([])
@@ -201,7 +203,7 @@ export default function UploadScreen() {
           size: size || undefined,
           condition,
           color: color || undefined,
-          language: 'sr',
+          language: locale,
         }, { timeout: 60000 })
 
         if (aiRes.data?.ok && aiRes.data?.data) {
@@ -221,6 +223,20 @@ export default function UploadScreen() {
     }
   }
 
+  const ensureUploadedUrls = async (): Promise<string[]> => {
+    if (uploadedUrls.length > 0) {
+      return uploadedUrls
+    }
+
+    if (images.length === 0) {
+      return []
+    }
+
+    const urls = await uploadImages()
+    setUploadedUrls(urls)
+    return urls
+  }
+
   const handleFinalSubmit = async () => {
     if (!title.trim()) {
       Alert.alert('Greska', 'Naslov je obavezan')
@@ -238,31 +254,7 @@ export default function UploadScreen() {
     try {
       setIsSubmitting(true)
 
-      // If images weren't uploaded yet (manual mode), upload now
-      let finalUrls = uploadedUrls
-      if (finalUrls.length === 0 && images.length > 0) {
-        for (const imageUri of images) {
-          const formData = new FormData()
-          const filename = imageUri.split('/').pop() || 'image.jpg'
-          const match = /\.(\w+)$/.exec(filename)
-          const type = match ? `image/${match[1]}` : 'image/jpeg'
-
-          formData.append('image', {
-            uri: imageUri,
-            name: filename,
-            type,
-          } as any)
-
-          const uploadRes = await client.post('/api/upload', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-            timeout: 30000,
-          })
-
-          if (uploadRes.data?.ok && uploadRes.data?.data?.url) {
-            finalUrls.push(uploadRes.data.data.url)
-          }
-        }
-      }
+      const finalUrls = await ensureUploadedUrls()
 
       const finalTradeFor = getTradeForValue()
 
@@ -305,6 +297,54 @@ export default function UploadScreen() {
       Alert.alert(
         'Greska',
         error.response?.data?.message || error.message || 'Greska pri upload-u'
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleSaveDraft = async () => {
+    try {
+      setIsSubmitting(true)
+      const finalUrls = await ensureUploadedUrls()
+      const finalTradeFor = getTradeForValue()
+
+      const body: any = {
+        status: 'draft',
+        title: title.trim() || undefined,
+        description: description.trim() || undefined,
+        category: category || undefined,
+        brand: brand || undefined,
+        size: size || undefined,
+        condition,
+        images: finalUrls,
+        listingType,
+      }
+
+      if ((listingType === 'sell' || listingType === 'both') && price.trim()) {
+        body.price = Number(price)
+      }
+
+      if ((listingType === 'trade' || listingType === 'both') && finalTradeFor) {
+        body.tradeFor = finalTradeFor
+      }
+
+      const response = await client.post('/api/items', body)
+      if (response.data?.ok) {
+        Alert.alert('Draft sacuvan', 'Komad je sacuvan u draft lane i ceka da ga doradis.', [
+          {
+            text: 'Otvori closet',
+            onPress: () => {
+              resetForm()
+              router.push('/(tabs)/closet')
+            },
+          },
+        ])
+      }
+    } catch (error: any) {
+      Alert.alert(
+        'Greska',
+        error.response?.data?.message || error.message || 'Draft trenutno nije moguce sacuvati'
       )
     } finally {
       setIsSubmitting(false)
@@ -602,7 +642,7 @@ export default function UploadScreen() {
                   <View className="flex-row items-center">
                     <ActivityIndicator color="#2B2A2B" size="small" />
                     <Text className="font-sans text-ink-dark font-bold text-base ml-2">
-                      AI generise opis...
+                      {t('upload.aiGenerating')}
                     </Text>
                   </View>
                 ) : (
@@ -639,6 +679,16 @@ export default function UploadScreen() {
               >
                 <Text className="font-sans text-ink-dark text-base">
                   Napisi rucno
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleSaveDraft}
+                className="mt-3 rounded-full border border-ink-dark rounded-full py-4 items-center"
+                disabled={isGeneratingAI || isSubmitting}
+              >
+                <Text className="font-sans text-ink-dark text-base font-semibold">
+                  Sacuvaj kao draft
                 </Text>
               </TouchableOpacity>
             </>
@@ -788,6 +838,16 @@ export default function UploadScreen() {
                     Objavi item
                   </Text>
                 )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleSaveDraft}
+                className="border border-ink-dark rounded-full py-4 items-center mb-3"
+                disabled={isSubmitting}
+              >
+                <Text className="font-sans text-ink-dark font-semibold">
+                  Sacuvaj draft
+                </Text>
               </TouchableOpacity>
 
               {/* Back Button */}

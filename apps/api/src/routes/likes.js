@@ -24,9 +24,10 @@ router.get('/', requireAuth, async (req, res) => {
       })
       .lean()
 
-    const valid = likes.filter((l) => l.itemId)
-    const hasMore = valid.length > limit
-    const data = valid.slice(0, limit).map((l) => ({ ...l.itemId, isLiked: true }))
+    const validItems = likes.filter((l) => l.itemId).map((l) => l.itemId)
+    const enriched = await enrichItems(validItems, req.dbUser._id)
+    const hasMore = validItems.length > limit
+    const data = enriched.slice(0, limit).map((item) => ({ ...item, isLiked: true }))
 
     res.json({ ok: true, data, page, hasMore })
   } catch (err) {
@@ -34,7 +35,7 @@ router.get('/', requireAuth, async (req, res) => {
   }
 })
 
-// POST /api/items/:id/like — toggle like (idempotent)
+// POST /api/items/:id/like — add like (idempotent)
 router.post('/:id/like', requireAuth, async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -46,19 +47,16 @@ router.post('/:id/like', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Item not found' })
     }
 
-    // Toggle like
-    const existingLike = await Like.findOne({
-      userId: req.dbUser._id,
-      itemId: req.params.id,
-    })
-
-    if (existingLike) {
-      await Like.deleteOne({ _id: existingLike._id })
-    } else {
-      await Like.create({ userId: req.dbUser._id, itemId: req.params.id })
+    if (String(item.userId) === String(req.dbUser._id)) {
+      return res.status(400).json({ error: 'Cannot like your own item' })
     }
 
-    // Return new state
+    await Like.findOneAndUpdate(
+      { userId: req.dbUser._id, itemId: req.params.id },
+      { userId: req.dbUser._id, itemId: req.params.id },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    )
+
     const enriched = await enrichItems(item, req.dbUser._id)
 
     res.json({

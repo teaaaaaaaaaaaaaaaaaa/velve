@@ -1,35 +1,48 @@
-import { useState, useEffect, useCallback } from 'react'
+import { Ionicons } from '@expo/vector-icons'
+import { useRouter } from 'expo-router'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  View,
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
   Text,
   TouchableOpacity,
-  FlatList,
-  Image,
-  RefreshControl,
-  ActivityIndicator,
+  View,
 } from 'react-native'
-import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
-import { useAuth } from '@/hooks/useAuth'
-import client from '@/api/client'
 
-interface Participant {
+import client from '@/api/client'
+import { ChatSkeleton } from '@/components/BrandedLoader'
+import { EditorialEmptyState } from '@/components/EditorialEmptyState'
+import { RemoteImage } from '@/components/RemoteImage'
+import { BrandBackground } from '@/components/BrandBackground'
+import { BrandWordmark } from '@/components/BrandWordmark'
+import { colors } from '@/design/tokens'
+import { useAuth } from '@/hooks/useAuth'
+import { useI18n } from '@/i18n'
+
+type Participant = {
   _id: string
   displayName: string
-  photoURL: string
+  photoURL?: string
   email?: string
 }
 
-interface LastMessage {
+type TradeMeta = {
+  _id: string
+  status: string
+}
+
+type LastMessage = {
   _id: string
   text: string
-  senderId: { _id: string; displayName: string }
+  senderId?: { _id: string; displayName: string }
   createdAt: string
 }
 
-interface ChatRoom {
+type ChatRoom = {
   _id: string
   participants: Participant[]
+  tradeRequestId?: TradeMeta | null
   lastMessage: LastMessage | null
   messageCount: number
   updatedAt: string
@@ -47,125 +60,198 @@ function formatTime(dateStr: string) {
   if (diffMins < 60) return `${diffMins}m`
   if (diffHours < 24) return `${diffHours}h`
   if (diffDays < 7) return `${diffDays}d`
-  return date.toLocaleDateString('sr-Latn')
+  return date.toLocaleDateString('sr-Latn', { day: 'numeric', month: 'short' })
+}
+
+function getTradeLabel(status?: string | null) {
+  if (status === 'accepted') return 'Active trade'
+  if (status === 'pending') return 'Pending trade'
+  if (status === 'rejected') return 'Declined'
+  if (status === 'cancelled') return 'Cancelled'
+  if (status === 'expired') return 'Expired'
+  return null
 }
 
 export default function ChatListScreen() {
   const router = useRouter()
-  const { currentUser, dbUser } = useAuth()
+  const { dbUser } = useAuth()
+  const { t, locale } = useI18n()
+
   const [chats, setChats] = useState<ChatRoom[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
-  const fetchChats = async () => {
-    try {
-      const response = await client.get('/api/chat')
-      if (response.data.ok) {
-        setChats(response.data.data)
-      }
-    } catch (error: any) {
-      console.error('[ChatList] Error fetching chats:', error.message)
+  const fetchChats = useCallback(async () => {
+    const response = await client.get('/api/chat')
+    if (response.data.ok) {
+      setChats(response.data.data as ChatRoom[])
     }
-  }
+  }, [])
 
   useEffect(() => {
-    fetchChats().finally(() => setLoading(false))
-  }, [])
+    fetchChats()
+      .catch(() => undefined)
+      .finally(() => setLoading(false))
+  }, [fetchChats])
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true)
-    await fetchChats()
-    setRefreshing(false)
-  }, [])
+    try {
+      setRefreshing(true)
+      await fetchChats()
+    } finally {
+      setRefreshing(false)
+    }
+  }, [fetchChats])
 
-  const getOtherParticipant = (participants: Participant[]) => {
-    if (!dbUser) return participants[0]
-    return participants.find((p) => p._id !== dbUser._id) || participants[0]
-  }
+  const summary = useMemo(() => {
+    return {
+      active: chats.filter((chat) => chat.tradeRequestId?.status === 'accepted').length,
+      pending: chats.filter((chat) => chat.tradeRequestId?.status === 'pending').length,
+    }
+  }, [chats])
 
-  const renderChatItem = ({ item }: { item: ChatRoom }) => {
-    const other = getOtherParticipant(item.participants)
-    const lastMsg = item.lastMessage
-
-    return (
-      <TouchableOpacity
-        onPress={() => router.push(`/(tabs)/chat/${item._id}`)}
-        className="flex-row items-center px-6 py-4 border-b border-ink-dark/5"
-        activeOpacity={0.7}
-      >
-        {/* Avatar */}
-        {other?.photoURL ? (
-          <Image
-            source={{ uri: other.photoURL }}
-            className="w-14 h-14 rounded-full mr-4"
-          />
-        ) : (
-          <View className="w-14 h-14 rounded-full bg-brand-accent-light items-center justify-center mr-4">
-            <Text className="font-display text-brand-accent-deep text-xl">
-              {(other?.displayName || '?').charAt(0).toUpperCase()}
-            </Text>
-          </View>
-        )}
-
-        {/* Content */}
-        <View className="flex-1 mr-3">
-          <Text className="font-sans text-base font-semibold text-ink-dark" numberOfLines={1}>
-            {other?.displayName || other?.email?.split('@')[0] || 'Korisnik'}
-          </Text>
-          {lastMsg ? (
-            <Text className="font-sans text-sm text-ink-dark/60 mt-1" numberOfLines={1}>
-              {lastMsg.text}
-            </Text>
-          ) : (
-            <Text className="font-sans text-sm text-ink-dark/40 mt-1 italic">
-              Započni razgovor
-            </Text>
-          )}
-        </View>
-
-        {/* Time */}
-        {lastMsg && (
-          <Text className="font-sans text-xs text-ink-dark/40">
-            {formatTime(lastMsg.createdAt)}
-          </Text>
-        )}
-      </TouchableOpacity>
-    )
-  }
+  const getOtherParticipant = useCallback(
+    (participants: Participant[]) => {
+      if (!dbUser) return participants[0]
+      return participants.find((participant) => participant._id !== dbUser._id) || participants[0]
+    },
+    [dbUser]
+  )
 
   if (loading) {
-    return (
-      <View className="flex-1 bg-base-canvas justify-center items-center">
-        <ActivityIndicator size="large" color="#431A43" />
-      </View>
-    )
+    return <ChatSkeleton />
   }
 
   return (
-    <View className="flex-1 bg-base-canvas">
-      {/* Header */}
-      <View className="px-6 pt-16 pb-4 border-b border-ink-dark/5">
-        <Text className="font-display text-2xl text-ink-dark">Poruke</Text>
-      </View>
+    <ScrollView
+      className="flex-1 bg-base-canvas"
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      contentContainerStyle={{ paddingBottom: 120 }}
+    >
+      <BrandBackground />
+      <View className="px-5 pb-8 pt-14">
+        <View className="mb-5 flex-row items-end justify-between">
+          <View className="flex-1 pr-4">
+            <BrandWordmark width={110} />
+            <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
+              {t('chat.eyebrow')}
+            </Text>
+            <Text className="font-display text-4xl text-ink-dark">{t('chat.title')}</Text>
+          </View>
 
-      {chats.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-6">
-          <Ionicons name="chatbubbles-outline" size={64} color="#2B2A2B" style={{ opacity: 0.2 }} />
-          <Text className="font-display text-lg text-ink-dark mt-4">Nema poruka</Text>
-          <Text className="font-sans text-sm text-ink-dark/50 text-center mt-2">
-            Kada predložiš ili primiš razmenu, razgovor će se pojaviti ovde.
-          </Text>
+          <TouchableOpacity
+            className="h-11 w-11 items-center justify-center rounded-full bg-white"
+            onPress={() => router.push('/(tabs)/trades')}
+          >
+              <Ionicons name="swap-horizontal" size={20} color={colors.accentDeep} />
+            </TouchableOpacity>
         </View>
-      ) : (
-        <FlatList
-          data={chats}
-          keyExtractor={(item) => item._id}
-          renderItem={renderChatItem}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        />
-      )}
-    </View>
+
+        <View className="mb-6 overflow-hidden rounded-[28px] border border-brand-accent-deep/10 bg-white px-4 py-4">
+          <Text className="font-display text-2xl text-ink-dark">{t('chat.tradePulse')}</Text>
+          <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/65">
+            Aktivni i pending trade razgovori ostaju uz chat, ali puni lifecycle sada imas u
+            posebnom trade desk ekranu.
+          </Text>
+
+          <View className="mt-4 flex-row gap-3">
+            <View className="flex-1 rounded-[22px] bg-base-canvas px-4 py-4">
+              <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
+                Pending
+              </Text>
+              <Text className="mt-1 font-display text-3xl text-ink-dark">{summary.pending}</Text>
+            </View>
+            <View className="flex-1 rounded-[22px] bg-base-canvas px-4 py-4">
+              <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
+                Active
+              </Text>
+              <Text className="mt-1 font-display text-3xl text-ink-dark">{summary.active}</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            className="mt-4 items-center rounded-full bg-brand-accent-deep px-4 py-3"
+            onPress={() => router.push('/(tabs)/trades')}
+          >
+            <Text className="font-sans text-sm font-semibold text-base-canvas">
+              {t('chat.openTradeDesk')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {chats.length === 0 ? (
+          <EditorialEmptyState
+            icon="chatbubbles-outline"
+            title={t('chat.emptyTitle')}
+            description={t('chat.emptyDescription')}
+          />
+        ) : (
+          chats.map((chat) => {
+            const other = getOtherParticipant(chat.participants)
+            const tradeLabel = getTradeLabel(chat.tradeRequestId?.status)
+
+            return (
+              <TouchableOpacity
+                key={chat._id}
+                activeOpacity={0.88}
+                onPress={() => router.push(`/(tabs)/chat/${chat._id}`)}
+                className="mb-4 overflow-hidden rounded-[28px] border border-ink-dark/8 bg-white px-4 py-4"
+              >
+                <View className="flex-row items-center">
+                  {other?.photoURL ? (
+                    <RemoteImage
+                      uri={other.photoURL}
+                      className="h-14 w-14 rounded-full"
+                      fallback={
+                        <View className="h-full w-full items-center justify-center rounded-full bg-brand-accent-light/35">
+                          <Text className="font-display text-2xl text-brand-accent-deep">
+                            {(other?.displayName || '?').charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                      }
+                    />
+                  ) : (
+                    <View className="h-14 w-14 items-center justify-center rounded-full bg-brand-accent-light/35">
+                      <Text className="font-display text-2xl text-brand-accent-deep">
+                        {(other?.displayName || '?').charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+
+                  <View className="ml-4 flex-1 pr-4">
+                    <Text className="font-display text-2xl text-ink-dark" numberOfLines={1}>
+                      {other?.displayName || other?.email?.split('@')[0] || 'Korisnik'}
+                    </Text>
+                    <Text className="mt-1 font-sans text-sm text-ink-dark/60" numberOfLines={2}>
+                      {chat.lastMessage?.text || 'Započni razgovor i zatim ga vodi kroz uredan trade lifecycle.'}
+                    </Text>
+                  </View>
+
+                    <Text className="font-sans text-xs text-ink-dark/40">
+                    {chat.lastMessage ? formatTime(chat.lastMessage.createdAt) : ''}
+                  </Text>
+                </View>
+
+                <View className="mt-4 flex-row flex-wrap gap-2">
+                  <View className="rounded-full bg-base-canvas px-3 py-2">
+                    <Text className="font-sans text-xs text-ink-dark/70">
+                      {chat.messageCount} poruka
+                    </Text>
+                  </View>
+
+                  {tradeLabel ? (
+                    <View className="rounded-full bg-brand-accent-light/25 px-3 py-2">
+                      <Text className="font-sans text-xs font-semibold text-brand-accent-deep">
+                        {tradeLabel}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </TouchableOpacity>
+            )
+          })
+        )}
+      </View>
+    </ScrollView>
   )
 }

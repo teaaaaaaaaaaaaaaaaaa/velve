@@ -24,6 +24,10 @@ type DbUser = {
   email: string
   displayName: string
   photoURL: string
+  bio?: string
+  emailVerified?: boolean
+  averageRating?: number
+  completedTrades?: number
   onboardingCompleted: boolean
   stylePreferences: string[]
   favoriteBrands: string[]
@@ -33,6 +37,11 @@ type DbUser = {
   followersCount: number
   followingCount: number
   itemsCount: number
+  joinedAt?: string
+  responseRate?: number | null
+  successfulSwaps?: number
+  profileCompleteness?: number
+  closetCounts?: { live: number; drafts: number; archive: number }
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)

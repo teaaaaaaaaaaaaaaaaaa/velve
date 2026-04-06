@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { Platform } from 'react-native'
 import Constants from 'expo-constants'
 import { useRouter } from 'expo-router'
-import client from '@/api/client'
 
-// Check if running in Expo Go (push not supported since SDK 53)
+import client from '@/api/client'
+import { useAuth } from '@/hooks/useAuth'
+
 const isExpoGo = Constants.appOwnership === 'expo'
 
-// Lazy import to avoid crash in Expo Go
 let Notifications: typeof import('expo-notifications') | null = null
 let Device: typeof import('expo-device') | null = null
 
@@ -16,26 +16,30 @@ if (!isExpoGo) {
     Notifications = require('expo-notifications')
     Device = require('expo-device')
 
-    // Configure notification behavior
-    if (Notifications) {
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowAlert: true,
-          shouldPlaySound: true,
-          shouldSetBadge: true,
-          shouldShowBanner: true,
-          shouldShowList: true,
-        }),
-      })
-    }
-  } catch (e) {
-    console.log('[Push] expo-notifications not available')
+    Notifications?.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    })
+  } catch {
+    Notifications = null
+    Device = null
   }
+}
+
+type NotificationData = {
+  type?: string
+  chatId?: string
+  tradeId?: string
+  status?: string
 }
 
 async function registerForPushNotifications(): Promise<string | null> {
   if (!Notifications || !Device) {
-    console.log('[Push] Skipping - not available in Expo Go')
     return null
   }
 
@@ -54,14 +58,11 @@ async function registerForPushNotifications(): Promise<string | null> {
     }
 
     if (finalStatus !== 'granted') {
-      console.log('[Push] Permission not granted')
       return null
     }
 
     const projectId = Constants.expoConfig?.extra?.eas?.projectId
     const tokenData = await Notifications.getExpoPushTokenAsync({ projectId })
-
-    console.log('[Push] Token:', tokenData.data)
 
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
@@ -72,67 +73,80 @@ async function registerForPushNotifications(): Promise<string | null> {
     }
 
     return tokenData.data
-  } catch (err: any) {
-    console.log('[Push] Registration error:', err.message)
+  } catch (error: unknown) {
+    console.log('[Push] Registration error:', error instanceof Error ? error.message : 'unknown')
     return null
   }
 }
 
+function resolveTradeBucket(data: NotificationData) {
+  if (data.type === 'trade_request') return 'pending'
+  if (data.type === 'trade_complete' || data.type === 'trade_rating') return 'history'
+  if (data.type === 'trade_cancelled' || data.type === 'item_deleted') return 'history'
+  if (data.type === 'trade_update' && data.status === 'accepted') return 'active'
+  if (data.type === 'trade_update' && ['rejected', 'cancelled', 'expired'].includes(String(data.status))) {
+    return 'history'
+  }
+  if (data.type === 'trade_expired') return 'history'
+  return 'pending'
+}
+
 export function usePushNotifications() {
   const router = useRouter()
+  const { currentUser } = useAuth()
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null)
-  const notificationListener = useRef<any>(null)
-  const responseListener = useRef<any>(null)
+  const notificationListener = useRef<{ remove: () => void } | null>(null)
+  const responseListener = useRef<{ remove: () => void } | null>(null)
 
   useEffect(() => {
-    if (!Notifications) {
-      console.log('[Push] Notifications disabled in Expo Go')
+    if (!Notifications || !currentUser) {
       return
     }
 
-    // Register and save token
     registerForPushNotifications().then(async (token) => {
-      if (token) {
-        setExpoPushToken(token)
-        try {
-          await client.put('/api/users/me/push-token', { token })
-          console.log('[Push] Token saved to server')
-        } catch (err: any) {
-          console.log('[Push] Error saving token:', err.message)
-        }
+      if (!token) return
+
+      setExpoPushToken(token)
+      try {
+        await client.put('/api/users/me/push-token', { token })
+      } catch (error: unknown) {
+        console.log('[Push] Error saving token:', error instanceof Error ? error.message : 'unknown')
       }
     })
 
-    // Handle incoming notifications while app is open
-    notificationListener.current = Notifications.addNotificationReceivedListener(
-      (notification) => {
-        console.log('[Push] Notification received:', notification.request.content.title)
-      }
-    )
+    notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
+      console.log('[Push] Notification received:', notification.request.content.title)
+    })
 
-    // Handle tapping on notification
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        const data = response.notification.request.content.data
-        console.log('[Push] Notification tapped:', data)
+    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = (response.notification.request.content.data || {}) as NotificationData
 
-        if (data?.type === 'chat_message' && data?.chatId) {
-          router.push(`/(tabs)/chat/${data.chatId}`)
-        } else if (data?.type === 'trade_request') {
-          router.push('/(tabs)/chat')
-        }
+      if (data.type === 'chat_message' && data.chatId) {
+        router.push(`/(tabs)/chat/${data.chatId}`)
+        return
       }
-    )
+
+      if (
+        data.type === 'trade_request' ||
+        data.type === 'trade_update' ||
+        data.type === 'trade_cancelled' ||
+        data.type === 'trade_complete' ||
+        data.type === 'trade_rating' ||
+        data.type === 'trade_expired' ||
+        data.type === 'item_deleted'
+      ) {
+        router.push({
+          pathname: '/(tabs)/trades',
+          params: { bucket: resolveTradeBucket(data) },
+        })
+      }
+    })
 
     return () => {
-      if (notificationListener.current) {
-        notificationListener.current.remove()
-      }
-      if (responseListener.current) {
-        responseListener.current.remove()
-      }
+      notificationListener.current?.remove()
+      responseListener.current?.remove()
     }
-  }, [])
+  }, [currentUser, router])
 
   return { expoPushToken }
 }

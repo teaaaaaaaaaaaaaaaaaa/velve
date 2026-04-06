@@ -344,9 +344,6 @@ The biggest remaining blockers before launch are:
 
 ## Phase 7 - Web And Localization
 
-### 7.1 Web product
-- `NOT STARTED`
-- Web is still a landing page placeholder.
 
 ### 7.2 i18n layer
 - `NOT STARTED`

@@ -6,6 +6,9 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
+    "seed:discovery": "node scripts/seedDiscovery.js",
+    "retry:embeddings": "node scripts/retryEmbeddings.js",
+    "rebuild:similar-index": "node scripts/rebuildSimilarIndex.js",
     "lint": "eslint src --ext .js",
     "lint:fix": "eslint src --ext .js --fix"
   },

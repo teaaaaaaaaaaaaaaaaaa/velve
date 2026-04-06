@@ -1,27 +1,39 @@
-import { useState, useEffect, useCallback } from 'react'
-import {
-  View,
-  Text,
-  ScrollView,
-  RefreshControl,
-  Image,
-  TouchableOpacity,
-  Modal,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-  FlatList,
-  StyleSheet,
-} from 'react-native'
-import { useRouter } from 'expo-router'
-import * as ImagePicker from 'expo-image-picker'
 import { Ionicons } from '@expo/vector-icons'
-import { useAuth } from '@/hooks/useAuth'
-import client from '@/api/client'
+import * as ImagePicker from 'expo-image-picker'
+import { useRouter } from 'expo-router'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 
-interface User {
+import client from '@/api/client'
+import { BrandBackground } from '@/components/BrandBackground'
+import { BrandWordmark } from '@/components/BrandWordmark'
+import { GlassSurface } from '@/components/GlassSurface'
+import { ProfileSkeleton } from '@/components/BrandedLoader'
+import { DiscoveryCardItem, DiscoveryItemCard } from '@/components/DiscoveryItemCard'
+import { EditorialEmptyState } from '@/components/EditorialEmptyState'
+import { RemoteImage } from '@/components/RemoteImage'
+import { colors } from '@/design/tokens'
+import { useAuth } from '@/hooks/useAuth'
+import { useI18n } from '@/i18n'
+
+type ClosetCounts = {
+  live: number
+  drafts: number
+  archive: number
+}
+
+type UserProfile = {
   _id: string
-  firebaseUid: string
   email: string
   displayName: string
   photoURL: string
@@ -32,223 +44,292 @@ interface User {
   followersCount: number
   followingCount: number
   itemsCount: number
+  joinedAt?: string
+  responseRate: number | null
+  successfulSwaps: number
+  profileCompleteness: number
+  closetCounts: ClosetCounts
   stylePreferences?: string[]
   categories?: string[]
   favoriteBrands?: string[]
-  sizes?: { clothing?: string; shoes?: string }
   location?: { city?: string; region?: string }
 }
 
-interface Item {
-  _id: string
-  title: string
-  images: string[]
-  brand?: string
-  size?: string
-  userId?: string
-  status?: string
-  archivedReason?: 'deleted' | 'sold'
+type ModulesPayload = {
+  recentlyViewed: DiscoveryCardItem[]
+  recommended: DiscoveryCardItem[]
 }
 
-type ProfileTab = 'items' | 'saved' | 'liked' | 'archive'
+function formatJoinedDate(
+  date: string | undefined,
+  formatter: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string,
+  joinedLabel: string,
+  newMemberLabel: string
+) {
+  if (!date) return newMemberLabel
 
-function calculateCompleteness(profile: User | null): number {
-  if (!profile) return 0
+  return joinedLabel.replace(
+    '{{date}}',
+    formatter(date, {
+      month: 'long',
+      year: 'numeric',
+    })
+  )
+}
 
-  let score = 0
+function getResponseRateLabel(rate: number | null, label: string, emptyLabel: string) {
+  if (rate == null) return emptyLabel
+  return label.replace('{{value}}', String(rate))
+}
 
-  // Core profile (40%)
-  score += 13.3 // displayName always filled
-  if (profile.photoURL) score += 13.3
-  if (profile.bio && profile.bio.length > 0) score += 13.3
+function TrustCard({
+  icon,
+  eyebrow,
+  value,
+  note,
+}: {
+  icon: keyof typeof Ionicons.glyphMap
+  eyebrow: string
+  value: string
+  note: string
+}) {
+  return (
+    <View className="mb-3 w-[48%] overflow-hidden rounded-[24px] border border-ink-dark/8 bg-white px-4 py-4">
+      <View className="mb-4 h-11 w-11 items-center justify-center rounded-full bg-brand-accent-deep/8">
+        <Ionicons name={icon} size={20} color={colors.accentDeep} />
+      </View>
+      <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
+        {eyebrow}
+      </Text>
+      <Text className="mt-1 font-display text-2xl text-ink-dark">{value}</Text>
+      <Text className="mt-1 font-sans text-xs leading-5 text-ink-dark/60">{note}</Text>
+    </View>
+  )
+}
 
-  // Preferences (60%)
-  if (profile.stylePreferences && profile.stylePreferences.length > 0) score += 10
-  if (profile.categories && profile.categories.length > 0) score += 10
-  if (profile.favoriteBrands && profile.favoriteBrands.length > 0) score += 10
-  if (profile.sizes?.clothing) score += 10
-  if (profile.sizes?.shoes) score += 10
-  if (profile.location?.city) score += 10
+function SectionHeader({
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  title: string
+  description: string
+  actionLabel?: string
+  onAction?: () => void
+}) {
+  return (
+    <View className="mb-4 flex-row items-end justify-between">
+      <View className="flex-1 pr-4">
+        <Text className="font-display text-3xl text-ink-dark">{title}</Text>
+        <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/60">{description}</Text>
+      </View>
+      {actionLabel && onAction ? (
+        <TouchableOpacity onPress={onAction}>
+          <Text className="font-sans text-sm font-semibold text-brand-accent-deep">
+            {actionLabel}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  )
+}
 
-  return Math.round(score)
+function ModuleRail({
+  items,
+  emptyTitle,
+  emptyDescription,
+  onPressItem,
+  badgeText,
+}: {
+  items: DiscoveryCardItem[]
+  emptyTitle: string
+  emptyDescription: string
+  onPressItem: (itemId: string) => void
+  badgeText?: string
+}) {
+  if (items.length === 0) {
+    return (
+      <EditorialEmptyState
+        icon="sparkles-outline"
+        title={emptyTitle}
+        description={emptyDescription}
+      />
+    )
+  }
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ gap: 12, paddingRight: 12 }}
+    >
+      {items.map((item) => (
+        <View key={item._id} style={{ width: 176 }}>
+          <DiscoveryItemCard
+            item={item}
+            badgeText={badgeText}
+            onPress={() => onPressItem(item._id)}
+          />
+        </View>
+      ))}
+    </ScrollView>
+  )
 }
 
 export default function ProfileScreen() {
   const router = useRouter()
-  const { currentUser, logout } = useAuth()
+  const { logout } = useAuth()
+  const { locale, setLocale, t, formatDate } = useI18n()
 
-  const [profile, setProfile] = useState<User | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [modules, setModules] = useState<ModulesPayload>({
+    recentlyViewed: [],
+    recommended: [],
+  })
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [activeTab, setActiveTab] = useState<ProfileTab>('items')
-
-  const [myItems, setMyItems] = useState<Item[]>([])
-  const [savedItems, setSavedItems] = useState<Item[]>([])
-  const [likedItems, setLikedItems] = useState<Item[]>([])
-  const [archivedItems, setArchivedItems] = useState<Item[]>([])
-
-  const [itemsLoading, setItemsLoading] = useState(false)
-  const [savedLoading, setSavedLoading] = useState(false)
-  const [likedLoading, setLikedLoading] = useState(false)
-  const [archivedLoading, setArchivedLoading] = useState(false)
-
   const [modalVisible, setModalVisible] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [editDisplayName, setEditDisplayName] = useState('')
   const [editBio, setEditBio] = useState('')
   const [editPhotoURL, setEditPhotoURL] = useState('')
 
-  const fetchProfile = async () => {
-    try {
-      const response = await client.get('/api/users/me')
-      if (response.data.ok) {
-        const data = response.data.data
-        setProfile(data)
-        setEditDisplayName(data.displayName)
-        setEditBio(data.bio || '')
-        setEditPhotoURL(data.photoURL)
-        return data
-      }
-    } catch (error: any) {
-      Alert.alert('Greška', error.response?.data?.message || 'Nije moguće učitati profil')
-    }
-    return null
-  }
+  const identityChips = useMemo(() => {
+    if (!profile) return []
 
-  const fetchMyItems = async (profileData: User) => {
-    try {
-      setItemsLoading(true)
-      const response = await client.get('/api/items', {
-        params: { userId: profileData._id },
-      })
-      if (response.data.ok) {
-        setMyItems(response.data.data)
-      }
-    } catch {}
-    finally { setItemsLoading(false) }
-  }
+    return [
+      profile.location?.city
+        ? `${profile.location.city}${profile.location.region ? `, ${profile.location.region}` : ''}`
+        : null,
+      profile.favoriteBrands?.[0] ? `Brand pulse: ${profile.favoriteBrands[0]}` : null,
+      profile.categories?.[0] ? `Vibe: ${profile.categories[0]}` : null,
+      profile.stylePreferences?.[0] ? profile.stylePreferences[0] : null,
+      profile.emailVerified ? 'Email verifikovan' : null,
+    ].filter(Boolean) as string[]
+  }, [profile])
 
-  const fetchSaved = async () => {
-    try {
-      setSavedLoading(true)
-      const response = await client.get('/api/wishlist')
-      if (response.data.ok) {
-        setSavedItems(
-          response.data.data
-            .filter((w: any) => w.itemId)
-            .map((w: any) => w.itemId)
-        )
-      }
-    } catch {}
-    finally { setSavedLoading(false) }
-  }
-
-  const fetchLiked = async () => {
-    try {
-      setLikedLoading(true)
-      const response = await client.get('/api/likes')
-      if (response.data.ok) {
-        setLikedItems(response.data.data)
-      }
-    } catch {}
-    finally { setLikedLoading(false) }
-  }
-
-  const fetchArchivedItems = async (profileData: User) => {
-    try {
-      setArchivedLoading(true)
-      const response = await client.get('/api/items', {
-        params: { userId: profileData._id, archived: true },
-      })
-      if (response.data.ok) {
-        setArchivedItems(response.data.data)
-      }
-    } catch {}
-    finally { setArchivedLoading(false) }
-  }
-
-  const loadAll = async () => {
-    setLoading(true)
-    const profileData = await fetchProfile()
-    if (profileData) {
-      await Promise.all([
-        fetchMyItems(profileData),
-        fetchSaved(),
-        fetchLiked(),
-        fetchArchivedItems(profileData),
-      ])
-    }
-    setLoading(false)
-  }
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true)
-    await loadAll()
-    setRefreshing(false)
+  const hydrateEditState = useCallback((nextProfile: UserProfile) => {
+    setEditDisplayName(nextProfile.displayName || '')
+    setEditBio(nextProfile.bio || '')
+    setEditPhotoURL(nextProfile.photoURL || '')
   }, [])
+
+  const loadProfile = useCallback(async () => {
+    const [profileResponse, modulesResponse] = await Promise.allSettled([
+      client.get('/api/users/me'),
+      client.get('/api/users/me/modules'),
+    ])
+
+    if (profileResponse.status === 'fulfilled' && profileResponse.value.data.ok) {
+      const nextProfile = profileResponse.value.data.data as UserProfile
+      setProfile(nextProfile)
+      hydrateEditState(nextProfile)
+    }
+
+    if (modulesResponse.status === 'fulfilled' && modulesResponse.value.data.ok) {
+      setModules(modulesResponse.value.data.data as ModulesPayload)
+    } else {
+      setModules({
+        recentlyViewed: [],
+        recommended: [],
+      })
+    }
+
+    if (profileResponse.status !== 'fulfilled') {
+      throw new Error('Profil trenutno nije moguce ucitati.')
+    }
+  }, [hydrateEditState])
+
+  const loadAll = useCallback(async () => {
+    try {
+      setLoading(true)
+      await loadProfile()
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Profil trenutno nije moguce ucitati.'
+      Alert.alert('Greska', message)
+    } finally {
+      setLoading(false)
+    }
+  }, [loadProfile])
 
   useEffect(() => {
     loadAll()
-  }, [])
+  }, [loadAll])
 
-  const handleLogout = async () => {
-    Alert.alert('Odjavi se', 'Da li si sigurna?', [
-      { text: 'Otkaži', style: 'cancel' },
+  const onRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true)
+      await loadProfile()
+    } finally {
+      setRefreshing(false)
+    }
+  }, [loadProfile])
+
+  const handleLogout = useCallback(() => {
+    Alert.alert(t('profile.logout'), t('profile.logoutConfirm'), [
+      { text: t('profile.stay'), style: 'cancel' },
       {
-        text: 'Odjavi se',
+        text: t('profile.logoutCta'),
         style: 'destructive',
         onPress: async () => {
           try {
             await logout()
             router.replace('/(auth)/login')
           } catch {
-            Alert.alert('Greška', 'Nije moguće odjaviti se')
+            Alert.alert('Greska', 'Odjava trenutno nije uspela.')
           }
         },
       },
     ])
-  }
+  }, [logout, router, t])
 
-  const handlePickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert('Dozvola', 'Potrebna je dozvola za pristup galeriji')
+  const handlePickImage = useCallback(async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (permission.status !== 'granted') {
+      Alert.alert('Dozvola', 'Potrebna je dozvola za pristup galeriji.')
       return
     }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
     })
+
     if (!result.canceled && result.assets[0]) {
-      await uploadAvatar(result.assets[0].uri)
-    }
-  }
+      try {
+        setUploading(true)
+        const uri = result.assets[0].uri
+        const filename = uri.split('/').pop() || 'avatar.jpg'
+        const match = /\.(\w+)$/.exec(filename)
+        const type = match ? `image/${match[1]}` : 'image/jpeg'
+        const formData = new FormData()
+        formData.append('image', { uri, name: filename, type } as never)
 
-  const uploadAvatar = async (uri: string) => {
-    try {
-      setUploading(true)
-      const formData = new FormData()
-      const filename = uri.split('/').pop() || 'avatar.jpg'
-      const match = /\.(\w+)$/.exec(filename)
-      const type = match ? `image/${match[1]}` : 'image/jpeg'
-      formData.append('image', { uri, name: filename, type } as any)
-      const response = await client.post('/api/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      if (response.data.ok) setEditPhotoURL(response.data.data.url)
-    } catch {
-      Alert.alert('Greška', 'Nije moguće uploadovati sliku')
-    } finally {
-      setUploading(false)
-    }
-  }
+        const response = await client.post('/api/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
 
-  const handleSaveProfile = async () => {
-    if (!editDisplayName.trim()) return Alert.alert('Greška', 'Ime ne može biti prazno')
-    if (editDisplayName.length > 50) return Alert.alert('Greška', 'Ime max 50 karaktera')
-    if (editBio.length > 200) return Alert.alert('Greška', 'Bio max 200 karaktera')
+        if (response.data.ok) {
+          setEditPhotoURL(response.data.data.url as string)
+        }
+      } catch {
+        Alert.alert('Greska', 'Avatar trenutno nije moguce uploadovati.')
+      } finally {
+        setUploading(false)
+      }
+    }
+  }, [])
+
+  const handleSaveProfile = useCallback(async () => {
+    if (!editDisplayName.trim()) {
+      Alert.alert('Greska', 'Ime ne moze biti prazno.')
+      return
+    }
+
     try {
       setUploading(true)
       const response = await client.put('/api/users/me', {
@@ -256,258 +337,348 @@ export default function ProfileScreen() {
         bio: editBio.trim(),
         photoURL: editPhotoURL,
       })
+
       if (response.data.ok) {
-        setProfile(response.data.data)
+        const nextProfile = response.data.data as UserProfile
+        setProfile(nextProfile)
+        hydrateEditState(nextProfile)
         setModalVisible(false)
       }
     } catch {
-      Alert.alert('Greška', 'Nije moguće ažurirati profil')
+      Alert.alert('Greska', 'Profil nije sacuvan.')
     } finally {
       setUploading(false)
     }
-  }
-
-  const handleRemoveSaved = async (itemId: string) => {
-    try {
-      await client.delete(`/api/wishlist/${itemId}`)
-      setSavedItems((prev) => prev.filter((i) => i._id !== itemId))
-    } catch {
-      Alert.alert('Greška', 'Nije moguće ukloniti iz sačuvanih')
-    }
-  }
-
-  const handleUnlike = async (itemId: string) => {
-    try {
-      await client.delete(`/api/items/${itemId}/like`)
-      setLikedItems((prev) => prev.filter((i) => i._id !== itemId))
-    } catch {
-      Alert.alert('Greška', 'Greška pri uklanjanju lajka')
-    }
-  }
+  }, [editBio, editDisplayName, editPhotoURL, hydrateEditState])
 
   if (loading) {
-    return (
-      <View className="flex-1 bg-base-canvas justify-center items-center">
-        <ActivityIndicator size="large" color="#431A43" />
-      </View>
-    )
+    return <ProfileSkeleton />
   }
 
   if (!profile) {
     return (
-      <View className="flex-1 bg-base-canvas justify-center items-center px-6">
-        <Text className="font-display text-ink-dark text-xl mb-6">Nije moguće učitati profil</Text>
-        <TouchableOpacity onPress={loadAll} className="bg-brand-accent-deep rounded-full py-4 px-6">
-          <Text className="font-sans text-base-canvas font-semibold">Pokušaj ponovo</Text>
-        </TouchableOpacity>
+      <View className="flex-1 bg-base-canvas px-4 pt-24">
+        <EditorialEmptyState
+          icon="person-outline"
+          title={t('profile.emptyTitle')}
+          description={t('profile.emptyDescription')}
+          actionLabel={t('common.refresh')}
+          onAction={loadAll}
+        />
       </View>
     )
   }
 
-  const tabData: Item[] =
-    activeTab === 'items'
-      ? myItems
-      : activeTab === 'saved'
-      ? savedItems
-      : activeTab === 'liked'
-      ? likedItems
-      : archivedItems
-
-  const tabLoading =
-    activeTab === 'items'
-      ? itemsLoading
-      : activeTab === 'saved'
-      ? savedLoading
-      : activeTab === 'liked'
-      ? likedLoading
-      : archivedLoading
-
   return (
     <>
-      <FlatList
-        data={tabData}
-        keyExtractor={(item) => item._id}
-        numColumns={2}
+      <ScrollView
+        className="flex-1 bg-base-canvas"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        columnWrapperStyle={styles.row}
-        contentContainerStyle={styles.listContent}
-        ListHeaderComponent={
-          <View>
-            {/* Profile Header */}
-            <View className="items-center pt-12 pb-6 px-6">
-              <TouchableOpacity onPress={() => setModalVisible(true)} className="mb-4">
+        contentContainerStyle={{ paddingBottom: 120 }}
+      >
+        <BrandBackground />
+        <View className="px-5 pb-8 pt-14">
+          <View className="mb-5 flex-row items-center justify-between">
+            <View className="flex-1 pr-4">
+              <BrandWordmark width={118} />
+              <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
+                {t('profile.eyebrow')}
+              </Text>
+              <Text className="font-display text-4xl text-ink-dark">{t('profile.title')}</Text>
+            </View>
+            <TouchableOpacity
+              className="h-11 w-11 items-center justify-center rounded-full bg-white"
+              onPress={handleLogout}
+            >
+              <Ionicons name="log-out-outline" size={20} color={colors.accentDeep} />
+            </TouchableOpacity>
+          </View>
+
+          <GlassSurface className="overflow-hidden rounded-editorial px-5 pb-5 pt-6">
+            <View className="absolute -right-10 top-0 h-36 w-36 rounded-full bg-brand-accent-light/25" />
+            <View className="absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-brand-highlight/12" />
+            <View className="absolute left-10 top-10 h-16 w-16 rounded-full bg-brand-accent-deep/6" />
+
+            <View className="flex-row items-center">
+              <TouchableOpacity activeOpacity={0.88} onPress={() => setModalVisible(true)}>
                 {profile.photoURL ? (
-                  <Image
-                    source={{ uri: profile.photoURL }}
-                    className="w-20 h-20 rounded-full border-2 border-brand-accent-deep"
+                  <RemoteImage
+                    uri={profile.photoURL}
+                    className="h-24 w-24 rounded-full"
+                    fallback={
+                      <View className="h-full w-full items-center justify-center rounded-full bg-brand-accent-light/40">
+                        <Text className="font-display text-4xl text-brand-accent-deep">
+                          {profile.displayName.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    }
                   />
                 ) : (
-                  <View className="w-20 h-20 rounded-full border-2 border-brand-accent-deep bg-brand-accent-light items-center justify-center">
-                    <Text className="font-display text-brand-accent-deep text-2xl">
-                      {profile.displayName?.charAt(0)?.toUpperCase() || '?'}
+                  <View className="h-24 w-24 items-center justify-center rounded-full bg-brand-accent-light/40">
+                    <Text className="font-display text-4xl text-brand-accent-deep">
+                      {profile.displayName.charAt(0).toUpperCase()}
                     </Text>
                   </View>
                 )}
               </TouchableOpacity>
 
-              <Text className="font-display text-ink-dark text-xl mb-1">{profile.displayName}</Text>
-              <Text className="font-sans text-ink-dark opacity-50 text-sm mb-2">{profile.email}</Text>
-
-              {profile.bio ? (
-                <Text className="font-sans text-ink-dark text-center text-sm mb-4">{profile.bio}</Text>
-              ) : null}
-
-              {/* Profile Completeness */}
-              {profile && calculateCompleteness(profile) < 100 && (
-                <View className="w-full px-6 mb-4">
-                  <View className="flex-row items-center justify-between mb-2">
-                    <Text className="text-ink-dark text-sm font-medium font-sans">
-                      Kompletnost profila
-                    </Text>
-                    <Text className="text-brand-accent-deep text-sm font-bold font-sans">
-                      {calculateCompleteness(profile)}%
-                    </Text>
-                  </View>
-
-                  {/* Progress bar */}
-                  <View className="w-full h-2 bg-brand-accent-light/30 rounded-full overflow-hidden">
-                    <View
-                      className="h-full bg-brand-accent-deep rounded-full"
-                      style={{ width: `${calculateCompleteness(profile)}%` }}
-                    />
-                  </View>
-
-                  {/* CTA */}
-                  <TouchableOpacity
-                    onPress={() => setModalVisible(true)}
-                    className="mt-2"
-                  >
-                    <Text className="text-brand-accent-deep text-xs font-sans">
-                      Završi profil za bolje preporuke
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* Stats */}
-              <View className="flex-row justify-around w-full mb-5">
-                <View className="items-center">
-                  <Text className="font-display text-ink-dark text-2xl">{profile.followersCount || 0}</Text>
-                  <Text className="font-sans text-ink-dark opacity-50 text-xs">Followers</Text>
-                </View>
-                <View className="items-center">
-                  <Text className="font-display text-ink-dark text-2xl">{profile.followingCount || 0}</Text>
-                  <Text className="font-sans text-ink-dark opacity-50 text-xs">Following</Text>
-                </View>
-                <View className="items-center">
-                  <Text className="font-display text-ink-dark text-2xl">{myItems.length}</Text>
-                  <Text className="font-sans text-ink-dark opacity-50 text-xs">Predmeti</Text>
-                </View>
-              </View>
-
-              {/* Action buttons */}
-              <View className="flex-row gap-3 w-full">
-                <TouchableOpacity
-                  onPress={() => setModalVisible(true)}
-                  className="flex-1 border border-ink-dark rounded-full py-3 px-4"
-                >
-                  <Text className="font-sans text-ink-dark text-center font-semibold">Izmeni profil</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleLogout}
-                  className="flex-1 border border-red-600 rounded-full py-3 px-4"
-                >
-                  <Text className="font-sans text-red-600 text-center font-semibold">Odjavi se</Text>
-                </TouchableOpacity>
+              <View className="ml-4 flex-1">
+                <Text className="font-display text-4xl text-ink-dark">{profile.displayName}</Text>
+                <Text className="mt-1 font-sans text-sm text-ink-dark/55">{profile.email}</Text>
+                <Text className="mt-2 font-sans text-sm text-brand-accent-deep">
+                  {formatJoinedDate(
+                    profile.joinedAt,
+                    formatDate,
+                    t('profile.joinedPrefix'),
+                    t('profile.newMember')
+                  )}
+                </Text>
               </View>
             </View>
 
-            {/* Tabs */}
-            <View style={styles.tabBar}>
-              {(['items', 'saved', 'liked', 'archive'] as ProfileTab[]).map((tab) => {
-                const labels: Record<ProfileTab, string> = {
-                  items: 'Moji predmeti',
-                  saved: 'Sačuvano',
-                  liked: 'Lajkovano',
-                  archive: 'Arhiva',
+            <Text className="mt-5 font-sans text-sm leading-6 text-ink-dark/75">
+              {profile.bio ||
+                'Dodaj kratku belešku o svom ukusu kako bi profil delovao kao licni editorial, a ne kao prazan nalog.'}
+            </Text>
+
+            {identityChips.length > 0 ? (
+              <View className="mt-4 flex-row flex-wrap gap-2">
+                {identityChips.map((chip) => (
+                  <View key={chip} className="rounded-full bg-base-canvas px-3 py-2">
+                    <Text className="font-sans text-xs text-ink-dark/70">{chip}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            <View className="mt-5 rounded-[24px] bg-base-canvas px-4 py-4">
+              <View className="mb-2 flex-row items-center justify-between">
+                <Text className="font-sans text-sm text-ink-dark/65">Kompletnost profila</Text>
+                <Text className="font-sans text-sm font-semibold text-brand-accent-deep">
+                  {profile.profileCompleteness}%
+                </Text>
+              </View>
+              <View className="h-2 overflow-hidden rounded-full bg-brand-accent-light/25">
+                <View
+                  className="h-full rounded-full bg-brand-accent-deep"
+                  style={{ width: `${profile.profileCompleteness}%` }}
+                />
+              </View>
+            </View>
+
+            <View className="mt-5 flex-row items-center justify-between">
+              <View className="items-center">
+                <Text className="font-display text-3xl text-ink-dark">{profile.followersCount}</Text>
+                <Text className="font-sans text-xs text-ink-dark/50">{t('profile.followers')}</Text>
+              </View>
+              <View className="items-center">
+                <Text className="font-display text-3xl text-ink-dark">{profile.followingCount}</Text>
+                <Text className="font-sans text-xs text-ink-dark/50">{t('profile.following')}</Text>
+              </View>
+              <View className="items-center">
+                <Text className="font-display text-3xl text-ink-dark">{profile.closetCounts.live}</Text>
+                <Text className="font-sans text-xs text-ink-dark/50">{t('profile.active')}</Text>
+              </View>
+            </View>
+
+            <View className="mt-5 flex-row gap-3">
+              <TouchableOpacity
+                className="flex-1 items-center rounded-full bg-brand-accent-deep px-4 py-3"
+                onPress={() => setModalVisible(true)}
+              >
+                <Text className="font-sans text-sm font-semibold text-base-canvas">
+                  {t('profile.edit')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="flex-1 items-center rounded-full border border-ink-dark/10 bg-base-canvas px-4 py-3"
+                onPress={() => router.push('/(tabs)/closet')}
+              >
+                <Text className="font-sans text-sm font-semibold text-ink-dark">
+                  {t('profile.closet')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              className="mt-3 flex-row items-center justify-between rounded-[24px] border border-brand-accent-deep/10 bg-brand-accent-deep px-4 py-4"
+              onPress={() => router.push('/(tabs)/trades')}
+            >
+              <View className="flex-1 pr-4">
+                <Text className="font-sans text-[11px] uppercase tracking-[1.4px] text-base-canvas/70">
+                  {t('profile.tradeDesk')}
+                </Text>
+                <Text className="mt-1 font-display text-2xl text-base-canvas">
+                  Aktivni i zavrseni zahtevi na jednom mestu
+                </Text>
+              </View>
+              <Ionicons name="swap-horizontal" size={28} color={colors.baseCanvas} />
+            </TouchableOpacity>
+          </GlassSurface>
+
+          <View className="mt-8">
+            <SectionHeader
+              title={t('profile.trust')}
+              description="Signal poverenja koji drugi vide kada otvore tvoj profil i tvoj trade flow."
+            />
+            <View className="flex-row flex-wrap justify-between">
+              <TrustCard
+                icon="star-outline"
+                eyebrow="Ocena"
+                value={
+                  profile.averageRating > 0 ? profile.averageRating.toFixed(1) : 'Novi profil'
                 }
-                const icons: Record<ProfileTab, string> = {
-                  items: 'shirt-outline',
-                  saved: 'bookmark-outline',
-                  liked: 'heart-outline',
-                  archive: 'archive-outline',
+                note={
+                  profile.averageRating > 0
+                    ? `${profile.completedTrades} zavrsenih trade-ova`
+                    : 'Ocene se pojavljuju nakon prvih razmena.'
                 }
+              />
+              <TrustCard
+                icon="repeat-outline"
+                eyebrow="Uspesne razmene"
+                value={String(profile.successfulSwaps || 0)}
+                note="Jasan signal koliko puta je profil zatvorio trade do kraja."
+              />
+              <TrustCard
+                icon="time-outline"
+                eyebrow="Response rate"
+                value={profile.responseRate == null ? 'N/A' : `${profile.responseRate}%`}
+                note={getResponseRateLabel(
+                  profile.responseRate,
+                  t('profile.responseRate'),
+                  t('profile.responseRateEmpty')
+                )}
+              />
+              <TrustCard
+                icon="shield-checkmark-outline"
+                eyebrow="Clan od"
+                value={formatJoinedDate(
+                  profile.joinedAt,
+                  formatDate,
+                  t('profile.joinedPrefix'),
+                  t('profile.newMember')
+                ).replace(`${t('profile.joinedPrefix').replace('{{date}}', '').trim()} `, '')}
+                note="Poverenje raste kada profil deluje stabilno i prisutno kroz vreme."
+              />
+            </View>
+          </View>
+
+          <View className="mt-5 overflow-hidden rounded-[28px] border border-ink-dark/8 bg-white px-5 py-5">
+            <SectionHeader
+              title="Wardrobe control"
+              description="Draft, active i archive tok sada imaju odvojene lane-ove i bulk akcije."
+              actionLabel="Otvori closet"
+              onAction={() => router.push('/(tabs)/closet')}
+            />
+            <View className="flex-row gap-3">
+              <View className="flex-1 rounded-[22px] bg-base-canvas px-4 py-4">
+                <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
+                  {t('profile.live')}
+                </Text>
+                <Text className="mt-1 font-display text-3xl text-ink-dark">
+                  {profile.closetCounts.live}
+                </Text>
+              </View>
+              <View className="flex-1 rounded-[22px] bg-base-canvas px-4 py-4">
+                <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
+                  {t('profile.drafts')}
+                </Text>
+                <Text className="mt-1 font-display text-3xl text-ink-dark">
+                  {profile.closetCounts.drafts}
+                </Text>
+              </View>
+              <View className="flex-1 rounded-[22px] bg-base-canvas px-4 py-4">
+                <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
+                  {t('profile.archive')}
+                </Text>
+                <Text className="mt-1 font-display text-3xl text-ink-dark">
+                  {profile.closetCounts.archive}
+                </Text>
+              </View>
+            </View>
+            <View className="mt-4 flex-row gap-3">
+              <TouchableOpacity
+                className="flex-1 items-center rounded-full border border-ink-dark/10 bg-base-canvas px-4 py-3"
+                onPress={() => router.push('/(tabs)/upload')}
+              >
+                <Text className="font-sans text-sm font-semibold text-ink-dark">
+                  {t('profile.newListing')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="flex-1 items-center rounded-full border border-ink-dark/10 bg-base-canvas px-4 py-3"
+                onPress={() => router.push('/(tabs)/wishlist')}
+              >
+                <Text className="font-sans text-sm font-semibold text-ink-dark">
+                  {t('profile.wishlist')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View className="mt-8">
+            <SectionHeader
+              title={t('profile.recentlyViewed')}
+              description="Komadi koje si skoro otvorila, da moodboard ostane pri ruci."
+            />
+            <ModuleRail
+              items={modules.recentlyViewed}
+              emptyTitle="Jos nema otvorenih komada"
+              emptyDescription="Kada budes istrazivala feed i detalje artikala, ovde ce ostati tvoja poslednja otvaranja."
+              onPressItem={(itemId) => router.push(`/items/${itemId}`)}
+              badgeText="Skoro gledano"
+            />
+          </View>
+
+          <View className="mt-8">
+            <SectionHeader
+              title={t('profile.recommended')}
+              description="Spoj ukusa, interakcija i visual signala iz discovery sloja."
+            />
+            <ModuleRail
+              items={modules.recommended}
+              emptyTitle="Preporuke jos rastu"
+              emptyDescription="Kako budes gledala, lajkovala i trgovala, preporuke ce postajati ostrije."
+              onPressItem={(itemId) => router.push(`/items/${itemId}`)}
+              badgeText="Za tvoj ukus"
+            />
+          </View>
+
+          <View className="mt-8 overflow-hidden rounded-[28px] border border-ink-dark/8 bg-white px-5 py-5">
+            <SectionHeader
+              title={t('profile.languageTitle')}
+              description={t('profile.languageDescription')}
+            />
+            <View className="flex-row gap-3">
+              {(['sr', 'en', 'ru'] as const).map((language) => {
+                const isActive = locale === language
+
                 return (
                   <TouchableOpacity
-                    key={tab}
-                    onPress={() => setActiveTab(tab)}
-                    style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]}
-                    activeOpacity={0.7}
+                    key={language}
+                    className={`flex-1 items-center rounded-full px-4 py-3 ${
+                      isActive
+                        ? 'bg-brand-accent-deep'
+                        : 'border border-ink-dark/10 bg-base-canvas'
+                    }`}
+                    onPress={() => setLocale(language)}
                   >
-                    <Ionicons
-                      name={icons[tab] as any}
-                      size={16}
-                      color={activeTab === tab ? '#431A43' : '#2B2A2B80'}
-                    />
-                    <Text style={[styles.tabLabel, activeTab === tab && styles.tabLabelActive]}>
-                      {labels[tab]}
+                    <Text
+                      className={`font-sans text-sm font-semibold ${
+                        isActive ? 'text-base-canvas' : 'text-ink-dark'
+                      }`}
+                    >
+                      {t(`language.${language}` as 'language.sr')}
                     </Text>
                   </TouchableOpacity>
                 )
               })}
             </View>
-
-            {tabLoading && (
-              <View className="py-12 items-center">
-                <ActivityIndicator size="small" color="#431A43" />
-              </View>
-            )}
           </View>
-        }
-        ListEmptyComponent={
-          tabLoading ? null : (
-            <View className="py-12 items-center px-6">
-              <Text className="font-display text-ink-dark text-base opacity-40 text-center">
-                {activeTab === 'items'
-                  ? 'Nemaš još predmeta'
-                  : activeTab === 'saved'
-                  ? 'Nemaš sačuvanih itema'
-                  : activeTab === 'liked'
-                  ? 'Nisi lajkovala nijedan item'
-                  : 'Arhiva je prazna'}
-              </Text>
-            </View>
-          )
-        }
-        renderItem={({ item }) => (
-          <ItemTile
-            item={item}
-            tab={activeTab}
-            onPress={() =>
-              router.push(
-                `/items/${item._id}?viewOnly=${activeTab === 'items' || activeTab === 'archive'}`
-              )
-            }
-            onRemove={
-              activeTab === 'saved'
-                ? () => handleRemoveSaved(item._id)
-                : activeTab === 'liked'
-                ? () => handleUnlike(item._id)
-                : undefined
-            }
-            archived={activeTab === 'archive'}
-            archiveStatus={
-              activeTab === 'archive'
-                ? item.status === 'sold'
-                  ? 'sold'
-                  : 'deleted'
-                : undefined
-            }
-          />
-        )}
-      />
+        </View>
+      </ScrollView>
 
-      {/* Edit Profile Modal */}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -515,61 +686,80 @@ export default function ProfileScreen() {
         onRequestClose={() => setModalVisible(false)}
       >
         <View className="flex-1 bg-base-canvas">
-          <View className="flex-row justify-between items-center px-6 pt-12 pb-4 border-b border-ink-dark/10">
+          <View className="flex-row items-center justify-between border-b border-ink-dark/10 px-6 pb-4 pt-12">
             <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Text className="font-sans text-ink-dark text-base">Otkaži</Text>
+              <Text className="font-sans text-base text-ink-dark">Zatvori</Text>
             </TouchableOpacity>
-            <Text className="font-display text-ink-dark text-lg">Izmeni profil</Text>
-            <TouchableOpacity onPress={handleSaveProfile} disabled={uploading}>
-              <Text className={`font-sans text-base font-semibold ${uploading ? 'text-ink-dark/40' : 'text-brand-accent-deep'}`}>
-                {uploading ? 'Čuvam...' : 'Sačuvaj'}
+            <Text className="font-display text-2xl text-ink-dark">Izmeni profil</Text>
+            <TouchableOpacity disabled={uploading} onPress={handleSaveProfile}>
+              <Text className="font-sans text-base font-semibold text-brand-accent-deep">
+                {uploading ? 'Cuvam...' : 'Sacuvaj'}
               </Text>
             </TouchableOpacity>
           </View>
 
-          <ScrollView className="flex-1 px-6 pt-6">
-            <View className="items-center mb-8">
+          <ScrollView className="flex-1 px-6 pt-6" contentContainerStyle={{ paddingBottom: 40 }}>
+            <View className="items-center">
               {editPhotoURL ? (
-                <Image source={{ uri: editPhotoURL }} className="w-24 h-24 rounded-full border-2 border-brand-accent-deep mb-4" />
+                <RemoteImage
+                  uri={editPhotoURL}
+                  className="h-28 w-28 rounded-full"
+                  fallback={
+                    <View className="h-full w-full items-center justify-center rounded-full bg-brand-accent-light/40">
+                      <Text className="font-display text-4xl text-brand-accent-deep">
+                        {editDisplayName.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  }
+                />
               ) : (
-                <View className="w-24 h-24 rounded-full border-2 border-brand-accent-deep bg-brand-accent-light items-center justify-center mb-4">
-                  <Text className="font-display text-brand-accent-deep text-3xl">{editDisplayName.charAt(0).toUpperCase()}</Text>
+                <View className="h-28 w-28 items-center justify-center rounded-full bg-brand-accent-light/40">
+                  <Text className="font-display text-4xl text-brand-accent-deep">
+                    {editDisplayName.charAt(0).toUpperCase() || '?'}
+                  </Text>
                 </View>
               )}
-              <TouchableOpacity onPress={handlePickImage} disabled={uploading} className="bg-brand-accent-deep rounded-full py-2 px-4">
-                <Text className="font-sans text-base-canvas text-sm font-semibold">
-                  {uploading ? 'Uploadujem...' : 'Promeni sliku'}
+
+              <TouchableOpacity
+                className="mt-4 rounded-full bg-brand-accent-deep px-5 py-3"
+                onPress={handlePickImage}
+                disabled={uploading}
+              >
+                <Text className="font-sans text-sm font-semibold text-base-canvas">
+                  {uploading ? 'Upload...' : 'Promeni avatar'}
                 </Text>
               </TouchableOpacity>
             </View>
 
-            <View className="mb-6">
-              <Text className="font-sans text-ink-dark text-sm mb-2">Ime</Text>
+            <View className="mt-8">
+              <Text className="mb-2 font-sans text-xs uppercase tracking-[1.2px] text-ink-dark/45">
+                Ime
+              </Text>
               <TextInput
                 value={editDisplayName}
                 onChangeText={setEditDisplayName}
                 maxLength={50}
-                className="bg-white border border-ink-dark/20 rounded-xl px-4 py-3 font-sans text-ink-dark"
                 placeholder="Tvoje ime"
                 placeholderTextColor="#2B2A2B66"
+                className="rounded-[22px] border border-ink-dark/10 bg-white px-4 py-4 font-sans text-sm text-ink-dark"
               />
-              <Text className="font-sans text-ink-dark opacity-40 text-xs mt-1">{editDisplayName.length}/50</Text>
             </View>
 
-            <View className="mb-6">
-              <Text className="font-sans text-ink-dark text-sm mb-2">Bio</Text>
+            <View className="mt-5">
+              <Text className="mb-2 font-sans text-xs uppercase tracking-[1.2px] text-ink-dark/45">
+                Bio
+              </Text>
               <TextInput
                 value={editBio}
                 onChangeText={setEditBio}
                 maxLength={200}
                 multiline
-                numberOfLines={4}
                 textAlignVertical="top"
-                className="bg-white border border-ink-dark/20 rounded-xl px-4 py-3 font-sans text-ink-dark"
-                placeholder="Napiši nešto o sebi..."
+                placeholder="Par reci o svom ukusu, silueti i komadima koje volis."
                 placeholderTextColor="#2B2A2B66"
+                className="min-h-[140px] rounded-[22px] border border-ink-dark/10 bg-white px-4 py-4 font-sans text-sm leading-6 text-ink-dark"
               />
-              <Text className="font-sans text-ink-dark opacity-40 text-xs mt-1">{editBio.length}/200</Text>
+              <Text className="mt-2 font-sans text-xs text-ink-dark/40">{editBio.length}/200</Text>
             </View>
           </ScrollView>
         </View>
@@ -577,156 +767,3 @@ export default function ProfileScreen() {
     </>
   )
 }
-
-function ItemTile({
-  item,
-  tab,
-  onPress,
-  onRemove,
-  archived,
-  archiveStatus,
-}: {
-  item: Item
-  tab: ProfileTab
-  onPress: () => void
-  onRemove?: () => void
-  archived?: boolean
-  archiveStatus?: 'deleted' | 'sold'
-}) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      style={styles.tile}
-      activeOpacity={0.8}
-    >
-      {item.images && item.images.length > 0 ? (
-        <Image source={{ uri: item.images[0] }} style={styles.tileImage} resizeMode="cover" />
-      ) : (
-        <View style={[styles.tileImage, styles.tileImagePlaceholder]}>
-          <Ionicons name="shirt-outline" size={32} color="#9DD3E4" />
-        </View>
-      )}
-
-      {/* Archive badge */}
-      {archived && archiveStatus && (
-        <View
-          style={[
-            styles.archiveBadge,
-            archiveStatus === 'sold' ? styles.archiveBadgeSold : styles.archiveBadgeDeleted,
-          ]}
-        >
-          <Text style={styles.archiveBadgeText}>
-            {archiveStatus === 'sold' ? 'Prodato' : 'Obrisano'}
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.tileMeta}>
-        <Text style={styles.tileTitle} numberOfLines={1}>{item.title}</Text>
-      </View>
-      {onRemove && (
-        <TouchableOpacity style={styles.tileRemoveBtn} onPress={onRemove} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons
-            name={tab === 'saved' ? 'bookmark' : 'heart'}
-            size={18}
-            color="#431A43"
-          />
-        </TouchableOpacity>
-      )}
-    </TouchableOpacity>
-  )
-}
-
-const styles = StyleSheet.create({
-  listContent: {
-    paddingBottom: 40,
-  },
-  row: {
-    paddingHorizontal: 16,
-    gap: 12,
-    marginBottom: 12,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 4,
-  },
-  tabBtn: {
-    flex: 1,
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: 12,
-    gap: 3,
-  },
-  tabBtnActive: {
-    backgroundColor: '#F6F8ED',
-  },
-  tabLabel: {
-    fontFamily: 'Inter',
-    fontSize: 9,
-    color: '#2B2A2B80',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  tabLabelActive: {
-    color: '#431A43',
-    fontWeight: '700',
-  },
-  tile: {
-    flex: 1,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  tileImage: {
-    width: '100%',
-    aspectRatio: 0.85,
-  },
-  tileImagePlaceholder: {
-    backgroundColor: '#E8F7FB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tileMeta: {
-    padding: 10,
-  },
-  tileTitle: {
-    fontFamily: 'Inter',
-    fontSize: 13,
-    color: '#2B2A2B',
-    fontWeight: '600',
-  },
-  tileRemoveBtn: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 12,
-    padding: 4,
-  },
-  archiveBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  archiveBadgeSold: {
-    backgroundColor: '#CBDA63',
-  },
-  archiveBadgeDeleted: {
-    backgroundColor: '#FF3B5C',
-  },
-  archiveBadgeText: {
-    fontFamily: 'Inter',
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#2B2A2B',
-  },
-})
