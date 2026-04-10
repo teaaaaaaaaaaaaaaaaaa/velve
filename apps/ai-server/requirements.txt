@@ -7,3 +7,6 @@ transformers==4.41.2
 Pillow==10.3.0
 faiss-cpu==1.8.0
 requests==2.32.3
+python-multipart==0.0.9
+opencv-python-headless==4.10.0.84
+rembg[cpu]==2.0.61

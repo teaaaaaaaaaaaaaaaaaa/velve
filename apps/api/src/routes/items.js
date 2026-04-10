@@ -14,6 +14,8 @@ const { sanitizeInput } = require('../lib/sanitize')
 const { enrichItems } = require('../lib/enrichItems')
 const { sendPushToUser } = require('../lib/pushNotifications')
 const { getBlockedUserIds, getHiddenItemIds } = require('../lib/discovery')
+const { withPrimaryImage } = require('../lib/itemPresentation')
+const { createItemCleanKey, uploadBuffer } = require('../lib/r2')
 
 const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:8000'
 const OWNER_ACTIVE_STATUSES = ['available', 'pending_trade', 'unavailable']
@@ -120,9 +122,18 @@ function serializeClosetItem(item) {
           ? 'archived'
           : null
 
-  return {
+  return withPrimaryImage({
     ...item,
     archiveStatus,
+  })
+}
+
+async function readErrorBody(response) {
+  try {
+    const body = await response.json()
+    return body.detail || body.error || JSON.stringify(body)
+  } catch {
+    return response.text()
   }
 }
 
@@ -648,6 +659,89 @@ router.put('/closet/bulk', requireAuth, async (req, res) => {
 })
 
 // GET /api/items/:id — item details
+router.get('/:id/images', requireAuth, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid item ID' })
+    }
+
+    const item = await Item.findById(req.params.id).lean()
+    if (!item || item.isDeleted) {
+      return res.status(404).json({ error: 'Item not found' })
+    }
+
+    if (String(item.userId) !== String(req.dbUser._id)) {
+      return res.status(403).json({ error: 'Not authorized to view this item images payload' })
+    }
+
+    res.json({
+      ok: true,
+      data: {
+        imageOriginal: item.images?.[0] || null,
+        imageClean: item.imageClean || null,
+        isDigitized: !!item.isDigitized,
+        digitizedAt: item.digitizedAt || null,
+      },
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.post('/:id/digitize', requireAuth, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid item ID' })
+    }
+
+    const item = await Item.findById(req.params.id)
+    if (!item || item.isDeleted) {
+      return res.status(404).json({ error: 'Item not found' })
+    }
+
+    if (!item.userId.equals(req.dbUser._id)) {
+      return res.status(403).json({ error: 'Not authorized to digitize this item' })
+    }
+
+    const imageOriginal = item.images?.[0]
+    if (!imageOriginal) {
+      return res.status(400).json({ error: 'Item must have at least one original image' })
+    }
+
+    const formData = new FormData()
+    formData.append('image_url', imageOriginal)
+
+    const aiResponse = await fetch(`${AI_SERVER_URL}/remove-background`, {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!aiResponse.ok) {
+      const message = await readErrorBody(aiResponse)
+      return res.status(502).json({ error: message || 'AI background removal failed' })
+    }
+
+    const cleanBytes = Buffer.from(await aiResponse.arrayBuffer())
+    const cleanKey = createItemCleanKey(item._id, imageOriginal)
+    const uploadResult = await uploadBuffer({
+      key: cleanKey,
+      buffer: cleanBytes,
+      contentType: 'image/png',
+    })
+
+    item.imageClean = uploadResult.url
+    item.isDigitized = true
+    item.digitizedAt = new Date()
+    await item.save()
+
+    generateEmbeddingAsync(item._id, uploadResult.url)
+
+    res.json({ ok: true, data: serializeClosetItem(item.toObject()) })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 router.get('/:id', maybeAuth, async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -765,6 +859,9 @@ router.post('/', requireAuth, async (req, res) => {
       size: String(size || '').slice(0, 20),
       condition: resolvedCondition,
       images: imageList,
+      imageClean: null,
+      isDigitized: false,
+      digitizedAt: null,
       listingType: resolvedListingType,
       status: requestedStatus,
       sortOrder,
@@ -985,6 +1082,9 @@ router.put('/:id', requireAuth, async (req, res) => {
       updates.images = Array.isArray(req.body.images)
         ? req.body.images.filter((u) => typeof u === 'string').slice(0, 5)
         : []
+      updates.imageClean = null
+      updates.isDigitized = false
+      updates.digitizedAt = null
     }
 
     if (req.body.condition !== undefined) {

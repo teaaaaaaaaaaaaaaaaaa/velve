@@ -126,19 +126,21 @@ export function usePushNotifications() {
         return
       }
 
-      if (
-        data.type === 'trade_request' ||
-        data.type === 'trade_update' ||
-        data.type === 'trade_cancelled' ||
-        data.type === 'trade_complete' ||
-        data.type === 'trade_rating' ||
-        data.type === 'trade_expired' ||
-        data.type === 'item_deleted'
-      ) {
-        router.push({
-          pathname: '/(tabs)/trades',
-          params: { bucket: resolveTradeBucket(data) },
-        })
+  if (
+    data.type === 'trade_request' ||
+    data.type === 'trade_update' ||
+    data.type === 'trade_cancelled' ||
+    data.type === 'trade_complete' ||
+    data.type === 'trade_rating' ||
+    data.type === 'trade_expired' ||
+    data.type === 'item_deleted'
+  ) {
+        if (data.chatId) {
+          router.push(`/(tabs)/chat/${data.chatId}`)
+          return
+        }
+
+        router.push('/(tabs)/chat')
       }
     })
 

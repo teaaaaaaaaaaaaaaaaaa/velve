@@ -1,14 +1,20 @@
+import base64
 import io
 import os
 import pickle
 import threading
+from typing import Optional
+from urllib.parse import urlparse
 
+import cv2
 import faiss
 import numpy as np
 import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import Response
+from PIL import Image, ImageOps
+from pydantic import BaseModel, Field
 
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -24,6 +30,8 @@ except Exception:
     pass
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+MODAL_ENDPOINT_URL = os.getenv("MODAL_ENDPOINT_URL", "")
+MODAL_API_KEY = os.getenv("MODAL_API_KEY", "")
 IMAGE_FETCH_HEADERS = {
     "User-Agent": "VelveAI/1.0 (+https://velve.app)",
     "Accept": "image/*,*/*;q=0.8",
@@ -35,6 +43,14 @@ FAISS_IDS_PATH = "data/faiss_ids.pkl"
 clip_model = None
 clip_processor = None
 clip_lock = threading.Lock()
+
+rembg_session = None
+rembg_remove = None
+rembg_lock = threading.Lock()
+
+faiss_index = None
+faiss_ids = []
+faiss_lock = threading.Lock()
 
 
 def get_clip():
@@ -51,9 +67,16 @@ def get_clip():
     return clip_model, clip_processor
 
 
-faiss_index = None
-faiss_ids = []
-faiss_lock = threading.Lock()
+def get_rembg():
+    global rembg_session, rembg_remove
+    if rembg_session is None or rembg_remove is None:
+        with rembg_lock:
+            if rembg_session is None or rembg_remove is None:
+                from rembg import new_session, remove
+
+                rembg_remove = remove
+                rembg_session = new_session("birefnet-general")
+    return rembg_session, rembg_remove
 
 
 def load_faiss_index():
@@ -84,10 +107,258 @@ def save_faiss_index():
         print(f"[FAISS] Failed to save index to disk: {error}")
 
 
+def fetch_image_bytes(image_url: str) -> bytes:
+    try:
+        response = requests.get(image_url, timeout=20, headers=IMAGE_FETCH_HEADERS)
+        response.raise_for_status()
+        return response.content
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=f"Cannot fetch image: {str(error)}")
+
+
+def decode_base64_image(image_base64: str) -> bytes:
+    try:
+        payload = image_base64.split(",", 1)[1] if "," in image_base64 else image_base64
+        return base64.b64decode(payload)
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=f"Invalid image_base64 payload: {str(error)}")
+
+
+def bytes_to_pil(image_bytes: bytes, mode: Optional[str] = None) -> Image.Image:
+    try:
+        image = Image.open(io.BytesIO(image_bytes))
+        image = ImageOps.exif_transpose(image)
+        return image.convert(mode) if mode else image
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=f"Cannot decode image: {str(error)}")
+
+
+async def load_image_payload(
+    file: UploadFile | None = None,
+    image_url: str | None = None,
+    image_base64: str | None = None,
+    mode: str = "RGB",
+) -> tuple[Image.Image, bytes]:
+    if file is not None:
+        image_bytes = await file.read()
+    elif image_url:
+        image_bytes = fetch_image_bytes(image_url)
+    elif image_base64:
+        image_bytes = decode_base64_image(image_base64)
+    else:
+        raise HTTPException(status_code=400, detail="Provide file, image_url, or image_base64")
+
+    return bytes_to_pil(image_bytes, mode=mode), image_bytes
+
+
+def pil_to_cv_rgb(image: Image.Image) -> np.ndarray:
+    return np.array(image.convert("RGB"), dtype=np.uint8)
+
+
+def encode_png(image: Image.Image) -> bytes:
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def prepare_binary_mask(image: Image.Image) -> tuple[np.ndarray, dict]:
+    rgb = pil_to_cv_rgb(image)
+    height, width = rgb.shape[:2]
+    total_pixels = float(max(height * width, 1))
+    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    edges = cv2.Canny(gray, 80, 160)
+
+    border_strip = max(4, min(width, height) // 18)
+    border_pixels = np.concatenate(
+        [
+            rgb[:border_strip, :, :].reshape(-1, 3),
+            rgb[-border_strip:, :, :].reshape(-1, 3),
+            rgb[:, :border_strip, :].reshape(-1, 3),
+            rgb[:, -border_strip:, :].reshape(-1, 3),
+        ],
+        axis=0,
+    )
+    bg_color = np.median(border_pixels, axis=0).astype(np.uint8)
+    bg_distance = np.linalg.norm(rgb.astype(np.float32) - bg_color.astype(np.float32), axis=2)
+
+    _, otsu_mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    edge_mask = cv2.dilate(edges, np.ones((5, 5), np.uint8), iterations=1)
+    distance_mask = (bg_distance > max(26.0, float(bg_distance.std()) + 10.0)).astype(np.uint8) * 255
+    combined = cv2.bitwise_or(otsu_mask, edge_mask)
+    combined = cv2.bitwise_or(combined, distance_mask)
+
+    kernel = np.ones((5, 5), np.uint8)
+    combined = cv2.morphologyEx(combined, cv2.MORPH_CLOSE, kernel, iterations=2)
+    combined = cv2.medianBlur(combined, 5)
+
+    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(combined, connectivity=8)
+    if num_labels <= 1:
+        bbox = (0, 0, width, height)
+        coverage = 0.0
+        touches_edge = False
+        aspect_ratio = width / max(height, 1)
+        center_offset = 1.0
+        subject_mask = combined
+    else:
+        best_index = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
+        x = int(stats[best_index, cv2.CC_STAT_LEFT])
+        y = int(stats[best_index, cv2.CC_STAT_TOP])
+        w = int(stats[best_index, cv2.CC_STAT_WIDTH])
+        h = int(stats[best_index, cv2.CC_STAT_HEIGHT])
+        subject_mask = np.where(labels == best_index, 255, 0).astype(np.uint8)
+        coverage = float(np.count_nonzero(subject_mask)) / total_pixels
+        touches_edge = x <= 3 or y <= 3 or (x + w) >= (width - 3) or (y + h) >= (height - 3)
+        subject_center_x = x + (w / 2.0)
+        center_offset = abs(subject_center_x - (width / 2.0)) / max(width / 2.0, 1.0)
+        aspect_ratio = w / max(h, 1)
+        bbox = (x, y, w, h)
+
+    border_whiteness = float(np.mean(border_pixels))
+    brightness = float(np.mean(gray))
+    contrast = float(np.std(gray))
+    color_distance = float(np.mean(bg_distance[subject_mask > 0])) if np.count_nonzero(subject_mask) else 0.0
+
+    return subject_mask, {
+        "bbox": bbox,
+        "coverage": round(coverage, 4),
+        "touchesEdge": touches_edge,
+        "aspectRatio": round(float(aspect_ratio), 4),
+        "centerOffset": round(float(center_offset), 4),
+        "brightness": round(brightness / 255.0, 4),
+        "contrast": round(contrast / 255.0, 4),
+        "borderWhiteness": round(border_whiteness / 255.0, 4),
+        "backgroundDistance": round(color_distance / 255.0, 4),
+        "width": width,
+        "height": height,
+    }
+
+
+def build_garment_analysis(image: Image.Image) -> dict:
+    _, metrics = prepare_binary_mask(image)
+
+    lighting_ok = metrics["brightness"] >= 0.36
+    framing_ok = (
+        0.08 <= metrics["coverage"] <= 0.78
+        and not metrics["touchesEdge"]
+        and metrics["centerOffset"] <= 0.35
+    )
+    contrast_ok = metrics["backgroundDistance"] >= 0.08 and metrics["contrast"] >= 0.14
+
+    ready = lighting_ok and framing_ok and contrast_ok
+
+    messages = []
+    if not lighting_ok:
+        messages.append("Treba nam malo vise svetla za jasnu teksturu.")
+    if not framing_ok:
+        messages.append("Rasiri artikal da vidimo njegov pun oblik.")
+    if not contrast_ok:
+        messages.append("Dodaj malo kontrasta u pozadini da AI lakse prepozna ivice.")
+
+    return {
+        "ready": ready,
+        "checks": {
+            "lighting": {"ok": lighting_ok},
+            "framing": {"ok": framing_ok},
+            "contrast": {"ok": contrast_ok},
+        },
+        "messages": messages,
+        "metrics": metrics,
+    }
+
+
+def build_body_scan_analysis(image: Image.Image) -> dict:
+    _, metrics = prepare_binary_mask(image)
+
+    background_ok = metrics["borderWhiteness"] >= 0.78 and metrics["backgroundDistance"] >= 0.06
+    framing_ok = 0.18 <= metrics["coverage"] <= 0.65 and not metrics["touchesEdge"]
+    silhouette_ok = 0.2 <= metrics["aspectRatio"] <= 0.85 and metrics["centerOffset"] <= 0.22
+    lighting_ok = metrics["brightness"] >= 0.34
+    ready = background_ok and framing_ok and silhouette_ok and lighting_ok
+
+    state = "ready" if ready else "needs_adjustment"
+    message = (
+        "Savrseno. Zadrzi poziciju za AI generaciju."
+        if ready
+        else "Nisi u silueti ili pozadina nije cista bela."
+    )
+
+    return {
+        "ready": ready,
+        "state": state,
+        "message": message,
+        "checks": {
+            "background": {"ok": background_ok},
+            "framing": {"ok": framing_ok},
+            "silhouette": {"ok": silhouette_ok},
+            "lighting": {"ok": lighting_ok},
+        },
+        "metrics": metrics,
+    }
+
+
+def normalize_clean_cut_output(image_bytes: bytes) -> bytes:
+    raw_output = None
+    try:
+        session, remove_fn = get_rembg()
+        raw_output = remove_fn(image_bytes, session=session)
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=f"Background removal failed: {str(error)}")
+
+    cutout = bytes_to_pil(raw_output, mode="RGBA")
+    white_bg = Image.new("RGBA", cutout.size, (255, 255, 255, 255))
+    composited = Image.alpha_composite(white_bg, cutout).convert("RGB")
+    return encode_png(composited)
+
+
+def require_clean_garment_url(garment_image_url: str):
+    path = urlparse(garment_image_url).path
+    basename = os.path.basename(path or "")
+    if not basename.startswith("clean_") or not basename.lower().endswith(".png"):
+        raise HTTPException(
+            status_code=400,
+            detail="garmentImageUrl must point to a clean_*.png asset generated by Clean Cut",
+        )
+
+
+def call_modal_try_on(payload: dict) -> dict:
+    if not MODAL_ENDPOINT_URL:
+        raise HTTPException(status_code=503, detail="MODAL_ENDPOINT_URL is not configured")
+
+    headers = {"Content-Type": "application/json"}
+    if MODAL_API_KEY:
+        headers["Authorization"] = f"Bearer {MODAL_API_KEY}"
+
+    try:
+        response = requests.post(
+            MODAL_ENDPOINT_URL,
+            json=payload,
+            headers=headers,
+            timeout=180,
+        )
+        response.raise_for_status()
+    except requests.RequestException as error:
+        raise HTTPException(status_code=502, detail=f"Modal VTO request failed: {str(error)}")
+
+    try:
+        data = response.json()
+    except ValueError as error:
+        raise HTTPException(status_code=502, detail=f"Modal VTO returned invalid JSON: {str(error)}")
+
+    if not data.get("imageUrl") and not data.get("imageBase64"):
+        raise HTTPException(status_code=502, detail="Modal VTO response did not include imageUrl or imageBase64")
+
+    return data
+
+
 @app.on_event("startup")
 def startup_event():
     print("[AI Server] Starting up...")
     load_faiss_index()
+    try:
+        get_rembg()
+        print("[AI Server] rembg birefnet-general session loaded")
+    except Exception as error:
+        print(f"[AI Server] rembg session failed to load: {error}")
     print("[AI Server] Ready")
 
 
@@ -127,9 +398,9 @@ def generate_description(req: DescriptionRequest):
         )
     elif req.language == "ru":
         prompt = (
-            "Ты copywriter для приложения по обмену одеждой. "
-            f"Напиши короткий заголовок (максимум 8 слов) и описание (максимум 2 предложения) для этого предмета: {details_str}. "
-            "Ответь ТОЛЬКО в формате:\nTitle: ...\nDescription: ..."
+            "Ty copywriter dlya prilozheniya po obmenu odezhdoy. "
+            f"Naprishi korotkiy zagolovok (maksimum 8 slov) i opisanie (maksimum 2 predlozheniya) dlya etogo predmeta: {details_str}. "
+            "Otvet tolko v formate:\nTitle: ...\nDescription: ..."
         )
     else:
         prompt = (
@@ -168,15 +439,9 @@ class EmbedRequest(BaseModel):
 @app.post("/embed")
 def embed_image(req: EmbedRequest):
     import torch
-    from PIL import Image
 
-    try:
-        response = requests.get(req.image_url, timeout=15, headers=IMAGE_FETCH_HEADERS)
-        response.raise_for_status()
-        image = Image.open(io.BytesIO(response.content)).convert("RGB")
-    except Exception as error:
-        raise HTTPException(status_code=400, detail=f"Cannot fetch image: {str(error)}")
-
+    image_bytes = fetch_image_bytes(req.image_url)
+    image = bytes_to_pil(image_bytes, mode="RGB")
     model, processor = get_clip()
     inputs = processor(images=image, return_tensors="pt")
     with torch.no_grad():
@@ -251,6 +516,78 @@ def find_similar(req: SimilarRequest):
             break
 
     return {"results": results}
+
+
+@app.post("/remove-background")
+async def remove_background(
+    file: UploadFile | None = File(default=None),
+    image_url: str | None = Form(default=None),
+    image_base64: str | None = Form(default=None),
+):
+    _, image_bytes = await load_image_payload(
+        file=file,
+        image_url=image_url,
+        image_base64=image_base64,
+        mode="RGBA",
+    )
+    output_bytes = normalize_clean_cut_output(image_bytes)
+    return Response(content=output_bytes, media_type="image/png")
+
+
+@app.post("/analyze-garment-photo")
+async def analyze_garment_photo(
+    file: UploadFile | None = File(default=None),
+    image_url: str | None = Form(default=None),
+    image_base64: str | None = Form(default=None),
+):
+    image, _ = await load_image_payload(
+        file=file,
+        image_url=image_url,
+        image_base64=image_base64,
+        mode="RGB",
+    )
+    return build_garment_analysis(image)
+
+
+@app.post("/analyze-body-scan")
+async def analyze_body_scan(
+    file: UploadFile | None = File(default=None),
+    image_url: str | None = Form(default=None),
+    image_base64: str | None = Form(default=None),
+):
+    image, _ = await load_image_payload(
+        file=file,
+        image_url=image_url,
+        image_base64=image_base64,
+        mode="RGB",
+    )
+    return build_body_scan_analysis(image)
+
+
+class VirtualTryOnRequest(BaseModel):
+    personImageUrl: str
+    garmentImageUrl: str
+    garmentCategory: str = Field(default="tops")
+    prompt: str = Field(default="")
+
+
+@app.post("/virtual-try-on")
+def virtual_try_on(req: VirtualTryOnRequest):
+    require_clean_garment_url(req.garmentImageUrl)
+    payload = {
+        "personImageUrl": req.personImageUrl,
+        "garmentImageUrl": req.garmentImageUrl,
+        "garmentCategory": req.garmentCategory,
+        "prompt": req.prompt,
+    }
+    modal_response = call_modal_try_on(payload)
+    return {
+        "ok": True,
+        "imageUrl": modal_response.get("imageUrl"),
+        "imageBase64": modal_response.get("imageBase64"),
+        "provider": "modal",
+        "model": modal_response.get("model", "fashn-vton-1.5"),
+    }
 
 
 if __name__ == "__main__":

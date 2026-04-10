@@ -14,6 +14,9 @@ const itemSchema = new mongoose.Schema(
       required: true,
     },
     images: [{ type: String }],         // Cloudflare R2 URL-ovi
+    imageClean: { type: String, default: null },
+    isDigitized: { type: Boolean, default: false },
+    digitizedAt: { type: Date, default: null },
     embedding: [{ type: Number }],      // CLIP vektor (512 dim)
     engagementScore: { type: Number, default: 0 },  // Pre-computed feed ranking score
     lastScoreUpdate: { type: Date },    // When score was last calculated

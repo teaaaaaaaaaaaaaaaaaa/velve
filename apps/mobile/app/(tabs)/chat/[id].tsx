@@ -1,7 +1,8 @@
-﻿import { Ionicons } from '@expo/vector-icons'
+import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import {
+  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -9,19 +10,18 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  ActivityIndicator,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { io, Socket } from 'socket.io-client'
 
 import client from '@/api/client'
 import { BrandBackground } from '@/components/BrandBackground'
 import { ChatSkeleton } from '@/components/BrandedLoader'
 import { RemoteImage } from '@/components/RemoteImage'
-import { BrandWordmark } from '@/components/BrandWordmark'
 import { colors } from '@/design/tokens'
-import { useAuth } from '@/hooks/useAuth'
 import { API_URL } from '@/config/api'
-import { auth as firebaseAuth } from '@/config/firebase'
+import { auth as firebaseAuth, getAuthToken } from '@/config/firebase'
+import { useAuth } from '@/hooks/useAuth'
 import { useI18n } from '@/i18n'
 
 type Participant = {
@@ -32,6 +32,7 @@ type Participant = {
 }
 
 type TradeData = {
+  tradeRequestId?: string
   offeredItemId: string
   offeredItemTitle: string
   offeredItemImage?: string
@@ -41,9 +42,11 @@ type TradeData = {
 }
 
 type BuyData = {
+  tradeRequestId?: string
   requestedItemId: string
   requestedItemTitle: string
   requestedItemImage?: string
+  offeredPrice?: number
 }
 
 type StatusData = {
@@ -64,10 +67,24 @@ type MessageRecord = {
   createdAt: string
 }
 
+type TradeState = {
+  _id: string
+  status: string
+  senderId: { _id: string } | string
+  receiverId: { _id: string } | string
+  type?: 'trade' | 'buy'
+  offeredPrice?: number | null
+}
+
 type ChatPayload = {
   participants: Participant[]
-  tradeRequestId?: { _id: string; status?: string } | null
+  tradeRequestId?: TradeState | null
   messages: MessageRecord[]
+}
+
+function resolveId(value?: { _id: string } | string | null) {
+  if (!value) return null
+  return typeof value === 'string' ? value : value._id
 }
 
 function getDisplayName(participant: Participant | null) {
@@ -95,7 +112,7 @@ function isSameDay(a?: string, b?: string) {
   return new Date(a).toDateString() === new Date(b).toDateString()
 }
 
-function ItemMiniCard({
+const ProposalItemCard = memo(function ProposalItemCard({
   title,
   imageUri,
   eyebrow,
@@ -113,13 +130,13 @@ function ItemMiniCard({
             className="aspect-square w-full"
             fallback={
               <View className="aspect-square w-full items-center justify-center bg-brand-accent-light/20">
-                <Ionicons name="shirt-outline" size={24} color="#431A43" />
+                <Ionicons name="shirt-outline" size={24} color={colors.accentDeep} />
               </View>
             }
           />
         ) : (
           <View className="aspect-square w-full items-center justify-center bg-brand-accent-light/20">
-            <Ionicons name="shirt-outline" size={24} color="#431A43" />
+            <Ionicons name="shirt-outline" size={24} color={colors.accentDeep} />
           </View>
         )}
       </View>
@@ -131,71 +148,68 @@ function ItemMiniCard({
       </Text>
     </View>
   )
-}
+})
 
-function TradeMessageCard({
+const ProposalMessageCard = memo(function ProposalMessageCard({
+  title,
+  subtitle,
   tradeData,
-  onViewRequested,
-}: {
-  tradeData: TradeData
-  onViewRequested: () => void
-}) {
-  return (
-    <View className="mx-4 my-2 overflow-hidden rounded-[24px] border border-brand-accent-deep/8 bg-surface-panel px-4 py-4"
-      style={{ shadowColor: '#431A43', shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 3 }, elevation: 4 }}
-    >
-      <Text className="font-display text-2xl text-ink-dark">Trade proposal</Text>
-      <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/65">
-        Editorial preview oba komada unutar iste poruke.
-      </Text>
-
-      <View className="mt-4 flex-row items-center gap-3">
-        <ItemMiniCard
-          title={tradeData.offeredItemTitle}
-          imageUri={tradeData.offeredItemImage}
-          eyebrow="Nudi"
-        />
-        <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-accent-deep/8">
-          <Ionicons name="swap-horizontal" size={18} color="#431A43" />
-        </View>
-        <ItemMiniCard
-          title={tradeData.requestedItemTitle}
-          imageUri={tradeData.requestedItemImage}
-          eyebrow="Trazi"
-        />
-      </View>
-
-      <TouchableOpacity
-        onPress={onViewRequested}
-        className="mt-4 items-center rounded-full bg-base-canvas px-4 py-3"
-      >
-        <Text className="font-sans text-sm font-semibold text-ink-dark">Otvori trazeni predmet</Text>
-      </TouchableOpacity>
-    </View>
-  )
-}
-
-function BuyMessageCard({
   buyData,
   onViewRequested,
+  showDecisionActions,
+  submittingDecision,
+  onAccept,
+  onReject,
 }: {
-  buyData: BuyData
+  title: string
+  subtitle: string
+  tradeData?: TradeData
+  buyData?: BuyData
   onViewRequested: () => void
+  showDecisionActions?: boolean
+  submittingDecision?: boolean
+  onAccept?: () => void
+  onReject?: () => void
 }) {
   return (
-    <View className="mx-4 my-2 overflow-hidden rounded-[24px] border border-brand-accent-deep/10 bg-surface-panel px-4 py-4">
-      <Text className="font-display text-2xl text-ink-dark">Buy request</Text>
-      <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/65">
-        Kupovina ulazi kroz isti premium thread kao trade.
-      </Text>
+    <View
+      className="mx-4 my-2 overflow-hidden rounded-[24px] border border-brand-accent-deep/8 bg-surface-panel px-4 py-4"
+      style={{
+        shadowColor: colors.accentDeep,
+        shadowOpacity: 0.08,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 4,
+      }}
+    >
+      <Text className="font-display text-2xl text-ink-dark">{title}</Text>
+      <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/65">{subtitle}</Text>
 
-      <View className="mt-4">
-        <ItemMiniCard
-          title={buyData.requestedItemTitle}
-          imageUri={buyData.requestedItemImage}
-          eyebrow="Predmet"
-        />
-      </View>
+      {tradeData ? (
+        <View className="mt-4 flex-row items-center gap-3">
+          <ProposalItemCard
+            title={tradeData.offeredItemTitle}
+            imageUri={tradeData.offeredItemImage}
+            eyebrow="Nudi"
+          />
+          <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-accent-deep/8">
+            <Ionicons name="swap-horizontal" size={18} color={colors.accentDeep} />
+          </View>
+          <ProposalItemCard
+            title={tradeData.requestedItemTitle}
+            imageUri={tradeData.requestedItemImage}
+            eyebrow="Trazi"
+          />
+        </View>
+      ) : buyData ? (
+        <View className="mt-4">
+          <ProposalItemCard
+            title={buyData.requestedItemTitle}
+            imageUri={buyData.requestedItemImage}
+            eyebrow={buyData.offeredPrice != null ? `Ponuda ${buyData.offeredPrice} EUR` : 'Kupovina'}
+          />
+        </View>
+      ) : null}
 
       <TouchableOpacity
         onPress={onViewRequested}
@@ -203,44 +217,55 @@ function BuyMessageCard({
       >
         <Text className="font-sans text-sm font-semibold text-ink-dark">Otvori predmet</Text>
       </TouchableOpacity>
+
+      {showDecisionActions ? (
+        <View className="mt-3 flex-row gap-3">
+          <TouchableOpacity
+            onPress={onAccept}
+            disabled={submittingDecision}
+            className="flex-1 items-center rounded-full bg-brand-accent-deep px-4 py-3"
+          >
+            {submittingDecision ? (
+              <ActivityIndicator size="small" color={colors.baseCanvas} />
+            ) : (
+              <Text className="font-sans text-sm font-semibold text-base-canvas">Prihvati</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onReject}
+            disabled={submittingDecision}
+            className="flex-1 items-center rounded-full border border-ink-dark/10 bg-base-canvas px-4 py-3"
+          >
+            <Text className="font-sans text-sm font-semibold text-ink-dark">Odbij</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   )
-}
+})
 
-function TradeStatusTicket({
-  statusData,
-  onOpenDesk,
-}: {
-  statusData: StatusData
-  onOpenDesk: () => void
-}) {
+const TradeStatusTicket = memo(function TradeStatusTicket({ statusData }: { statusData: StatusData }) {
   return (
     <View className="mx-4 my-2 overflow-hidden rounded-[22px] border border-ink-dark/8 bg-surface-panel px-4 py-4">
       <View className="flex-row items-center">
         <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-accent-light/25">
-          <Ionicons name="sparkles-outline" size={18} color="#431A43" />
+          <Ionicons name="sparkles-outline" size={18} color={colors.accentDeep} />
         </View>
         <View className="ml-3 flex-1">
           <Text className="font-sans text-[11px] uppercase tracking-[1.1px] text-ink-dark/45">
-            Trade update
+            Status
           </Text>
           <Text className="font-sans text-sm leading-6 text-ink-dark/75">{statusData.label}</Text>
         </View>
       </View>
-
-      <TouchableOpacity
-        onPress={onOpenDesk}
-        className="mt-4 items-center rounded-full bg-base-canvas px-4 py-3"
-      >
-        <Text className="font-sans text-sm font-semibold text-ink-dark">Otvori trade desk</Text>
-      </TouchableOpacity>
     </View>
   )
-}
+})
 
 export default function ChatScreen() {
   const { id: chatId } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { dbUser } = useAuth()
   const { t } = useI18n()
 
@@ -248,20 +273,23 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [submittingDecision, setSubmittingDecision] = useState(false)
   const [otherUser, setOtherUser] = useState<Participant | null>(null)
   const [typingUser, setTypingUser] = useState<string | null>(null)
-  const [tradeStatus, setTradeStatus] = useState<string | null>(null)
+  const [tradeRequest, setTradeRequest] = useState<TradeState | null>(null)
 
   const socketRef = useRef<Socket | null>(null)
   const flatListRef = useRef<FlatList<MessageRecord>>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
 
   const fetchChat = useCallback(async () => {
     const response = await client.get(`/api/chat/${chatId}`)
     if (response.data.ok) {
       const data = response.data.data as ChatPayload
       setMessages(data.messages || [])
-      setTradeStatus(data.tradeRequestId?.status || null)
+      setTradeRequest(data.tradeRequestId || null)
 
       if (data.participants && dbUser) {
         const participant =
@@ -284,7 +312,7 @@ export default function ChatScreen() {
       const user = firebaseAuth.currentUser
       if (!user) return
 
-      const token = await user.getIdToken()
+      const token = await getAuthToken(user)
       socket = io(API_URL, {
         auth: { token },
         transports: ['websocket'],
@@ -376,10 +404,41 @@ export default function ChatScreen() {
     return message.senderId
   }, [])
 
+  const activeTradeId = tradeRequest?._id ? String(tradeRequest._id) : null
+  const canRespondToTrade =
+    tradeRequest?.status === 'pending' &&
+    resolveId(tradeRequest.receiverId) === dbUser?._id
+
+  const handleTradeDecision = useCallback(
+    async (status: 'accepted' | 'rejected') => {
+      if (!tradeRequest?._id || !canRespondToTrade || submittingDecision) return
+
+      try {
+        setSubmittingDecision(true)
+        const response = await client.put(`/api/trades/${tradeRequest._id}`, { status })
+        if (response.data.ok) {
+          setTradeRequest(response.data.data as TradeState)
+          await fetchChat()
+        }
+      } catch {
+        // Keep failure quiet inside the thread and let the user retry.
+      } finally {
+        setSubmittingDecision(false)
+      }
+    },
+    [canRespondToTrade, fetchChat, submittingDecision, tradeRequest?._id]
+  )
+
   const renderMessage = useCallback(
     ({ item, index }: { item: MessageRecord; index: number }) => {
       const isMine = getSenderId(item) === dbUser?._id
-      const showDate = index === 0 || !isSameDay(item.createdAt, messages[index - 1]?.createdAt)
+      const showDate = index === 0 || !isSameDay(item.createdAt, messagesRef.current[index - 1]?.createdAt)
+      const proposalId = item.tradeData?.tradeRequestId || item.buyData?.tradeRequestId
+      const showDecisionActions =
+        canRespondToTrade &&
+        !!activeTradeId &&
+        proposalId === activeTradeId &&
+        !isMine
 
       return (
         <View>
@@ -390,27 +449,44 @@ export default function ChatScreen() {
           ) : null}
 
           {item.type === 'trade' && item.tradeData ? (
-            <TradeMessageCard
+            <ProposalMessageCard
+              title="Trade proposal"
+              subtitle="Jedan jasan predlog razmene bez dodatnog trade desk toka."
               tradeData={item.tradeData}
-              onViewRequested={() => router.push(`/items/${item.tradeData?.requestedItemId}`)}
+              onViewRequested={() => router.push(`/items/${item.tradeData!.requestedItemId}`)}
+              showDecisionActions={showDecisionActions}
+              submittingDecision={submittingDecision}
+              onAccept={() => handleTradeDecision('accepted')}
+              onReject={() => handleTradeDecision('rejected')}
             />
           ) : item.type === 'buy' && item.buyData ? (
-            <BuyMessageCard
+            <ProposalMessageCard
+              title="Ponuda"
+              subtitle={
+                item.buyData.offeredPrice != null
+                  ? `Kupac nudi ${item.buyData.offeredPrice} EUR za ovaj komad.`
+                  : 'Kupac zeli da kupi ovaj komad.'
+              }
               buyData={item.buyData}
-              onViewRequested={() => router.push(`/items/${item.buyData?.requestedItemId}`)}
+              onViewRequested={() => router.push(`/items/${item.buyData!.requestedItemId}`)}
+              showDecisionActions={showDecisionActions}
+              submittingDecision={submittingDecision}
+              onAccept={() => handleTradeDecision('accepted')}
+              onReject={() => handleTradeDecision('rejected')}
             />
           ) : item.type === 'trade_update' && item.statusData ? (
-            <TradeStatusTicket
-              statusData={item.statusData}
-              onOpenDesk={() => router.push('/(tabs)/trades')}
-            />
+            <TradeStatusTicket statusData={item.statusData} />
           ) : (
             <View className={`mb-1 px-4 ${isMine ? 'items-end' : 'items-start'}`}>
               <View
-                className={`max-w-[82%] rounded-[22px] px-4 py-3 ${isMine ? 'bg-brand-accent-deep' : 'border border-ink-dark/8 bg-surface-panel'}`}
+                className={`max-w-[82%] rounded-[22px] px-4 py-3 ${
+                  isMine ? 'bg-brand-accent-deep' : 'border border-ink-dark/8 bg-surface-panel'
+                }`}
               >
                 <Text
-                  className={`font-sans text-[15px] leading-6 ${isMine ? 'text-base-canvas' : 'text-ink-dark'}`}
+                  className={`font-sans text-[15px] leading-6 ${
+                    isMine ? 'text-base-canvas' : 'text-ink-dark'
+                  }`}
                 >
                   {item.text}
                 </Text>
@@ -423,7 +499,15 @@ export default function ChatScreen() {
         </View>
       )
     },
-    [dbUser?._id, getSenderId, messages, router]
+    [
+      activeTradeId,
+      canRespondToTrade,
+      dbUser?._id,
+      getSenderId,
+      handleTradeDecision,
+      router,
+      submittingDecision,
+    ]
   )
 
   if (loading) {
@@ -433,10 +517,15 @@ export default function ChatScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-base-canvas"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : insets.top + 10}
     >
       <BrandBackground />
-      <View className="flex-row items-center border-b border-ink-dark/8 px-4 pb-4 pt-14">
+
+      <View
+        className="flex-row items-center border-b border-ink-dark/8 px-4 pb-4"
+        style={{ paddingTop: insets.top + 8 }}
+      >
         <TouchableOpacity
           onPress={() => router.back()}
           className="mr-3 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
@@ -465,44 +554,32 @@ export default function ChatScreen() {
         )}
 
         <View className="ml-3 flex-1">
-          <BrandWordmark width={90} />
           <Text className="font-display text-3xl text-ink-dark">{getDisplayName(otherUser)}</Text>
           <Text className="font-sans text-xs text-ink-dark/55">
             {typingUser
               ? t('chat.typeStatus', { name: typingUser })
-              : tradeStatus
-                ? t('chat.tradeStatusLabel', { status: tradeStatus })
-                : t('chat.directConversation')}
+              : tradeRequest?.status === 'pending'
+                ? 'Predlog ceka odluku'
+                : tradeRequest?.status === 'accepted'
+                  ? 'Predlog prihvacen'
+                  : t('chat.directConversation')}
           </Text>
         </View>
-
-        <TouchableOpacity
-          onPress={() => router.push('/(tabs)/trades')}
-          className="h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
-        >
-          <Ionicons name="swap-horizontal" size={20} color={colors.accentDeep} />
-        </TouchableOpacity>
       </View>
-
-      {tradeStatus ? (
-        <View className="mx-4 mt-4 rounded-[22px] border border-brand-accent-deep/10 bg-surface-panel px-4 py-4">
-          <Text className="font-sans text-[11px] uppercase tracking-[1.1px] text-ink-dark/45">
-            {t('chat.lifecycle')}
-          </Text>
-          <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/70">
-            {t('chat.tradeStatusPanel', { status: tradeStatus })}
-          </Text>
-        </View>
-      ) : null}
 
       <FlatList
         ref={flatListRef}
         data={messages}
         keyExtractor={(item) => item._id}
         renderItem={renderMessage}
-        contentContainerStyle={{ paddingVertical: 16 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 8 }}
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
         onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        keyboardShouldPersistTaps="handled"
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={7}
+        removeClippedSubviews
         ListEmptyComponent={
           <View className="items-center justify-center px-6 py-20">
             <Ionicons
@@ -518,7 +595,10 @@ export default function ChatScreen() {
         }
       />
 
-      <View className="flex-row items-end border-t border-ink-dark/8 px-4 py-3">
+      <View
+        className="flex-row items-end border-t border-ink-dark/8 bg-base-canvas px-4 pt-3"
+        style={{ paddingBottom: Math.max(insets.bottom, 16) + 4 }}
+      >
         <TextInput
           value={inputText}
           onChangeText={(text) => {
@@ -529,12 +609,15 @@ export default function ChatScreen() {
           placeholderTextColor={colors.mutedText}
           multiline
           maxLength={1000}
+          textAlignVertical="top"
           className="max-h-[120px] flex-1 rounded-[24px] border border-ink-dark/10 bg-surface-panel px-4 py-3 font-sans text-[15px] leading-6 text-ink-dark"
         />
         <TouchableOpacity
           onPress={handleSend}
           disabled={!inputText.trim() || sending}
-          className={`ml-3 h-12 w-12 items-center justify-center rounded-full ${inputText.trim() && !sending ? 'bg-brand-accent-deep' : 'bg-ink-dark/10'}`}
+          className={`ml-3 h-12 w-12 items-center justify-center rounded-full ${
+            inputText.trim() && !sending ? 'bg-brand-accent-deep' : 'bg-ink-dark/10'
+          }`}
         >
           <Ionicons
             name="send"

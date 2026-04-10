@@ -285,8 +285,12 @@ router.get('/history', requireAuth, async (req, res) => {
 // POST /api/trades — slanje trade requesta
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const { offeredItemId, requestedItemId, message } = req.body
+    const { offeredItemId, requestedItemId, message, offeredPrice } = req.body
     const isBuyRequest = !offeredItemId
+    const normalizedOfferedPrice =
+      offeredPrice === null || offeredPrice === undefined || offeredPrice === ''
+        ? null
+        : Number(offeredPrice)
 
     if (!requestedItemId) {
       return res.status(400).json({ error: 'requestedItemId is required' })
@@ -297,6 +301,13 @@ router.post('/', requireAuth, async (req, res) => {
     }
     if (!mongoose.Types.ObjectId.isValid(requestedItemId)) {
       return res.status(400).json({ error: 'Invalid requestedItemId' })
+    }
+
+    if (
+      normalizedOfferedPrice != null &&
+      (!Number.isFinite(normalizedOfferedPrice) || normalizedOfferedPrice < 0)
+    ) {
+      return res.status(400).json({ error: 'offeredPrice must be a positive number' })
     }
 
     const [offeredItem, requestedItem] = await Promise.all([
@@ -359,6 +370,7 @@ router.post('/', requireAuth, async (req, res) => {
       receiverId,
       type: isBuyRequest ? 'buy' : 'trade',
       ...(offeredItem ? { offeredItemId: offeredItem._id } : {}),
+      ...(normalizedOfferedPrice != null ? { offeredPrice: normalizedOfferedPrice } : {}),
       requestedItemId,
       message: (message || '').slice(0, 300),
       expiresAt: getTradeExpiryDate(),
@@ -380,15 +392,22 @@ router.post('/', requireAuth, async (req, res) => {
     const senderName = req.dbUser.displayName || 'Korisnik'
 
     if (isBuyRequest) {
+      const priceCopy =
+        normalizedOfferedPrice != null
+          ? `${senderName} nudi ${normalizedOfferedPrice} EUR za "${requestedItem.title}"`
+          : `${senderName} zeli da kupi "${requestedItem.title}"`
+
       await Message.create({
         chatId: chat._id,
         senderId: req.dbUser._id,
         type: 'buy',
-        text: `${senderName} zeli da kupi "${requestedItem.title}"`,
+        text: priceCopy,
         buyData: {
+          tradeRequestId: trade._id,
           requestedItemId: requestedItem._id,
           requestedItemTitle: requestedItem.title,
           requestedItemImage: requestedItem.images[0] || '',
+          ...(normalizedOfferedPrice != null ? { offeredPrice: normalizedOfferedPrice } : {}),
         },
       })
     } else {
@@ -398,6 +417,7 @@ router.post('/', requireAuth, async (req, res) => {
         type: 'trade',
         text: `${senderName} zeli da zameni "${offeredItem.title}" za "${requestedItem.title}"`,
         tradeData: {
+          tradeRequestId: trade._id,
           offeredItemId: offeredItem._id,
           offeredItemTitle: offeredItem.title,
           offeredItemImage: offeredItem.images[0] || '',
@@ -411,7 +431,9 @@ router.post('/', requireAuth, async (req, res) => {
     await Chat.findByIdAndUpdate(chat._id, { lastMessageAt: new Date() })
 
     const pushBody = isBuyRequest
-      ? `${senderName} zeli da kupi "${requestedItem.title}"`
+      ? normalizedOfferedPrice != null
+        ? `${senderName} nudi ${normalizedOfferedPrice} EUR za tvoj predmet`
+        : `${senderName} zeli da kupi "${requestedItem.title}"`
       : `${senderName} zeli da zameni "${offeredItem.title}" za tvoj predmet`
 
     sendPushToUser(receiverId, {

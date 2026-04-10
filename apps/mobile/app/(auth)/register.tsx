@@ -1,13 +1,15 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import {
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
 import { useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { BrandBackground } from '@/components/BrandBackground'
 import { BrandWordmark } from '@/components/BrandWordmark'
@@ -22,6 +24,7 @@ function validateEmail(email: string) {
 
 export default function RegisterScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { registerWithEmail } = useAuth()
   const { t } = useI18n()
 
@@ -29,6 +32,15 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const passwordRef = useRef<TextInput>(null)
+  const scrollRef = useRef<ScrollView>(null)
+
+  const scrollToForm = useCallback(() => {
+    setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true })
+    }, 180)
+  }, [])
 
   async function handleRegister() {
     setError('')
@@ -48,11 +60,11 @@ export default function RegisterScreen() {
       await registerWithEmail(email, password)
     } catch (e: any) {
       if (e.code === 'auth/email-already-in-use') {
-        setError('Ovaj email je već registrovan.')
+        setError('Ovaj email je vec registrovan.')
       } else if (e.code === 'auth/invalid-email') {
         setError('Neispravan email format.')
       } else {
-        setError('Greška pri registraciji. Pokušaj ponovo.')
+        setError('Greska pri registraciji. Pokusaj ponovo.')
       }
     } finally {
       setLoading(false)
@@ -63,72 +75,84 @@ export default function RegisterScreen() {
     <KeyboardAvoidingView
       className="flex-1 bg-base-canvas"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+      style={{ flex: 1 }}
     >
       <BrandBackground />
 
-      <View className="flex-1 px-gutter pb-10 pt-16">
-        <View className="flex-1 justify-between">
-          <View className="pt-4">
-            <BrandWordmark width={180} />
-            <Text className="mt-5 font-logo text-[34px] leading-none text-brand-accent-deep/70">
-              join the swap scene
-            </Text>
-            <Text className="mt-4 font-display text-[40px] leading-[42px] text-ink-dark">
-              {t('auth.registerTitle')}
-            </Text>
-            <Text className="mt-4 max-w-[320px] font-sans text-base leading-7 text-ink-dark/68">
-              {t('auth.registerDescription')}
-            </Text>
-          </View>
-
-          <GlassSurface className="px-5 py-5">
-            <TextInput
-              className="mb-4 rounded-soft border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-base text-ink-dark"
-              placeholder={t('auth.emailPlaceholder')}
-              placeholderTextColor={colors.mutedText}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              value={email}
-              onChangeText={setEmail}
-            />
-
-            <TextInput
-              className="rounded-soft border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-base text-ink-dark"
-              placeholder={t('auth.passwordLongPlaceholder')}
-              placeholderTextColor={colors.mutedText}
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-            />
-
-            {error ? (
-              <Text className="mt-4 font-sans text-sm leading-6" style={{ color: colors.danger }}>
-                {error}
-              </Text>
-            ) : null}
-
-            <TouchableOpacity
-              className="mt-5 items-center rounded-pill bg-brand-accent-deep px-4 py-4"
-              onPress={handleRegister}
-              disabled={loading}
-            >
-              <Text className="font-sans text-base font-semibold text-base-canvas">
-                {loading ? `${t('auth.register')}...` : t('auth.register')}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              className="mt-3 items-center rounded-pill border border-ink-dark/10 bg-base-canvas/70 px-4 py-4"
-              onPress={() => router.back()}
-            >
-              <Text className="font-sans text-base font-medium text-ink-dark">
-                {t('auth.haveAccount')}
-              </Text>
-            </TouchableOpacity>
-          </GlassSurface>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: 'space-between',
+          paddingHorizontal: 20,
+          paddingTop: Math.max(insets.top + 28, 64),
+          paddingBottom: Math.max(insets.bottom + 32, 40),
+        }}
+        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 180 }}>
+          <BrandWordmark width={220} />
         </View>
-      </View>
+
+        <GlassSurface style={{ paddingHorizontal: 20, paddingVertical: 20 }}>
+          <TextInput
+            className="mb-4 rounded-soft border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-base text-ink-dark"
+            placeholder={t('auth.emailPlaceholder')}
+            placeholderTextColor={colors.mutedText}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={email}
+            onChangeText={setEmail}
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+            blurOnSubmit={false}
+            onFocus={scrollToForm}
+          />
+
+          <TextInput
+            ref={passwordRef}
+            className="rounded-soft border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-base text-ink-dark"
+            placeholder={t('auth.passwordLongPlaceholder')}
+            placeholderTextColor={colors.mutedText}
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+            returnKeyType="done"
+            onSubmitEditing={handleRegister}
+            onFocus={scrollToForm}
+          />
+
+          {error ? (
+            <Text className="mt-4 font-sans text-sm leading-6" style={{ color: colors.danger }}>
+              {error}
+            </Text>
+          ) : null}
+
+          <TouchableOpacity
+            className="mt-5 items-center rounded-pill bg-brand-accent-deep px-4 py-4"
+            onPress={handleRegister}
+            disabled={loading}
+          >
+            <Text className="font-sans text-base font-semibold text-base-canvas">
+              {loading ? `${t('auth.register')}...` : t('auth.register')}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className="mt-3 items-center rounded-pill border border-ink-dark/10 bg-base-canvas/70 px-4 py-4"
+            onPress={() => router.back()}
+          >
+            <Text className="font-sans text-base font-medium text-ink-dark">
+              {t('auth.haveAccount')}
+            </Text>
+          </TouchableOpacity>
+        </GlassSurface>
+      </ScrollView>
     </KeyboardAvoidingView>
   )
 }

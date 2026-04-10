@@ -22,6 +22,7 @@ const followsRouter = require('./routes/follows')
 const aiRouter = require('./routes/ai')
 const verificationRouter = require('./routes/verification')
 const wishlistRouter = require('./routes/wishlist')
+const vtoRouter = require('./routes/vto')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -151,6 +152,7 @@ app.use('/api/users', followsRouter)    // /api/users/:id/follow
 app.use('/api/ai', aiRouter)
 app.use('/api/verification', verificationRouter)
 app.use('/api/wishlist', wishlistRouter)
+app.use('/api/vto', vtoRouter)
 
 // Sentry error handler (must be before other error middleware)
 app.use(Sentry.Handlers.errorHandler())

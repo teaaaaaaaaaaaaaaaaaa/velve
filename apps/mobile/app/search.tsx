@@ -1,290 +1,271 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { Ionicons } from '@expo/vector-icons'
+import { Stack, useRouter } from 'expo-router'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  ActivityIndicator,
   FlatList,
   RefreshControl,
+  StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
   useWindowDimensions,
+  View,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Stack, useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+
 import client from '@/api/client'
+import { BrandedLoader } from '@/components/BrandedLoader'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
-import { DiscoveryCardItem, DiscoveryItemCard } from '@/components/DiscoveryItemCard'
-
-type SearchItem = DiscoveryCardItem
-
-const CONDITION_OPTIONS = [
-  { label: 'Sve', value: '' },
-  { label: 'Novo', value: 'new' },
-  { label: 'Kao novo', value: 'like_new' },
-  { label: 'Dobro', value: 'good' },
-  { label: 'OK', value: 'fair' },
-]
-
-const LISTING_OPTIONS = [
-  { label: 'Sve', value: '' },
-  { label: 'Razmena', value: 'trade' },
-  { label: 'Kupovina', value: 'sell' },
-  { label: 'Oba', value: 'both' },
-]
+import { ImmersiveFeedCard, ImmersiveFeedItem } from '@/components/ImmersiveFeedCard'
+import { colors, shadows } from '@/design/tokens'
+import { useI18n } from '@/i18n'
 
 export default function SearchScreen() {
   const router = useRouter()
-  const { width } = useWindowDimensions()
+  const insets = useSafeAreaInsets()
+  const { height: windowHeight } = useWindowDimensions()
+  const { locale } = useI18n()
+
   const [query, setQuery] = useState('')
-  const [brand, setBrand] = useState('')
-  const [size, setSize] = useState('')
-  const [city, setCity] = useState('')
-  const [condition, setCondition] = useState('')
-  const [listingType, setListingType] = useState('')
-  const [items, setItems] = useState<SearchItem[]>([])
+  const [items, setItems] = useState<ImmersiveFeedItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(false)
 
-  const isCompactLayout = width < 390
-  const numColumns = width < 360 ? 1 : 2
-  const hasActiveFilters = Boolean(
-    query.trim() || brand.trim() || size.trim() || city.trim() || condition || listingType
-  )
+  const pageHeight = Math.max(windowHeight, 1)
 
-  const params = useMemo(
-    () => ({
-      limit: 30,
-      search: query.trim() || undefined,
-      brand: brand.trim() || undefined,
-      size: size.trim() || undefined,
-      city: city.trim() || undefined,
-      condition: condition || undefined,
-      listingType: listingType || undefined,
-    }),
-    [brand, city, condition, listingType, query, size]
-  )
+  const updateItem = useCallback((itemId: string, updater: (item: ImmersiveFeedItem) => ImmersiveFeedItem) => {
+    setItems((prev) => prev.map((item) => (item._id === itemId ? updater(item) : item)))
+  }, [])
 
-  const clearFilters = () => {
-    setQuery('')
-    setBrand('')
-    setSize('')
-    setCity('')
-    setCondition('')
-    setListingType('')
-  }
+  const loadResults = useCallback(
+    async (mode: 'replace' | 'append' = 'replace') => {
+      try {
+        if (mode === 'replace') {
+          setLoading(true)
+        } else {
+          setLoadingMore(true)
+        }
 
-  const loadResults = async (showLoader = true) => {
-    try {
-      if (showLoader) {
-        setLoading(true)
+        const response = await client.get('/api/items', {
+          params: {
+            limit: 20,
+            search: query.trim() || undefined,
+            cursor: mode === 'append' ? nextCursor || undefined : undefined,
+          },
+        })
+
+        if (response.data.ok) {
+          const nextItems = response.data.data as ImmersiveFeedItem[]
+          setItems((prev) => (mode === 'append' ? [...prev, ...nextItems] : nextItems))
+          setNextCursor(response.data.nextCursor ? String(response.data.nextCursor) : null)
+          setHasMore(Boolean(response.data.hasMore))
+        }
+      } catch {
+        if (mode === 'replace') {
+          setItems([])
+        }
+      } finally {
+        setLoading(false)
+        setLoadingMore(false)
+        setRefreshing(false)
       }
-
-      const response = await client.get('/api/items', { params })
-      if (response.data.ok) {
-        setItems(response.data.data)
-      }
-    } catch {
-      setItems([])
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }
+    },
+    [nextCursor, query]
+  )
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      loadResults(items.length === 0)
+      loadResults('replace')
     }, 250)
 
     return () => clearTimeout(timeout)
-  }, [params])
+  }, [loadResults])
 
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true)
-    await loadResults(false)
+    await loadResults('replace')
+  }, [loadResults])
+
+  const onLoadMore = useCallback(() => {
+    if (!hasMore || loadingMore || !nextCursor) return
+    loadResults('append')
+  }, [hasMore, loadResults, loadingMore, nextCursor])
+
+  const handleLike = useCallback(
+    async (itemId: string, isLiked: boolean) => {
+      let previousCount = 0
+
+      updateItem(itemId, (item) => {
+        previousCount = item.likesCount ?? 0
+        return {
+          ...item,
+          isLiked: !isLiked,
+          likesCount: (item.likesCount ?? 0) + (isLiked ? -1 : 1),
+        }
+      })
+
+      try {
+        const response = isLiked
+          ? await client.delete(`/api/items/${itemId}/like`)
+          : await client.post(`/api/items/${itemId}/like`)
+
+        if (!isLiked && response.data.ok) {
+          updateItem(itemId, (item) => ({
+            ...item,
+            isLiked: response.data.isLiked,
+            likesCount: response.data.likesCount,
+          }))
+        }
+      } catch {
+        updateItem(itemId, (item) => ({
+          ...item,
+          isLiked,
+          likesCount: previousCount,
+        }))
+      }
+    },
+    [updateItem]
+  )
+
+  const handleWishlist = useCallback(
+    async (itemId: string, isWishlisted: boolean) => {
+      let previousCount = 0
+
+      updateItem(itemId, (item) => {
+        previousCount = item.wishlistCount ?? 0
+        return {
+          ...item,
+          isWishlisted: !isWishlisted,
+          wishlistCount: (item.wishlistCount ?? 0) + (isWishlisted ? -1 : 1),
+        }
+      })
+
+      try {
+        if (isWishlisted) {
+          await client.delete(`/api/wishlist/${itemId}`)
+        } else {
+          await client.post(`/api/wishlist/${itemId}`)
+        }
+      } catch {
+        updateItem(itemId, (item) => ({
+          ...item,
+          isWishlisted,
+          wishlistCount: previousCount,
+        }))
+      }
+    },
+    [updateItem]
+  )
+
+  const renderSearchItem = useCallback(
+    ({ item }: { item: ImmersiveFeedItem }) => (
+      <ImmersiveFeedCard
+        item={item}
+        height={pageHeight}
+        locale={locale}
+        topInset={insets.top}
+        bottomInset={insets.bottom}
+        onLike={handleLike}
+        onWishlist={handleWishlist}
+      />
+    ),
+    [handleLike, handleWishlist, insets.bottom, insets.top, locale, pageHeight]
+  )
+
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 })
+
+  if (loading && items.length === 0) {
+    return <BrandedLoader dark />
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-base-canvas" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-brand-accent-deep" edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      <FlatList
-        key={`search-grid-${numColumns}`}
-        data={items}
-        numColumns={numColumns}
-        keyExtractor={(item) => item._id}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        columnWrapperStyle={
-          numColumns === 2
-            ? {
-                gap: 12,
-                paddingHorizontal: 20,
-              }
-            : undefined
-        }
-        contentContainerStyle={{ paddingBottom: 120 }}
-        ListHeaderComponent={
-          <View className="px-5 pb-6 pt-2">
-            <View className="mb-5 flex-row items-start">
-              <TouchableOpacity
-                onPress={() => router.back()}
-                className="mt-1 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
-              >
-                <Ionicons name="arrow-back" size={22} color="#2B2A2B" />
-              </TouchableOpacity>
-
-              <View className="ml-4 flex-1">
-                <Text className="font-display text-4xl text-ink-dark">Search</Text>
-                <Text className="mt-1 font-sans text-sm leading-5 text-ink-dark/60">
-                  Filtriraj discovery po ukusu, velicini i gradu bez raspadanja layouta na manjem ekranu.
-                </Text>
-              </View>
-            </View>
-
-            <View className="overflow-hidden rounded-[32px] border border-ink-dark/6 bg-surface-panel px-4 py-4"
-              style={{ shadowColor: '#2B2A2B', shadowOpacity: 0.08, shadowRadius: 24, shadowOffset: { width: 0, height: 6 }, elevation: 6 }}
-            >
-
-              <View className="mb-4 flex-row items-center rounded-full bg-base-canvas px-4 py-3">
-                <Ionicons name="search" size={18} color="#431A43" />
-                <TextInput
-                  value={query}
-                  onChangeText={setQuery}
-                  placeholder="Pretrazi title, brand ili kategoriju..."
-                  placeholderTextColor="#2B2A2B66"
-                  className="ml-3 flex-1 font-sans text-sm text-ink-dark"
-                />
-              </View>
-
-              <View className={isCompactLayout ? 'gap-3' : 'flex-row gap-3'}>
-                <View className="flex-1 rounded-[20px] bg-base-canvas px-4 py-3">
-                  <Text className="mb-1 font-sans text-[11px] uppercase tracking-[0.8px] text-ink-dark/45">
-                    Brand
-                  </Text>
-                  <TextInput
-                    value={brand}
-                    onChangeText={setBrand}
-                    placeholder="npr. Zara"
-                    placeholderTextColor="#2B2A2B66"
-                    className="font-sans text-sm text-ink-dark"
-                  />
-                </View>
-
-                <View className="flex-1 rounded-[20px] bg-base-canvas px-4 py-3">
-                  <Text className="mb-1 font-sans text-[11px] uppercase tracking-[0.8px] text-ink-dark/45">
-                    Velicina
-                  </Text>
-                  <TextInput
-                    value={size}
-                    onChangeText={setSize}
-                    placeholder="S / 38 / M"
-                    placeholderTextColor="#2B2A2B66"
-                    className="font-sans text-sm text-ink-dark"
-                  />
+      {items.length === 0 ? (
+        <View className="flex-1 bg-base-canvas px-5 pt-24">
+          <EditorialEmptyState
+            icon="search-outline"
+            title="Nema rezultata za ovaj upit"
+            description="Probaj drugi naziv, brend ili kategoriju i feed ce odmah pokazati novi set komada."
+            actionLabel="Obrisi unos"
+            onAction={() => setQuery('')}
+          />
+        </View>
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item._id}
+          renderItem={renderSearchItem}
+          showsVerticalScrollIndicator={false}
+          pagingEnabled
+          decelerationRate="fast"
+          snapToInterval={pageHeight}
+          snapToAlignment="start"
+          disableIntervalMomentum
+          initialNumToRender={2}
+          maxToRenderPerBatch={2}
+          windowSize={3}
+          updateCellsBatchingPeriod={40}
+          removeClippedSubviews
+          viewabilityConfig={viewabilityConfig.current}
+          onEndReached={onLoadMore}
+          onEndReachedThreshold={0.55}
+          getItemLayout={(_, index) => ({
+            length: pageHeight,
+            offset: pageHeight * index,
+            index,
+          })}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          ListFooterComponent={
+            loadingMore ? (
+              <View className="py-8">
+                <View className="mx-auto rounded-full border border-white/18 bg-white/14 px-5 py-3" style={shadows.glass}>
+                  <Text className="font-sans text-sm text-base-canvas/82">Loading more...</Text>
                 </View>
               </View>
+            ) : null
+          }
+        />
+      )}
 
-              <View className="mt-3 rounded-[20px] bg-base-canvas px-4 py-3">
-                <Text className="mb-1 font-sans text-[11px] uppercase tracking-[0.8px] text-ink-dark/45">
-                  Grad
-                </Text>
-                <TextInput
-                  value={city}
-                  onChangeText={setCity}
-                  placeholder="Beograd, Novi Sad..."
-                  placeholderTextColor="#2B2A2B66"
-                  className="font-sans text-sm text-ink-dark"
-                />
-              </View>
+      <View className="absolute left-4 right-4 z-10" style={{ top: insets.top + 10 }}>
+        <View className="flex-row items-center gap-3">
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="h-11 w-11 items-center justify-center rounded-full border border-white/18 bg-white/14"
+            style={shadows.glass}
+          >
+            <Ionicons name="arrow-back" size={20} color={colors.baseCanvas} />
+          </TouchableOpacity>
 
-              <View className="mt-4 rounded-[24px] bg-base-canvas/90 px-4 py-4">
-                <View className="flex-row items-center justify-between">
-                  <Text className="font-sans text-[11px] uppercase tracking-[1px] text-ink-dark/45">
-                    Stanje
-                  </Text>
-                  {hasActiveFilters ? (
-                    <TouchableOpacity onPress={clearFilters} className="rounded-full bg-surface-panel px-3 py-1.5">
-                      <Text className="font-sans text-xs font-semibold text-brand-accent-deep">
-                        Ocisti sve
-                      </Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-
-                <View className="mt-3 flex-row flex-wrap gap-2">
-                  {CONDITION_OPTIONS.map((option) => {
-                    const isActive = condition === option.value
-
-                    return (
-                      <TouchableOpacity
-                        key={option.value || 'all-condition'}
-                        onPress={() => setCondition(option.value)}
-                        className={`rounded-full px-4 py-2.5 ${isActive ? 'bg-brand-accent-deep' : 'bg-surface-panel'}`}
-                      >
-                        <Text className={`font-sans text-sm ${isActive ? 'text-base-canvas' : 'text-ink-dark'}`}>
-                          {option.label}
-                        </Text>
-                      </TouchableOpacity>
-                    )
-                  })}
-                </View>
-              </View>
-
-              <View className="mt-3 rounded-[24px] bg-base-canvas/90 px-4 py-4">
-                <Text className="font-sans text-[11px] uppercase tracking-[1px] text-ink-dark/45">
-                  Tip objave
-                </Text>
-
-                <View className="mt-3 flex-row flex-wrap gap-2">
-                  {LISTING_OPTIONS.map((option) => {
-                    const isActive = listingType === option.value
-
-                    return (
-                      <TouchableOpacity
-                        key={option.value || 'all-listing'}
-                        onPress={() => setListingType(option.value)}
-                        className={`rounded-full border px-4 py-2.5 ${isActive ? 'border-brand-highlight bg-brand-highlight' : 'border-ink-dark/10 bg-surface-panel'}`}
-                      >
-                        <Text className="font-sans text-sm text-ink-dark">{option.label}</Text>
-                      </TouchableOpacity>
-                    )
-                  })}
-                </View>
-              </View>
-            </View>
-
-            {!loading ? (
-              <View className="mt-5 flex-row items-center justify-between px-1">
-                <Text className="font-display text-2xl text-ink-dark">Curated results</Text>
-                <Text className="font-sans text-sm text-ink-dark/55">{items.length} komada</Text>
-              </View>
-            ) : null}
+          <View
+            className="flex-1 flex-row items-center rounded-full border border-white/18 bg-white/14 px-4 py-3"
+            style={shadows.glass}
+          >
+            <Ionicons name="search" size={18} color={colors.baseCanvas} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Pretrazi komade, brend ili kategoriju..."
+              placeholderTextColor="rgba(246,248,237,0.62)"
+              className="ml-3 flex-1 font-sans text-sm text-base-canvas"
+            />
           </View>
-        }
-        ListEmptyComponent={
-          loading ? (
-            <View className="items-center px-5 py-16" style={{ width: '100%' }}>
-              <ActivityIndicator size="large" color="#431A43" />
-            </View>
-          ) : (
-            <View className="px-5 pt-2" style={{ width: '100%' }}>
-              <EditorialEmptyState
-                icon="sparkles-outline"
-                title="Nema rezultata za ovaj filter set"
-                description="Pomeri jedan signal, vrati search na sire kriterijume ili ocisti filtere i discovery ce odmah prodisati."
-                actionLabel="Ocisti filtere"
-                onAction={clearFilters}
-              />
-            </View>
-          )
-        }
-        renderItem={({ item }) => (
-          <View style={numColumns === 1 ? { paddingHorizontal: 20 } : { flex: 1 }}>
-            <DiscoveryItemCard item={item} onPress={() => router.push(`/items/${item._id}`)} />
+        </View>
+
+        {!loading ? (
+          <View className="mt-3 self-start rounded-full border border-white/16 bg-white/12 px-3 py-2">
+            <Text className="font-sans text-xs font-semibold text-base-canvas/86">
+              {items.length} rezultata
+            </Text>
           </View>
-        )}
-      />
+        ) : null}
+      </View>
     </SafeAreaView>
   )
 }

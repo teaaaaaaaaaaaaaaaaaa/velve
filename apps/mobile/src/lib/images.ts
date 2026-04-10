@@ -1,4 +1,4 @@
-import { ImageSourcePropType } from 'react-native';
+import { ImageURISource } from 'react-native';
 
 import { API_URL } from '@/config/api';
 
@@ -45,7 +45,7 @@ export function normalizeImageUri(input?: string | null) {
   return null;
 }
 
-export function getRemoteImageSource(uri?: string | null): ImageSourcePropType | null {
+export function getRemoteImageSource(uri?: string | null): ImageURISource | null {
   const normalizedUri = normalizeImageUri(uri);
 
   if (!normalizedUri) {

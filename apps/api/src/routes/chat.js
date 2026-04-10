@@ -12,7 +12,7 @@ router.get('/', requireAuth, async (req, res) => {
     const chats = await Chat.find({ participants: req.dbUser._id })
       .sort({ updatedAt: -1 })
       .populate('participants', 'displayName photoURL email')
-      .populate('tradeRequestId', 'status offeredItemId requestedItemId')
+      .populate('tradeRequestId', 'status type offeredPrice')
       .lean()
 
     // Fetch last message for each chat
@@ -76,7 +76,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 
     const chat = await Chat.findById(req.params.id)
       .populate('participants', 'displayName photoURL email')
-      .populate('tradeRequestId')
+      .populate('tradeRequestId', 'status senderId receiverId type offeredPrice')
       .lean()
 
     if (!chat) return res.status(404).json({ error: 'Chat not found' })

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons'
-import { ReactNode } from 'react'
+import { memo, ReactNode } from 'react'
 import { TouchableOpacity, View, Text } from 'react-native'
 
 import { BrandWordmark } from '@/components/BrandWordmark'
@@ -14,7 +14,7 @@ type Props = {
   footer?: ReactNode
 }
 
-export function EditorialEmptyState({
+export const EditorialEmptyState = memo(function EditorialEmptyState({
   icon,
   title,
   description,
@@ -52,4 +52,4 @@ export function EditorialEmptyState({
       {footer ? <View className="mt-4">{footer}</View> : null}
     </View>
   )
-}
+})

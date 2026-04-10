@@ -38,10 +38,11 @@ async function retryMissingEmbeddings() {
     // Process items sequentially to avoid overwhelming AI server
     for (const item of items) {
       try {
+        const sourceImage = item.imageClean || item.images[0]
         const response = await fetch(`${AI_SERVER_URL}/embed`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_url: item.images[0] }),
+          body: JSON.stringify({ image_url: sourceImage }),
           timeout: 30000, // 30s timeout
         })
 

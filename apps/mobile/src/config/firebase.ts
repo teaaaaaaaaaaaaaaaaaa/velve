@@ -9,7 +9,7 @@
  */
 
 import { getApp } from '@react-native-firebase/app'
-import { getAuth } from '@react-native-firebase/auth'
+import { getAuth, getIdToken, type FirebaseAuthTypes } from '@react-native-firebase/auth'
 
 const firebaseApp = getApp()
 const auth = getAuth(firebaseApp)
@@ -43,4 +43,8 @@ if (googleOAuthConfigError) {
 
 console.log('[Firebase] Auth module ready')
 
-export { auth, firebaseApp, googleClientId, googleOAuthConfigError }
+async function getAuthToken(user: FirebaseAuthTypes.User, forceRefresh = false) {
+  return getIdToken(user, forceRefresh)
+}
+
+export { auth, firebaseApp, googleClientId, googleOAuthConfigError, getAuthToken }

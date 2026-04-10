@@ -6,6 +6,7 @@ const messageSchema = new mongoose.Schema({
   text: { type: String, required: true },
   type: { type: String, enum: ['text', 'trade', 'buy', 'trade_update'], default: 'text' },
   tradeData: {
+    tradeRequestId: { type: mongoose.Schema.Types.ObjectId, ref: 'TradeRequest' },
     offeredItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
     offeredItemTitle: String,
     offeredItemImage: String,
@@ -14,9 +15,11 @@ const messageSchema = new mongoose.Schema({
     requestedItemImage: String,
   },
   buyData: {
+    tradeRequestId: { type: mongoose.Schema.Types.ObjectId, ref: 'TradeRequest' },
     requestedItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
     requestedItemTitle: String,
     requestedItemImage: String,
+    offeredPrice: Number,
   },
   statusData: {
     tradeRequestId: { type: mongoose.Schema.Types.ObjectId, ref: 'TradeRequest' },

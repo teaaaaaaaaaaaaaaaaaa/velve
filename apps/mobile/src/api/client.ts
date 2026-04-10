@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { Alert } from 'react-native'
-import { auth } from '@/config/firebase'
+import { auth, getAuthToken } from '@/config/firebase'
 import { API_URL } from '@/config/api'
 
 console.log('[APIClient] Using baseURL:', API_URL)
@@ -19,7 +19,7 @@ let lastOfflineAlert = 0
 client.interceptors.request.use(async (config) => {
   const user = auth.currentUser
   if (user) {
-    const token = await user.getIdToken()
+    const token = await getAuthToken(user)
     config.headers.Authorization = `Bearer ${token}`
     console.log('[APIClient] Request:', config.method?.toUpperCase(), `${config.baseURL ?? ''}${config.url ?? ''}`, '(with auth)')
   } else {

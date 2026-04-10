@@ -1,75 +1,36 @@
-﻿import { Ionicons } from '@expo/vector-icons'
+import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert,
   FlatList,
+  LayoutChangeEvent,
   Modal,
   Pressable,
   RefreshControl,
   StatusBar,
-  StyleSheet,
   Text,
   TouchableOpacity,
   useWindowDimensions,
   View,
+  ViewToken,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import client from '@/api/client'
-import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { FeedSkeleton } from '@/components/BrandedLoader'
-import { GlassSurface } from '@/components/GlassSurface'
+import { EditorialEmptyState } from '@/components/EditorialEmptyState'
+import { BrandWordmark } from '@/components/BrandWordmark'
+import { ImmersiveFeedCard, ImmersiveFeedItem } from '@/components/ImmersiveFeedCard'
 import { colors, shadows } from '@/design/tokens'
 import { useI18n } from '@/i18n'
-import { RemoteImage } from '@/components/RemoteImage'
+import { prefetchImageUri } from '@/lib/expoImage'
+import { getPrimaryItemImage } from '@/lib/itemImages'
+import { normalizeImageUri } from '@/lib/images'
 
-type Item = {
-  _id: string
-  title: string
-  description: string
-  category: string
-  brand: string
-  size: string
-  condition: 'new' | 'like_new' | 'good' | 'fair'
-  status?: 'available' | 'pending_trade' | 'traded'
-  images: string[]
-  userId: {
-    _id: string
-    displayName: string
-    photoURL: string
-  }
-  createdAt: string
-  likesCount?: number
-  isLiked?: boolean
-  isWishlisted?: boolean
-  listingType?: 'trade' | 'sell' | 'both'
-  price?: number
-  tradeFor?: string
-}
+type FeedMode = 'for_you' | 'following'
 
-const conditionCopy = {
-  sr: {
-    new: 'Novo',
-    like_new: 'Kao novo',
-    good: 'Dobro',
-    fair: 'OK stanje',
-  },
-  en: {
-    new: 'New',
-    like_new: 'Like new',
-    good: 'Good',
-    fair: 'Fair',
-  },
-  ru: {
-    new: 'Новое',
-    like_new: 'Как новое',
-    good: 'Хорошее',
-    fair: 'Нормальное',
-  },
-} as const
-
-function dedupeItemsById(items: Item[]) {
+function dedupeItemsById(items: ImmersiveFeedItem[]) {
   const seen = new Set<string>()
 
   return items.filter((item) => {
@@ -86,13 +47,14 @@ export default function FeedScreen() {
   const { height: windowHeight } = useWindowDimensions()
   const { locale, t } = useI18n()
 
-  const [items, setItems] = useState<Item[]>([])
+  const [items, setItems] = useState<ImmersiveFeedItem[]>([])
+  const [feedMode, setFeedMode] = useState<FeedMode>('for_you')
   const [hasMore, setHasMore] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [isFirstTime, setIsFirstTime] = useState(true)
-  const [actionItem, setActionItem] = useState<Item | null>(null)
+  const [actionItem, setActionItem] = useState<ImmersiveFeedItem | null>(null)
 
   const pageHeight = Math.max(windowHeight, 1)
 
@@ -109,9 +71,10 @@ export default function FeedScreen() {
         const params: Record<string, string | number> = {
           limit: 10,
           page: mode === 'append' ? 0 : pageNum,
+          mode: feedMode,
         }
 
-        if (pageNum === 0 && isFirstTime) {
+        if (feedMode === 'for_you' && pageNum === 0 && isFirstTime) {
           params.firstTime = 'true'
         }
 
@@ -122,7 +85,7 @@ export default function FeedScreen() {
         const response = await client.get('/api/feed', { params })
 
         if (response.data.ok) {
-          const nextItems = dedupeItemsById(response.data.data as Item[])
+          const nextItems = dedupeItemsById(response.data.data as ImmersiveFeedItem[])
           setItems((prev) =>
             mode === 'append' ? dedupeItemsById([...prev, ...nextItems]) : nextItems
           )
@@ -142,12 +105,22 @@ export default function FeedScreen() {
         setRefreshing(false)
       }
     },
-    [isFirstTime]
+    [feedMode, isFirstTime]
   )
 
   useEffect(() => {
     fetchFeed(0)
   }, [fetchFeed])
+
+  useEffect(() => {
+    items.slice(0, 3).forEach((item) => {
+      const uri = normalizeImageUri(getPrimaryItemImage(item))
+      if (uri && !prefetchedRef.current.has(uri)) {
+        prefetchedRef.current.add(uri)
+        void prefetchImageUri(uri)
+      }
+    })
+  }, [items])
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -159,7 +132,7 @@ export default function FeedScreen() {
     fetchFeed(0, 'append', items.map((item) => item._id))
   }, [fetchFeed, hasMore, isLoadingMore, items])
 
-  const updateItem = useCallback((itemId: string, updater: (item: Item) => Item) => {
+  const updateItem = useCallback((itemId: string, updater: (item: ImmersiveFeedItem) => ImmersiveFeedItem) => {
     setItems((prev) => prev.map((item) => (item._id === itemId ? updater(item) : item)))
   }, [])
 
@@ -202,7 +175,16 @@ export default function FeedScreen() {
 
   const handleWishlist = useCallback(
     async (itemId: string, isWishlisted: boolean) => {
-      updateItem(itemId, (item) => ({ ...item, isWishlisted: !isWishlisted }))
+      let previousCount = 0
+
+      updateItem(itemId, (item) => {
+        previousCount = item.wishlistCount ?? 0
+        return {
+          ...item,
+          isWishlisted: !isWishlisted,
+          wishlistCount: (item.wishlistCount ?? 0) + (isWishlisted ? -1 : 1),
+        }
+      })
 
       try {
         if (isWishlisted) {
@@ -211,13 +193,17 @@ export default function FeedScreen() {
           await client.post(`/api/wishlist/${itemId}`)
         }
       } catch {
-        updateItem(itemId, (item) => ({ ...item, isWishlisted }))
+        updateItem(itemId, (item) => ({
+          ...item,
+          isWishlisted,
+          wishlistCount: previousCount,
+        }))
       }
     },
     [updateItem]
   )
 
-  const handleHideItem = useCallback(async (item: Item) => {
+  const handleHideItem = useCallback(async (item: ImmersiveFeedItem) => {
     try {
       await client.post(`/api/items/${item._id}/hide`, { reason: 'not_interested' })
       setItems((prev) => prev.filter((entry) => entry._id !== item._id))
@@ -227,7 +213,7 @@ export default function FeedScreen() {
     }
   }, [])
 
-  const handleReportItem = useCallback(async (item: Item) => {
+  const handleReportItem = useCallback(async (item: ImmersiveFeedItem) => {
     try {
       await client.post(`/api/items/${item._id}/report`, { reason: 'community_report' })
       setActionItem(null)
@@ -237,7 +223,7 @@ export default function FeedScreen() {
     }
   }, [])
 
-  const handleBlockSeller = useCallback(async (item: Item) => {
+  const handleBlockSeller = useCallback(async (item: ImmersiveFeedItem) => {
     try {
       await client.post(`/api/users/${item.userId._id}/block`)
       setItems((prev) => prev.filter((entry) => entry.userId._id !== item.userId._id))
@@ -251,13 +237,32 @@ export default function FeedScreen() {
     }
   }, [])
 
-  const handleOpenMore = useCallback((item: Item) => {
-    setActionItem(item)
-  }, [])
+  const prefetchedRef = useRef(new Set<string>())
+  const itemsRef = useRef(items)
+  itemsRef.current = items
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (viewableItems.length === 0 || viewableItems[0].index == null) return
+      const currentIndex = viewableItems[0].index
+      const currentItems = itemsRef.current
+      for (let i = 1; i <= 2; i++) {
+        const nextItem = currentItems[currentIndex + i]
+        if (!nextItem) continue
+        const uri = normalizeImageUri(getPrimaryItemImage(nextItem))
+        if (uri && !prefetchedRef.current.has(uri)) {
+          prefetchedRef.current.add(uri)
+          void prefetchImageUri(uri)
+        }
+      }
+    }
+  )
+
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 })
 
   const renderFeedItem = useCallback(
-    ({ item }: { item: Item }) => (
-      <FeedItem
+    ({ item }: { item: ImmersiveFeedItem }) => (
+      <ImmersiveFeedCard
         item={item}
         height={pageHeight}
         locale={locale}
@@ -265,13 +270,11 @@ export default function FeedScreen() {
         bottomInset={insets.bottom}
         onLike={handleLike}
         onWishlist={handleWishlist}
-        onMore={handleOpenMore}
+        onMore={setActionItem}
       />
     ),
-    [handleLike, handleOpenMore, handleWishlist, insets.bottom, insets.top, locale, pageHeight]
+    [handleLike, handleWishlist, insets.bottom, insets.top, locale, pageHeight]
   )
-
-  const feedKeyExtractor = useCallback((item: Item) => item._id, [])
 
   if (isLoading) {
     return <FeedSkeleton />
@@ -284,17 +287,30 @@ export default function FeedScreen() {
       {items.length === 0 ? (
         <View className="flex-1 justify-center bg-base-canvas px-4 pt-20">
           <EditorialEmptyState
-            icon="sparkles-outline"
-            title={t('feed.emptyTitle')}
-            description={t('feed.emptyDescription')}
-            actionLabel={t('common.refresh')}
-            onAction={() => fetchFeed(0)}
+            icon={feedMode === 'following' ? 'people-outline' : 'sparkles-outline'}
+            title={
+              feedMode === 'following' ? 'Following feed je jos prazan' : t('feed.emptyTitle')
+            }
+            description={
+              feedMode === 'following'
+                ? 'Zapratite par profila i ovde ce se pojaviti samo njihovi komadi u istom feed ritmu.'
+                : t('feed.emptyDescription')
+            }
+            actionLabel={feedMode === 'following' ? 'Predji na For You' : t('common.refresh')}
+            onAction={() => {
+              if (feedMode === 'following') {
+                setFeedMode('for_you')
+                return
+              }
+              fetchFeed(0)
+            }}
           />
         </View>
       ) : (
         <FlatList
           data={items}
-          keyExtractor={feedKeyExtractor}
+          key={feedMode}
+          keyExtractor={(item) => item._id}
           renderItem={renderFeedItem}
           showsVerticalScrollIndicator={false}
           pagingEnabled
@@ -302,11 +318,13 @@ export default function FeedScreen() {
           snapToInterval={pageHeight}
           snapToAlignment="start"
           disableIntervalMomentum
-          removeClippedSubviews
           initialNumToRender={2}
           maxToRenderPerBatch={2}
           windowSize={3}
           updateCellsBatchingPeriod={40}
+          removeClippedSubviews
+          onViewableItemsChanged={onViewableItemsChanged.current}
+          viewabilityConfig={viewabilityConfig.current}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.55}
           getItemLayout={(_, index) => ({
@@ -318,9 +336,9 @@ export default function FeedScreen() {
           ListFooterComponent={
             isLoadingMore ? (
               <View className="py-8">
-                <GlassSurface className="mx-auto rounded-pill px-5 py-3" dark>
+                <View className="mx-auto rounded-full border border-white/18 bg-white/14 px-5 py-3" style={shadows.glass}>
                   <Text className="font-sans text-sm text-base-canvas/82">Loading more...</Text>
-                </GlassSurface>
+                </View>
               </View>
             ) : null
           }
@@ -332,28 +350,18 @@ export default function FeedScreen() {
         style={{ top: insets.top + 10 }}
         pointerEvents="box-none"
       >
-        <View className="flex-row items-start justify-between">
-          <View className="flex-1 pr-4">
-          <Text className="font-sans text-[11px] uppercase tracking-[1.6px] text-base-canvas/70">
-              {t('feed.discovery')}
-            </Text>
-            <Text className="mt-1 max-w-[250px] font-display text-[30px] leading-[30px] text-base-canvas">
-              {t('feed.title')}
-            </Text>
-          </View>
+        <View className="flex-row items-center justify-between">
+          <BrandWordmark width={92} tone="light" />
+
+          <FeedModeToggle feedMode={feedMode} onChangeMode={setFeedMode} />
 
           <TouchableOpacity
-            className="rounded-pill border border-base-canvas/22 bg-brand-accent-deep/62 px-4 py-3"
+            className="h-11 w-11 items-center justify-center rounded-full bg-white"
             activeOpacity={0.86}
             style={shadows.glass}
             onPress={() => router.push('/search')}
           >
-            <View className="flex-row items-center gap-2">
-              <Ionicons name="search" size={16} color={colors.baseCanvas} />
-              <Text className="font-sans text-sm font-semibold text-base-canvas">
-                {t('common.search')}
-              </Text>
-            </View>
+            <Ionicons name="search" size={18} color={colors.inkDark} />
           </TouchableOpacity>
         </View>
       </View>
@@ -365,7 +373,7 @@ export default function FeedScreen() {
         onRequestClose={() => setActionItem(null)}
       >
         <Pressable className="flex-1 justify-end bg-black/55 px-4 py-4" onPress={() => setActionItem(null)}>
-          <Pressable className="rounded-editorial bg-surface-panel px-5 py-5">
+          <Pressable className="rounded-[34px] bg-surface-panel px-5 py-5">
             <Text className="font-display text-[28px] text-ink-dark">
               {actionItem ? `@${actionItem.userId.displayName}` : 'Opcije objave'}
             </Text>
@@ -400,7 +408,7 @@ export default function FeedScreen() {
             />
 
             <TouchableOpacity
-              className="mt-3 items-center rounded-pill bg-ink-dark/6 px-4 py-4"
+              className="mt-3 items-center rounded-full bg-ink-dark/6 px-4 py-4"
               activeOpacity={0.86}
               onPress={() => setActionItem(null)}
             >
@@ -415,238 +423,81 @@ export default function FeedScreen() {
   )
 }
 
-type FeedItemProps = {
-  item: Item
-  height: number
-  locale: 'sr' | 'en' | 'ru'
-  topInset: number
-  bottomInset: number
-  onLike: (itemId: string, isLiked: boolean) => void
-  onWishlist: (itemId: string, isWishlisted: boolean) => void
-  onMore: (item: Item) => void
-}
+const FEED_TABS = [
+  { key: 'following' as const, label: 'Following' },
+  { key: 'for_you' as const, label: 'For You' },
+]
 
-const FeedItem = memo(function FeedItem({
-  item,
-  height,
-  locale,
-  topInset,
-  bottomInset,
-  onLike,
-  onWishlist,
-  onMore,
-}: FeedItemProps) {
-  const router = useRouter()
-  const { t, formatDate } = useI18n()
+function FeedModeToggle({
+  feedMode,
+  onChangeMode,
+}: {
+  feedMode: FeedMode
+  onChangeMode: (mode: FeedMode) => void
+}) {
+  const tabFrames = useRef<Array<{ x: number; width: number } | null>>([null, null])
+  const [indicatorFrame, setIndicatorFrame] = useState<{ x: number; width: number } | null>(null)
 
-  const imageUri = item.images?.[0]
-  const contentBottomOffset = Math.max(bottomInset, 10) + 28
+  const activeIndex = feedMode === 'following' ? 0 : 1
 
-  const metaParts = [
-    item.brand,
-    item.size ? item.size.toUpperCase() : null,
-    conditionCopy[locale][item.condition],
-  ].filter(Boolean)
+  const syncIndicator = useCallback((index: number) => {
+    const frame = tabFrames.current[index]
+    if (frame) {
+      setIndicatorFrame(frame)
+    }
+  }, [])
 
-  const metaLine = useMemo(
-    () => metaParts.join(' / '),
-    [metaParts]
+  const onTabLayout = useCallback(
+    (index: number) => (e: LayoutChangeEvent) => {
+      const { x, width } = e.nativeEvent.layout
+      tabFrames.current[index] = { x, width }
+
+      if (index === activeIndex || !indicatorFrame) {
+        syncIndicator(activeIndex)
+      }
+    },
+    [activeIndex, indicatorFrame, syncIndicator]
   )
 
-  const showPrice =
-    (item.listingType === 'sell' || item.listingType === 'both') && item.price != null
-  const showTradeBtn =
-    !item.listingType || item.listingType === 'trade' || item.listingType === 'both'
-  const showBuyBtn = item.listingType === 'sell' || item.listingType === 'both'
+  useEffect(() => {
+    syncIndicator(activeIndex)
+  }, [activeIndex, syncIndicator])
 
   return (
-    <View style={{ height }} className="w-full bg-brand-accent-deep">
-      {imageUri ? (
-        <RemoteImage
-          uri={imageUri}
-          style={StyleSheet.absoluteFillObject}
-          fallback={
-            <View style={[StyleSheet.absoluteFillObject, styles.imageFallback]}>
-              <Ionicons name="shirt-outline" size={48} color={colors.baseCanvas} />
-            </View>
-          }
-        />
-      ) : (
-        <View style={[StyleSheet.absoluteFillObject, styles.imageFallback]}>
-          <Text className="max-w-[180px] text-center font-sans text-sm leading-6 text-base-canvas/78">
-            {t('feed.manualFallback')}
-          </Text>
-        </View>
-      )}
-
-      <TouchableOpacity
-        style={StyleSheet.absoluteFillObject}
-        activeOpacity={1}
-        onPress={() => router.push(`/items/${item._id}`)}
+    <View className="flex-row items-center rounded-full bg-white p-1">
+      <View
+        className="absolute h-[34px] rounded-full bg-brand-accent-deep"
+        style={{
+          left: indicatorFrame?.x ?? 0,
+          width: indicatorFrame?.width ?? 0,
+          opacity: indicatorFrame ? 1 : 0,
+        }}
       />
-      <View style={styles.topShade} />
-
-      <View className="absolute left-4 right-20" style={{ top: topInset + 96 }}>
-        <View className="self-start rounded-pill bg-black/16 px-3 py-2">
-          <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-base-canvas/78">
-            {formatDate(item.createdAt, { day: 'numeric', month: 'short' })}
-          </Text>
-        </View>
-
-        <Text className="mt-4 font-display text-[34px] leading-[33px] text-base-canvas" numberOfLines={2}>
-          {item.title}
-        </Text>
-
-        <Text className="mt-3 font-sans text-sm leading-6 text-base-canvas/80" numberOfLines={2}>
-          {metaLine}
-        </Text>
-      </View>
-
-      <View className="absolute right-3 items-center gap-3" style={{ bottom: contentBottomOffset + 104 }}>
-        <ActionButton
-          icon={item.isLiked ? 'heart' : 'heart-outline'}
-          iconColor={item.isLiked ? '#FF5F77' : colors.baseCanvas}
-          label={(item.likesCount ?? 0) > 0 ? String(item.likesCount) : undefined}
-          onPress={() => onLike(item._id, !!item.isLiked)}
-        />
-        <ActionButton
-          icon={item.isWishlisted ? 'bookmark' : 'bookmark-outline'}
-          iconColor={item.isWishlisted ? colors.highlight : colors.baseCanvas}
-          onPress={() => onWishlist(item._id, !!item.isWishlisted)}
-        />
-        <ActionButton
-          icon="paper-plane-outline"
-          iconColor={colors.baseCanvas}
-          onPress={() => router.push('/(tabs)/chat')}
-        />
-        <ActionButton
-          icon="ellipsis-horizontal"
-          iconColor={colors.baseCanvas}
-          onPress={() => onMore(item)}
-        />
-      </View>
-
-      <GlassSurface
-        dark
-        className="absolute left-4 right-4 px-4 py-4"
-        style={{ bottom: contentBottomOffset }}
-      >
-        <View className="flex-row items-center">
+      {FEED_TABS.map((tab, index) => {
+        const active = feedMode === tab.key
+        return (
           <TouchableOpacity
-            className="flex-1 flex-row items-center"
-            activeOpacity={0.88}
-            onPress={() => router.push({ pathname: '/users/[id]', params: { id: item.userId._id } })}
+            key={tab.key}
+            activeOpacity={0.86}
+            onPress={() => onChangeMode(tab.key)}
+            onLayout={onTabLayout(index)}
+            className="rounded-full px-4 py-2"
           >
-            {item.userId?.photoURL ? (
-              <RemoteImage
-                uri={item.userId.photoURL}
-                className="h-11 w-11 rounded-full"
-                fallback={
-                  <View className="h-full w-full items-center justify-center rounded-full bg-brand-accent-light/35">
-                    <Text className="font-display text-2xl text-brand-accent-deep">
-                      {(item.userId?.displayName || '?').charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                }
-              />
-            ) : (
-              <View className="h-11 w-11 items-center justify-center rounded-full bg-brand-accent-light/35">
-                <Text className="font-display text-2xl text-brand-accent-deep">
-                  {(item.userId?.displayName || '?').charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            )}
-
-            <View className="ml-3 flex-1 pr-3">
-              <Text className="font-sans text-[11px] uppercase tracking-[1.1px] text-base-canvas/55">
-                Seller
-              </Text>
-              <Text className="font-display text-2xl text-base-canvas" numberOfLines={1}>
-                @{item.userId.displayName}
-              </Text>
-            </View>
+            <Text
+              className={`font-sans text-sm font-semibold ${
+                active ? 'text-base-canvas' : 'text-ink-dark/45'
+              }`}
+            >
+              {tab.label}
+            </Text>
           </TouchableOpacity>
-
-          <View className="items-end gap-2">
-            {showPrice ? (
-              <View className="rounded-pill border border-brand-highlight/35 bg-brand-highlight/12 px-3 py-2">
-                <Text className="font-sans text-xs font-semibold text-brand-highlight">
-                  {item.price} EUR
-                </Text>
-              </View>
-            ) : null}
-
-            {showBuyBtn ? (
-              <TouchableOpacity
-                className="rounded-pill bg-brand-highlight px-4 py-3"
-                activeOpacity={0.86}
-                onPress={() => router.push(`/items/${item._id}`)}
-              >
-                <Text className="font-sans text-sm font-semibold text-ink-dark">
-                  {t('feed.details')}
-                </Text>
-              </TouchableOpacity>
-            ) : showTradeBtn ? (
-              <TouchableOpacity
-                className="rounded-pill border border-base-canvas/18 bg-brand-accent-deep px-4 py-3"
-                activeOpacity={0.86}
-                onPress={() => router.push(`/items/${item._id}?openTrade=true`)}
-              >
-                <Text className="font-sans text-sm font-semibold text-base-canvas">
-                  {t('feed.trade')}
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        </View>
-
-        {!!item.description ? (
-          <Text className="mt-4 font-sans text-sm leading-6 text-base-canvas/75" numberOfLines={3}>
-            {item.description}
-          </Text>
-        ) : null}
-      </GlassSurface>
+        )
+      })}
     </View>
   )
-},
-(prev, next) =>
-  prev.item === next.item &&
-  prev.height === next.height &&
-  prev.locale === next.locale &&
-  prev.topInset === next.topInset &&
-  prev.bottomInset === next.bottomInset &&
-  prev.onLike === next.onLike &&
-  prev.onWishlist === next.onWishlist &&
-  prev.onMore === next.onMore
-)
-
-function ActionButton({
-  icon,
-  iconColor,
-  label,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap
-  iconColor: string
-  label?: string
-  onPress: () => void
-}) {
-  return (
-    <TouchableOpacity
-      className="w-[52px] items-center rounded-soft border border-base-canvas/14 bg-brand-accent-deep/55 px-2 py-3"
-      style={shadows.glass}
-      onPress={onPress}
-      activeOpacity={0.82}
-    >
-      <Ionicons name={icon} size={25} color={iconColor} />
-      {label ? (
-        <Text className="mt-1 font-sans text-xs font-semibold text-base-canvas">{label}</Text>
-      ) : null}
-    </TouchableOpacity>
-  )
 }
 
-function SheetButton({
+const SheetButton = memo(function SheetButton({
   label,
   icon,
   destructive,
@@ -659,7 +510,7 @@ function SheetButton({
 }) {
   return (
     <TouchableOpacity
-      className="mt-3 flex-row items-center rounded-soft bg-surface-panel px-4 py-4"
+      className="mt-3 flex-row items-center rounded-[24px] bg-surface-panel px-4 py-4"
       activeOpacity={0.86}
       onPress={onPress}
     >
@@ -682,21 +533,4 @@ function SheetButton({
       </Text>
     </TouchableOpacity>
   )
-}
-
-const styles = StyleSheet.create({
-  imageFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.accentDeep,
-    paddingHorizontal: 24,
-  },
-  topShade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    height: 220,
-    backgroundColor: 'rgba(4,2,4,0.08)',
-  },
 })

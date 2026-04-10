@@ -36,6 +36,8 @@ type DbUser = {
   emailVerified?: boolean
   averageRating?: number
   completedTrades?: number
+  bodyScanUrl?: string | null
+  bodyScanCreatedAt?: string | null
   onboardingCompleted: boolean
   stylePreferences: string[]
   favoriteBrands: string[]

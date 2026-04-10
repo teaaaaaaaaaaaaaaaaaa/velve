@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -17,13 +17,13 @@ import {
 import client from '@/api/client'
 import { BrandBackground } from '@/components/BrandBackground'
 import { BrandWordmark } from '@/components/BrandWordmark'
-import { GlassSurface } from '@/components/GlassSurface'
 import { ProfileSkeleton } from '@/components/BrandedLoader'
 import { DiscoveryCardItem } from '@/components/DiscoveryItemCard'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { RemoteImage } from '@/components/RemoteImage'
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
+import { getPrimaryItemImage } from '@/lib/itemImages'
 
 type ClosetCounts = {
   live: number
@@ -48,12 +48,46 @@ type UserProfile = {
   successfulSwaps: number
   profileCompleteness: number
   closetCounts: ClosetCounts
-  stylePreferences?: string[]
-  categories?: string[]
   favoriteBrands?: string[]
   location?: { city?: string; region?: string }
 }
 
+const ProfileGridItem = memo(function ProfileGridItem({
+  item,
+  onPress,
+}: {
+  item: { _id: string; title: string; images?: string[]; imageClean?: string | null; primaryImage?: string | null; isDigitized?: boolean; brand?: string }
+  onPress: () => void
+}) {
+  const imageUri = getPrimaryItemImage(item)
+
+  return (
+    <TouchableOpacity
+      style={{ width: '48%' }}
+      onPress={onPress}
+      className="overflow-hidden rounded-[24px]"
+    >
+      {imageUri ? (
+        <RemoteImage
+          uri={imageUri}
+          className="aspect-[3/4] w-full rounded-[24px] bg-surface-soft"
+        />
+      ) : (
+        <View className="aspect-[3/4] w-full items-center justify-center rounded-[24px] bg-surface-tint">
+          <Ionicons name="image-outline" size={32} color={colors.mutedText} />
+        </View>
+      )}
+      <Text className="mt-1.5 font-sans text-sm font-semibold text-ink-dark" numberOfLines={1}>
+        {item.title}
+      </Text>
+      {item.brand ? (
+        <Text className="font-sans text-xs text-ink-dark/50" numberOfLines={1}>
+          {item.brand}
+        </Text>
+      ) : null}
+    </TouchableOpacity>
+  )
+})
 
 function formatJoinedDate(
   date: string | undefined,
@@ -72,50 +106,15 @@ function formatJoinedDate(
   )
 }
 
-function getResponseRateLabel(rate: number | null, label: string, emptyLabel: string) {
-  if (rate == null) return emptyLabel
-  return label.replace('{{value}}', String(rate))
-}
-
-
-function SectionHeader({
-  title,
-  description,
-  actionLabel,
-  onAction,
-}: {
-  title: string
-  description: string
-  actionLabel?: string
-  onAction?: () => void
-}) {
-  return (
-    <View className="mb-4 flex-row items-end justify-between">
-      <View className="flex-1 pr-4">
-        <Text className="font-display text-3xl text-ink-dark">{title}</Text>
-        <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/60">{description}</Text>
-      </View>
-      {actionLabel && onAction ? (
-        <TouchableOpacity onPress={onAction}>
-          <Text className="font-sans text-sm font-semibold text-brand-accent-deep">
-            {actionLabel}
-          </Text>
-        </TouchableOpacity>
-      ) : null}
-    </View>
-  )
-}
-
-
 export default function ProfileScreen() {
   const router = useRouter()
-const { t, formatDate } = useI18n()
+  const { t, formatDate } = useI18n()
 
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
-  const [activeTab, setActiveTab] = useState<'posts' | 'saved' | 'liked'>('posts')
+  const [activeTab, setActiveTab] = useState<'posts' | 'saved'>('posts')
   const [closetItems, setClosetItems] = useState<any[]>([])
   const [wishlistItems, setWishlistItems] = useState<DiscoveryCardItem[]>([])
   const [tabLoading, setTabLoading] = useState(false)
@@ -131,9 +130,7 @@ const { t, formatDate } = useI18n()
       profile.location?.city
         ? `${profile.location.city}${profile.location.region ? `, ${profile.location.region}` : ''}`
         : null,
-      profile.favoriteBrands?.[0] ? `Brand pulse: ${profile.favoriteBrands[0]}` : null,
-      profile.categories?.[0] ? `Vibe: ${profile.categories[0]}` : null,
-      profile.stylePreferences?.[0] ? profile.stylePreferences[0] : null,
+      profile.favoriteBrands?.[0] ? `Brand: ${profile.favoriteBrands[0]}` : null,
       profile.emailVerified ? 'Email verifikovan' : null,
     ].filter(Boolean) as string[]
   }, [profile])
@@ -145,7 +142,9 @@ const { t, formatDate } = useI18n()
   }, [])
 
   const loadProfile = useCallback(async () => {
-    const profileResponse = await client.get('/api/users/me').catch((e) => ({ status: 'rejected' as const, reason: e }))
+    const profileResponse = await client
+      .get('/api/users/me')
+      .catch((error) => ({ status: 'rejected' as const, reason: error }))
 
     if ('data' in profileResponse && profileResponse.data.ok) {
       const nextProfile = profileResponse.data.data as UserProfile
@@ -173,27 +172,22 @@ const { t, formatDate } = useI18n()
     loadAll()
   }, [loadAll])
 
-  const onRefresh = useCallback(async () => {
-    try {
-      setRefreshing(true)
-      await loadProfile()
-    } finally {
-      setRefreshing(false)
-    }
-  }, [loadProfile])
-
-  const loadTabContent = useCallback(async (tab: 'posts' | 'saved' | 'liked') => {
+  const loadTabContent = useCallback(async (tab: 'posts' | 'saved') => {
     setTabLoading(true)
     try {
       if (tab === 'posts') {
-        const res = await client.get('/api/items/closet')
-        if (res.data.ok) setClosetItems(res.data.data.live || [])
-      } else if (tab === 'saved') {
-        const res = await client.get('/api/wishlist')
-        if (res.data.ok) setWishlistItems(res.data.data || [])
+        const response = await client.get('/api/items/closet')
+        if (response.data.ok) {
+          setClosetItems(response.data.data.live || [])
+        }
+      } else {
+        const response = await client.get('/api/wishlist')
+        if (response.data.ok) {
+          setWishlistItems(response.data.data || [])
+        }
       }
     } catch {
-      // silent fail
+      // Keep the section quiet and retry on next refresh.
     } finally {
       setTabLoading(false)
     }
@@ -202,6 +196,15 @@ const { t, formatDate } = useI18n()
   useEffect(() => {
     loadTabContent('posts')
   }, [loadTabContent])
+
+  const onRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true)
+      await Promise.all([loadProfile(), loadTabContent(activeTab)])
+    } finally {
+      setRefreshing(false)
+    }
+  }, [activeTab, loadProfile, loadTabContent])
 
   const handlePickImage = useCallback(async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -312,7 +315,16 @@ const { t, formatDate } = useI18n()
             </TouchableOpacity>
           </View>
 
-          <GlassSurface className="overflow-hidden rounded-editorial px-5 pb-5 pt-6">
+          <View
+            className="overflow-hidden rounded-[32px] bg-surface-panel px-5 pb-5 pt-6"
+            style={{
+              shadowColor: colors.inkDark,
+              shadowOpacity: 0.08,
+              shadowRadius: 22,
+              shadowOffset: { width: 0, height: 6 },
+              elevation: 6,
+            }}
+          >
             <View className="flex-row items-center">
               <TouchableOpacity activeOpacity={0.88} onPress={() => setModalVisible(true)}>
                 {profile.photoURL ? (
@@ -351,8 +363,7 @@ const { t, formatDate } = useI18n()
             </View>
 
             <Text className="mt-5 font-sans text-sm leading-6 text-ink-dark/75">
-              {profile.bio ||
-                'Dodaj kratku belešku o svom ukusu kako bi profil delovao kao licni editorial, a ne kao prazan nalog.'}
+              {profile.bio || 'Dodaj par reci o svom ukusu da profil deluje zivo i licno.'}
             </Text>
 
             {identityChips.length > 0 ? (
@@ -364,21 +375,6 @@ const { t, formatDate } = useI18n()
                 ))}
               </View>
             ) : null}
-
-            <View className="mt-4">
-              <View className="mb-2 flex-row items-center justify-between">
-                <Text className="font-sans text-sm text-ink-dark/65">Kompletnost profila</Text>
-                <Text className="font-sans text-sm font-semibold text-brand-accent-deep">
-                  {profile.profileCompleteness}%
-                </Text>
-              </View>
-              <View className="h-1.5 overflow-hidden rounded-full bg-brand-accent-light/30">
-                <View
-                  className="h-full rounded-full bg-brand-accent-deep"
-                  style={{ width: `${profile.profileCompleteness}%` }}
-                />
-              </View>
-            </View>
 
             <View className="mt-5 flex-row items-center justify-between">
               <View className="items-center">
@@ -396,24 +392,30 @@ const { t, formatDate } = useI18n()
             </View>
 
             <View className="mt-4 flex-row flex-wrap gap-2">
-              {profile.averageRating > 0 && (
+              {profile.averageRating > 0 ? (
                 <View className="flex-row items-center gap-1 rounded-full bg-brand-highlight/30 px-3 py-1.5">
                   <Ionicons name="star" size={12} color={colors.inkDark} />
-                  <Text className="font-sans text-xs font-semibold text-ink-dark">{profile.averageRating.toFixed(1)}</Text>
+                  <Text className="font-sans text-xs font-semibold text-ink-dark">
+                    {profile.averageRating.toFixed(1)}
+                  </Text>
                 </View>
-              )}
-              {profile.successfulSwaps > 0 && (
+              ) : null}
+              {profile.successfulSwaps > 0 ? (
                 <View className="flex-row items-center gap-1 rounded-full bg-brand-accent-light/30 px-3 py-1.5">
                   <Ionicons name="repeat-outline" size={12} color={colors.accentDeep} />
-                  <Text className="font-sans text-xs text-brand-accent-deep">{profile.successfulSwaps} razmena</Text>
+                  <Text className="font-sans text-xs text-brand-accent-deep">
+                    {profile.successfulSwaps} razmena
+                  </Text>
                 </View>
-              )}
-              {profile.responseRate != null && (
+              ) : null}
+              {profile.responseRate != null ? (
                 <View className="flex-row items-center gap-1 rounded-full bg-surface-soft px-3 py-1.5">
                   <Ionicons name="time-outline" size={12} color={colors.inkDark} />
-                  <Text className="font-sans text-xs text-ink-dark/70">{profile.responseRate}% response</Text>
+                  <Text className="font-sans text-xs text-ink-dark/70">
+                    {profile.responseRate}% response
+                  </Text>
                 </View>
-              )}
+              ) : null}
             </View>
 
             <View className="mt-5 flex-row gap-3">
@@ -434,36 +436,27 @@ const { t, formatDate } = useI18n()
                 </Text>
               </TouchableOpacity>
             </View>
+          </View>
 
-            <TouchableOpacity
-              className="mt-3 flex-row items-center justify-between rounded-[24px] border border-brand-accent-deep/10 bg-brand-accent-deep px-4 py-4"
-              onPress={() => router.push('/(tabs)/trades')}
-            >
-              <View className="flex-1 pr-4">
-                <Text className="font-sans text-[11px] uppercase tracking-[1.4px] text-base-canvas/70">
-                  {t('profile.tradeDesk')}
-                </Text>
-                <Text className="mt-1 font-display text-2xl text-base-canvas">
-                  Aktivni i zavrseni zahtevi na jednom mestu
-                </Text>
-              </View>
-              <Ionicons name="swap-horizontal" size={28} color={colors.baseCanvas} />
-            </TouchableOpacity>
-          </GlassSurface>
-
-          <View className="mt-5 overflow-hidden rounded-[28px] bg-surface-panel px-5 py-5"
-            style={{ shadowColor: '#2B2A2B', shadowOpacity: 0.07, shadowRadius: 20, shadowOffset: { width: 0, height: 4 }, elevation: 5 }}
+          <View
+            className="mt-5 rounded-[28px] bg-surface-panel px-5 py-5"
+            style={{
+              shadowColor: colors.inkDark,
+              shadowOpacity: 0.06,
+              shadowRadius: 18,
+              shadowOffset: { width: 0, height: 4 },
+              elevation: 4,
+            }}
           >
-            <SectionHeader
-              title="Wardrobe control"
-              description="Draft, active i archive tok sada imaju odvojene lane-ove i bulk akcije."
-              actionLabel="Otvori closet"
-              onAction={() => router.push('/(tabs)/closet')}
-            />
-            <View className="flex-row gap-3">
+            <Text className="font-display text-3xl text-ink-dark">Closet pregled</Text>
+            <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/60">
+              Jednostavan pregled aktivnih, draft i arhiviranih komada.
+            </Text>
+
+            <View className="mt-4 flex-row gap-3">
               <View className="flex-1 rounded-[22px] bg-surface-soft px-4 py-4">
                 <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
-                  {t('profile.live')}
+                  Live
                 </Text>
                 <Text className="mt-1 font-display text-3xl text-ink-dark">
                   {profile.closetCounts.live}
@@ -471,7 +464,7 @@ const { t, formatDate } = useI18n()
               </View>
               <View className="flex-1 rounded-[22px] bg-surface-soft px-4 py-4">
                 <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
-                  {t('profile.drafts')}
+                  Drafts
                 </Text>
                 <Text className="mt-1 font-display text-3xl text-ink-dark">
                   {profile.closetCounts.drafts}
@@ -479,65 +472,42 @@ const { t, formatDate } = useI18n()
               </View>
               <View className="flex-1 rounded-[22px] bg-surface-soft px-4 py-4">
                 <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
-                  {t('profile.archive')}
+                  Archive
                 </Text>
                 <Text className="mt-1 font-display text-3xl text-ink-dark">
                   {profile.closetCounts.archive}
                 </Text>
               </View>
             </View>
-            <View className="mt-4 flex-row gap-3">
-              <TouchableOpacity
-                className="flex-1 items-center rounded-full border border-ink-dark/8 bg-base-canvas px-4 py-3"
-                onPress={() => router.push('/(tabs)/upload')}
-              >
-                <Text className="font-sans text-sm font-semibold text-ink-dark">
-                  {t('profile.newListing')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                className="flex-1 items-center rounded-full border border-ink-dark/8 bg-base-canvas px-4 py-3"
-                onPress={() => router.push('/(tabs)/wishlist')}
-              >
-                <Text className="font-sans text-sm font-semibold text-ink-dark">
-                  {t('profile.wishlist')}
-                </Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
-          {/* TikTok-style tabs */}
           <View className="mt-6">
-            {/* Tab bar */}
-            <View className="flex-row border-b border-ink-dark/10">
-              {[
-                { key: 'posts', label: 'Objave', icon: 'grid-outline' },
-                { key: 'saved', label: 'Sacuvano', icon: 'bookmark-outline' },
-                { key: 'liked', label: 'Lajkovano', icon: 'heart-outline' },
-              ].map((tab) => (
+            <View className="mb-4 flex-row rounded-[22px] bg-surface-panel p-1">
+              {([
+                { key: 'posts', label: 'Objave' },
+                { key: 'saved', label: 'Sacuvano' },
+              ] as const).map((tab) => (
                 <TouchableOpacity
                   key={tab.key}
-                  className="flex-1 items-center py-3"
+                  className={`flex-1 rounded-[18px] px-4 py-3 ${
+                    activeTab === tab.key ? 'bg-brand-accent-deep' : ''
+                  }`}
                   onPress={() => {
-                    setActiveTab(tab.key as any)
-                    loadTabContent(tab.key as any)
+                    setActiveTab(tab.key)
+                    loadTabContent(tab.key)
                   }}
                 >
-                  <Ionicons
-                    name={tab.icon as any}
-                    size={20}
-                    color={activeTab === tab.key ? colors.accentDeep : colors.mutedText}
-                  />
-                  <View
-                    className={`mt-2 h-0.5 w-8 rounded-full ${
-                      activeTab === tab.key ? 'bg-brand-accent-deep' : 'bg-transparent'
+                  <Text
+                    className={`text-center font-sans text-sm font-semibold ${
+                      activeTab === tab.key ? 'text-base-canvas' : 'text-ink-dark/60'
                     }`}
-                  />
+                  >
+                    {tab.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            {/* Tab content */}
             {tabLoading ? (
               <View className="items-center py-12">
                 <ActivityIndicator color={colors.accentDeep} />
@@ -546,7 +516,7 @@ const { t, formatDate } = useI18n()
               closetItems.length === 0 ? (
                 <EditorialEmptyState
                   icon="shirt-outline"
-                  title="Tvoj ormar je prazan"
+                  title="Tvoj ormar je jos prazan"
                   description="Dodaj prve komade i postavi ih u discovery."
                   actionLabel="Dodaj komad"
                   onAction={() => router.push('/(tabs)/upload')}
@@ -554,80 +524,34 @@ const { t, formatDate } = useI18n()
               ) : (
                 <View className="mt-3 flex-row flex-wrap gap-2">
                   {closetItems.map((item: any) => (
-                    <TouchableOpacity
+                    <ProfileGridItem
                       key={item._id}
-                      style={{ width: '48%' }}
+                      item={item}
                       onPress={() => router.push(`/items/${item._id}`)}
-                      className="overflow-hidden rounded-card"
-                    >
-                      {item.images?.[0] ? (
-                        <RemoteImage
-                          uri={item.images[0]}
-                          className="aspect-[3/4] w-full rounded-card bg-surface-soft"
-                        />
-                      ) : (
-                        <View className="aspect-[3/4] w-full items-center justify-center rounded-card bg-surface-tint">
-                          <Ionicons name="image-outline" size={32} color={colors.mutedText} />
-                        </View>
-                      )}
-                      <Text className="mt-1.5 font-sans text-sm font-semibold text-ink-dark" numberOfLines={1}>
-                        {item.title}
-                      </Text>
-                      {item.brand && (
-                        <Text className="font-sans text-xs text-ink-dark/50" numberOfLines={1}>
-                          {item.brand}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
+                    />
                   ))}
                 </View>
               )
-            ) : activeTab === 'saved' ? (
-              wishlistItems.length === 0 ? (
-                <EditorialEmptyState
-                  icon="bookmark-outline"
-                  title="Nema sacuvanih komada"
-                  description="Sacuvaj komade iz feeda i nadi ih ovde."
-                  actionLabel="Idi na feed"
-                  onAction={() => router.push('/(tabs)/feed')}
-                />
-              ) : (
-                <View className="mt-3 flex-row flex-wrap gap-2">
-                  {wishlistItems.map((item: any) => (
-                    <TouchableOpacity
-                      key={item._id}
-                      style={{ width: '48%' }}
-                      onPress={() => router.push(`/items/${item._id}`)}
-                      className="overflow-hidden rounded-card"
-                    >
-                      {item.images?.[0] ? (
-                        <RemoteImage
-                          uri={item.images[0]}
-                          className="aspect-[3/4] w-full rounded-card bg-surface-soft"
-                        />
-                      ) : (
-                        <View className="aspect-[3/4] w-full items-center justify-center rounded-card bg-surface-tint">
-                          <Ionicons name="image-outline" size={32} color={colors.mutedText} />
-                        </View>
-                      )}
-                      <Text className="mt-1.5 font-sans text-sm font-semibold text-ink-dark" numberOfLines={1}>
-                        {item.title}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )
-            ) : (
+            ) : wishlistItems.length === 0 ? (
               <EditorialEmptyState
-                icon="heart-outline"
-                title="Nema lajkovanih komada"
-                description="Lajkuj komade u feedu i nadi ih ovde."
+                icon="bookmark-outline"
+                title="Nema sacuvanih komada"
+                description="Sacuvaj komade iz feeda i nadi ih ovde."
                 actionLabel="Idi na feed"
                 onAction={() => router.push('/(tabs)/feed')}
               />
+            ) : (
+              <View className="mt-3 flex-row flex-wrap gap-2">
+                {wishlistItems.map((item: any) => (
+                  <ProfileGridItem
+                    key={item._id}
+                    item={item}
+                    onPress={() => router.push(`/items/${item._id}`)}
+                  />
+                ))}
+              </View>
             )}
           </View>
-
         </View>
       </ScrollView>
 
@@ -707,7 +631,7 @@ const { t, formatDate } = useI18n()
                 maxLength={200}
                 multiline
                 textAlignVertical="top"
-                placeholder="Par reci o svom ukusu, silueti i komadima koje volis."
+                placeholder="Par reci o svom ukusu i komadima koje volis."
                 placeholderTextColor="#2B2A2B66"
                 className="min-h-[140px] rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm leading-6 text-ink-dark"
               />

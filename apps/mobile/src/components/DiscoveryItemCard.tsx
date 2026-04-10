@@ -1,8 +1,10 @@
 ﻿import { Ionicons } from '@expo/vector-icons';
+import { memo } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 import { RemoteImage } from '@/components/RemoteImage';
 import { colors } from '@/design/tokens';
+import { getPrimaryItemImage } from '@/lib/itemImages';
 
 type Owner = {
   _id?: string;
@@ -14,6 +16,9 @@ export type DiscoveryCardItem = {
   _id: string;
   title: string;
   images?: string[];
+  imageClean?: string | null;
+  primaryImage?: string | null;
+  isDigitized?: boolean;
   brand?: string;
   size?: string;
   price?: number;
@@ -27,8 +32,8 @@ type Props = {
   badgeText?: string;
 };
 
-export function DiscoveryItemCard({ item, onPress, badgeText }: Props) {
-  const imageUri = item.images?.[0];
+export const DiscoveryItemCard = memo(function DiscoveryItemCard({ item, onPress, badgeText }: Props) {
+  const imageUri = getPrimaryItemImage(item);
   const owner = item.userId && typeof item.userId === 'object' ? item.userId.displayName : null;
 
   return (
@@ -90,4 +95,4 @@ export function DiscoveryItemCard({ item, onPress, badgeText }: Props) {
       </View>
     </TouchableOpacity>
   );
-}
+})

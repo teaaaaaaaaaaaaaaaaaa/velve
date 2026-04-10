@@ -14,6 +14,8 @@ const userSchema = new mongoose.Schema(
     averageRating: { type: Number, default: 0, min: 0, max: 5 },
     totalRatings: { type: Number, default: 0 },
     completedTrades: { type: Number, default: 0 },
+    bodyScanUrl: { type: String, default: null },
+    bodyScanCreatedAt: { type: Date, default: null },
 
     // Onboarding fields
     onboardingCompleted: { type: Boolean, default: false },

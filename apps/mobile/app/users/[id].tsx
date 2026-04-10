@@ -1,16 +1,10 @@
 ﻿import { Ionicons } from '@expo/vector-icons'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
-import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native'
+import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 
 import client from '@/api/client'
+import { BrandedLoader } from '@/components/BrandedLoader'
 import { DiscoveryCardItem, DiscoveryItemCard } from '@/components/DiscoveryItemCard'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { RemoteImage } from '@/components/RemoteImage'
@@ -169,10 +163,10 @@ export default function PublicProfileScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-base-canvas">
+      <>
         <Stack.Screen options={{ headerShown: false }} />
-        <ActivityIndicator size="large" color="#431A43" />
-      </View>
+        <BrandedLoader />
+      </>
     )
   }
 

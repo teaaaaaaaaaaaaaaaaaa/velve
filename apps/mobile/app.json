@@ -24,6 +24,19 @@
     "plugins": [
       "expo-router",
       "expo-web-browser",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Velve koristi kameru za body scan i fotografisanje artikala."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Velve koristi galeriju da sacuva i izveze tvoj virtual try-on rezultat.",
+          "savePhotosPermission": "Velve koristi galeriju da sacuva outfit preview i try-on rezultate."
+        }
+      ],
       "@react-native-firebase/app",
       "@react-native-google-signin/google-signin"
     ],

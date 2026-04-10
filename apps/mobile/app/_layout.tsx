@@ -1,5 +1,5 @@
 import '../global.css'
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Stack, useRouter, useSegments, ErrorBoundary } from 'expo-router'
 import { useFonts } from 'expo-font'
 import { BrandedLoader } from '@/components/BrandedLoader'
@@ -20,11 +20,18 @@ function AuthGate() {
     Inter: require('../assets/fonts/Inter-Variable.ttf'),
   })
 
+  const [minSplashDone, setMinSplashDone] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMinSplashDone(true), 1200)
+    return () => clearTimeout(timer)
+  }, [])
+
   // Register push notifications when user is logged in
   usePushNotifications()
 
   useEffect(() => {
-    if (loading) return
+    if (loading || !minSplashDone) return
 
     const inAuthGroup = segments[0] === '(auth)'
     const inOnboarding = segments[0] === 'onboarding'
@@ -33,32 +40,36 @@ function AuthGate() {
     const inUsers = segments[0] === 'users'
     const inSearch = segments[0] === 'search'
     const inSettings = segments[0] === 'settings'
+    const inUploadFlow = segments[0] === 'upload-flow'
+    const inVto = segments[0] === 'vto'
     const isIndex = false // TypeScript knows segments.length is never 0
 
     if (!currentUser && !inAuthGroup) {
       router.replace('/(auth)/login')
     } else if (currentUser && inAuthGroup) {
       router.replace('/')
-    } else if (currentUser && !inOnboarding && !inTabs && !inItems && !inUsers && !inSearch && !inSettings && !isIndex) {
+    } else if (currentUser && !inOnboarding && !inTabs && !inItems && !inUsers && !inSearch && !inSettings && !inUploadFlow && !inVto && !isIndex) {
       router.replace('/')
     }
-  }, [currentUser, loading, segments])
+  }, [currentUser, loading, segments, minSplashDone])
 
-  if (loading || !fontsLoaded) {
+  if (loading || !fontsLoaded || !minSplashDone) {
     return <BrandedLoader label={t('common.loading')} />
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="onboarding" />
-      <Stack.Screen name="items/[id]" />
-      <Stack.Screen name="users/[id]" />
-      <Stack.Screen name="search" />
-      <Stack.Screen name="settings" />
-    </Stack>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="items/[id]" />
+        <Stack.Screen name="users/[id]" />
+        <Stack.Screen name="search" />
+        <Stack.Screen name="settings" />
+        <Stack.Screen name="upload-flow" />
+        <Stack.Screen name="vto" />
+      </Stack>
   )
 }
 

@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
+    "reset:all": "node scripts/resetAllData.js",
     "seed:discovery": "node scripts/seedDiscovery.js",
     "retry:embeddings": "node scripts/retryEmbeddings.js",
     "rebuild:similar-index": "node scripts/rebuildSimilarIndex.js",

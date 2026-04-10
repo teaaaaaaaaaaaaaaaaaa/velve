@@ -11,6 +11,7 @@ const tradeRequestSchema = new mongoose.Schema(
       enum: ['trade', 'buy'],
       default: 'trade',
     },
+    offeredPrice: { type: Number, min: 0 },
     status: {
       type: String,
       enum: ['pending', 'accepted', 'rejected', 'cancelled', 'expired'],

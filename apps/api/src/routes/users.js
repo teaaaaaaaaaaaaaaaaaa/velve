@@ -10,6 +10,8 @@ const Report = require('../models/Report')
 const TradeRequest = require('../models/TradeRequest')
 const ItemView = require('../models/ItemView')
 const { enrichItems } = require('../lib/enrichItems')
+const { imageUpload } = require('../lib/uploadMiddleware')
+const { createBodyScanKey, uploadBuffer } = require('../lib/r2')
 const {
   getDiscoverySignals,
   getBehavioralAffinity,
@@ -387,6 +389,52 @@ router.put('/me/push-token', requireAuth, async (req, res) => {
 
     await User.findByIdAndUpdate(req.dbUser._id, { expoPushToken: token })
     res.json({ ok: true, message: 'Push token saved' })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.get('/body-scan', requireAuth, async (req, res) => {
+  try {
+    res.json({
+      ok: true,
+      data: {
+        exists: !!req.dbUser.bodyScanUrl,
+        url: req.dbUser.bodyScanUrl || null,
+        createdAt: req.dbUser.bodyScanCreatedAt || null,
+      },
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.post('/body-scan', requireAuth, imageUpload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'image is required' })
+    }
+
+    const key = createBodyScanKey(req.dbUser._id)
+    const uploadResult = await uploadBuffer({
+      key,
+      buffer: req.file.buffer,
+      contentType: req.file.mimetype,
+    })
+
+    const bodyScanCreatedAt = new Date()
+    await User.findByIdAndUpdate(req.dbUser._id, {
+      bodyScanUrl: uploadResult.url,
+      bodyScanCreatedAt,
+    })
+
+    res.status(201).json({
+      ok: true,
+      data: {
+        url: uploadResult.url,
+        createdAt: bodyScanCreatedAt,
+      },
+    })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

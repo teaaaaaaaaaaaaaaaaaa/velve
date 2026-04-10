@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { io, Socket } from 'socket.io-client'
 import { View } from 'react-native'
 import { useAuth } from '@/hooks/useAuth'
-import { auth as firebaseAuth } from '@/config/firebase'
+import { auth as firebaseAuth, getAuthToken } from '@/config/firebase'
 import { API_URL } from '@/config/api'
 import { colors, fonts, shadows } from '@/design/tokens'
 import { useI18n } from '@/i18n'
@@ -15,6 +15,8 @@ export default function TabsLayout() {
   const pathname = usePathname()
   const [unreadCount, setUnreadCount] = useState(0)
   const socketRef = useRef<Socket | null>(null)
+  const hideFloatingBar =
+    pathname.includes('/chat') || pathname.endsWith('/closet') || pathname.endsWith('/trades')
 
   // Resetuj badge kad korisnik otvori chat
   useEffect(() => {
@@ -32,7 +34,7 @@ export default function TabsLayout() {
     async function connect() {
       const user = firebaseAuth.currentUser
       if (!user) return
-      const token = await user.getIdToken()
+      const token = await getAuthToken(user)
 
       socket = io(API_URL, {
         auth: { token },
@@ -75,6 +77,7 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarHideOnKeyboard: true,
         tabBarBackground: () => (
           <View
             className="mx-3 mb-3 flex-1 rounded-editorial border border-base-canvas/70 bg-base-canvas/80"
@@ -82,6 +85,7 @@ export default function TabsLayout() {
           />
         ),
         tabBarStyle: {
+          display: hideFloatingBar ? 'none' : 'flex',
           position: 'absolute',
           left: 0,
           right: 0,
