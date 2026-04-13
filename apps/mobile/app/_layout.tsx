@@ -33,6 +33,12 @@ function AuthGate() {
   useEffect(() => {
     if (loading || !minSplashDone) return
 
+    console.log('[AuthGate] Evaluating navigation state', {
+      currentUserUid: currentUser?.uid ?? null,
+      loading,
+      minSplashDone,
+      segments,
+    })
     const inAuthGroup = segments[0] === '(auth)'
     const inOnboarding = segments[0] === 'onboarding'
     const inTabs = segments[0] === '(tabs)'
@@ -45,10 +51,13 @@ function AuthGate() {
     const isIndex = false // TypeScript knows segments.length is never 0
 
     if (!currentUser && !inAuthGroup) {
+      console.log('[AuthGate] Redirecting signed-out user to /(auth)/login')
       router.replace('/(auth)/login')
     } else if (currentUser && inAuthGroup) {
+      console.log('[AuthGate] Redirecting signed-in user from auth group to /')
       router.replace('/')
     } else if (currentUser && !inOnboarding && !inTabs && !inItems && !inUsers && !inSearch && !inSettings && !inUploadFlow && !inVto && !isIndex) {
+      console.log('[AuthGate] Redirecting signed-in user to home because route is outside allowed groups')
       router.replace('/')
     }
   }, [currentUser, loading, segments, minSplashDone])

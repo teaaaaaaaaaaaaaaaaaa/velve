@@ -10,6 +10,7 @@ type Props = {
   count?: number
   active?: boolean
   accessibilityLabel: string
+  tone?: 'light' | 'dark'
 }
 
 function formatCount(value?: number) {
@@ -18,7 +19,7 @@ function formatCount(value?: number) {
   return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`
 }
 
-const baseStyle: ViewStyle = {
+const lightBase: ViewStyle = {
   width: 58,
   borderRadius: 22,
   borderWidth: 1,
@@ -26,8 +27,20 @@ const baseStyle: ViewStyle = {
   backgroundColor: 'rgba(255,255,255,0.16)',
 }
 
-const activeStyle: ViewStyle = {
+const lightActive: ViewStyle = {
   backgroundColor: 'rgba(255,255,255,0.26)',
+}
+
+const darkBase: ViewStyle = {
+  width: 58,
+  borderRadius: 22,
+  borderWidth: 1,
+  borderColor: 'rgba(43,42,43,0.10)',
+  backgroundColor: 'rgba(43,42,43,0.06)',
+}
+
+const darkActive: ViewStyle = {
+  backgroundColor: 'rgba(43,42,43,0.12)',
 }
 
 export const GlassCountActionButton = memo(function GlassCountActionButton({
@@ -36,8 +49,11 @@ export const GlassCountActionButton = memo(function GlassCountActionButton({
   count,
   active = false,
   accessibilityLabel,
+  tone = 'light',
 }: Props) {
   const countLabel = formatCount(count)
+  const isDark = tone === 'dark'
+  const iconColor = isDark ? colors.inkDark : colors.baseCanvas
 
   return (
     <TouchableOpacity
@@ -46,11 +62,20 @@ export const GlassCountActionButton = memo(function GlassCountActionButton({
       onPress={onPress}
       activeOpacity={0.84}
       className="items-center px-2 py-3"
-      style={[baseStyle, shadows.glass, active ? activeStyle : null]}
+      style={[
+        isDark ? darkBase : lightBase,
+        isDark ? shadows.soft : shadows.glass,
+        active ? (isDark ? darkActive : lightActive) : null,
+      ]}
     >
-      <Ionicons name={icon} size={26} color={colors.baseCanvas} />
+      <Ionicons name={icon} size={26} color={iconColor} />
       {countLabel ? (
-        <Text className="mt-1 font-sans text-xs font-semibold text-base-canvas">{countLabel}</Text>
+        <Text
+          className="mt-1 font-sans text-xs font-semibold"
+          style={{ color: isDark ? colors.inkDark : colors.baseCanvas }}
+        >
+          {countLabel}
+        </Text>
       ) : null}
     </TouchableOpacity>
   )

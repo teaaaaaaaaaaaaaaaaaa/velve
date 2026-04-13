@@ -10,19 +10,28 @@ import {
   RefreshControl,
   StatusBar,
   Text,
+  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
   ViewToken,
 } from 'react-native'
+import Animated, {
+  Extrapolation,
+  FadeIn,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import client from '@/api/client'
-import { FeedSkeleton } from '@/components/BrandedLoader'
+import { BrandedLoader, FeedSkeleton } from '@/components/BrandedLoader'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { BrandWordmark } from '@/components/BrandWordmark'
 import { ImmersiveFeedCard, ImmersiveFeedItem } from '@/components/ImmersiveFeedCard'
-import { colors, shadows } from '@/design/tokens'
+import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
 import { prefetchImageUri } from '@/lib/expoImage'
 import { getPrimaryItemImage } from '@/lib/itemImages'
@@ -44,7 +53,7 @@ function dedupeItemsById(items: ImmersiveFeedItem[]) {
 export default function FeedScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const { height: windowHeight } = useWindowDimensions()
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions()
   const { locale, t } = useI18n()
 
   const [items, setItems] = useState<ImmersiveFeedItem[]>([])
@@ -55,6 +64,104 @@ export default function FeedScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [isFirstTime, setIsFirstTime] = useState(true)
   const [actionItem, setActionItem] = useState<ImmersiveFeedItem | null>(null)
+
+  // --- Inline search state ---
+  const [searchActive, setSearchActive] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchItems, setSearchItems] = useState<ImmersiveFeedItem[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchLoadingMore, setSearchLoadingMore] = useState(false)
+  const [searchNextCursor, setSearchNextCursor] = useState<string | null>(null)
+  const [searchHasMore, setSearchHasMore] = useState(false)
+  const searchInputRef = useRef<TextInput>(null)
+
+  // Animation shared value: 0 = closed, 1 = expanded
+  const searchProgress = useSharedValue(0)
+  const headerWidth = windowWidth - 32 // full width minus horizontal padding (left-4 right-4 = 32)
+
+  const openSearch = useCallback(() => {
+    setSearchActive(true)
+    setSearchLoading(true)
+    searchProgress.value = withSpring(1, { damping: 22, stiffness: 240 })
+    setTimeout(() => searchInputRef.current?.focus(), 350)
+  }, [searchProgress])
+
+  const finishCloseSearch = useCallback(() => {
+    setSearchActive(false)
+    setSearchQuery('')
+    setSearchItems([])
+    setSearchNextCursor(null)
+  }, [])
+
+  const closeSearch = useCallback(() => {
+    searchInputRef.current?.blur()
+    searchProgress.value = withSpring(0, { damping: 22, stiffness: 240 })
+    setTimeout(finishCloseSearch, 300)
+  }, [searchProgress, finishCloseSearch])
+
+  // Animated style for logo + toggle (fade out when searching)
+  const headerElementsStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(searchProgress.value, [0, 0.4], [1, 0], Extrapolation.CLAMP),
+    transform: [
+      { scale: interpolate(searchProgress.value, [0, 0.5], [1, 0.92], Extrapolation.CLAMP) },
+    ],
+  }))
+
+  // Animated style for search bar (expands from right to left)
+  const searchBarStyle = useAnimatedStyle(() => ({
+    width: interpolate(searchProgress.value, [0, 1], [44, headerWidth], Extrapolation.CLAMP),
+    height: 44,
+    borderRadius: 22,
+    overflow: 'hidden' as const,
+  }))
+
+  // Animated style for search input inside the expanded bar
+  const searchInputOpacity = useAnimatedStyle(() => ({
+    opacity: interpolate(searchProgress.value, [0.5, 0.85], [0, 1], Extrapolation.CLAMP),
+  }))
+
+  // Search data fetching
+  const loadSearchResults = useCallback(
+    async (mode: 'replace' | 'append' = 'replace') => {
+      try {
+        if (mode === 'replace') setSearchLoading(true)
+        else setSearchLoadingMore(true)
+
+        const response = await client.get('/api/items', {
+          params: {
+            limit: 20,
+            search: searchQuery.trim() || undefined,
+            cursor: mode === 'append' ? searchNextCursor || undefined : undefined,
+          },
+        })
+
+        if (response.data.ok) {
+          const nextItems = response.data.data as ImmersiveFeedItem[]
+          setSearchItems((prev) => (mode === 'append' ? [...prev, ...nextItems] : nextItems))
+          setSearchNextCursor(response.data.nextCursor ? String(response.data.nextCursor) : null)
+          setSearchHasMore(Boolean(response.data.hasMore))
+        }
+      } catch {
+        if (mode === 'replace') setSearchItems([])
+      } finally {
+        setSearchLoading(false)
+        setSearchLoadingMore(false)
+      }
+    },
+    [searchNextCursor, searchQuery]
+  )
+
+  // Debounced search trigger
+  useEffect(() => {
+    if (!searchActive) return
+    const timeout = setTimeout(() => loadSearchResults('replace'), 250)
+    return () => clearTimeout(timeout)
+  }, [searchQuery, searchActive, loadSearchResults])
+
+  const onSearchLoadMore = useCallback(() => {
+    if (!searchHasMore || searchLoadingMore || !searchNextCursor) return
+    loadSearchResults('append')
+  }, [searchHasMore, loadSearchResults, searchLoadingMore, searchNextCursor])
 
   const pageHeight = Math.max(windowHeight, 1)
 
@@ -276,15 +383,147 @@ export default function FeedScreen() {
     [handleLike, handleWishlist, insets.bottom, insets.top, locale, pageHeight]
   )
 
+  // Search-specific item updater + handlers
+  const updateSearchItem = useCallback(
+    (itemId: string, updater: (item: ImmersiveFeedItem) => ImmersiveFeedItem) => {
+      setSearchItems((prev) => prev.map((item) => (item._id === itemId ? updater(item) : item)))
+    },
+    []
+  )
+
+  const handleSearchLike = useCallback(
+    async (itemId: string, isLiked: boolean) => {
+      let previousCount = 0
+      updateSearchItem(itemId, (item) => {
+        previousCount = item.likesCount ?? 0
+        return { ...item, isLiked: !isLiked, likesCount: (item.likesCount ?? 0) + (isLiked ? -1 : 1) }
+      })
+      try {
+        const response = isLiked
+          ? await client.delete(`/api/items/${itemId}/like`)
+          : await client.post(`/api/items/${itemId}/like`)
+        if (!isLiked && response.data.ok) {
+          updateSearchItem(itemId, (item) => ({
+            ...item,
+            isLiked: response.data.isLiked,
+            likesCount: response.data.likesCount,
+          }))
+        }
+      } catch {
+        updateSearchItem(itemId, (item) => ({ ...item, isLiked, likesCount: previousCount }))
+      }
+    },
+    [updateSearchItem]
+  )
+
+  const handleSearchWishlist = useCallback(
+    async (itemId: string, isWishlisted: boolean) => {
+      let previousCount = 0
+      updateSearchItem(itemId, (item) => {
+        previousCount = item.wishlistCount ?? 0
+        return { ...item, isWishlisted: !isWishlisted, wishlistCount: (item.wishlistCount ?? 0) + (isWishlisted ? -1 : 1) }
+      })
+      try {
+        if (isWishlisted) await client.delete(`/api/wishlist/${itemId}`)
+        else await client.post(`/api/wishlist/${itemId}`)
+      } catch {
+        updateSearchItem(itemId, (item) => ({ ...item, isWishlisted, wishlistCount: previousCount }))
+      }
+    },
+    [updateSearchItem]
+  )
+
+  const renderSearchItem = useCallback(
+    ({ item }: { item: ImmersiveFeedItem }) => (
+      <ImmersiveFeedCard
+        item={item}
+        height={pageHeight}
+        locale={locale}
+        topInset={insets.top}
+        bottomInset={insets.bottom}
+        onLike={handleSearchLike}
+        onWishlist={handleSearchWishlist}
+      />
+    ),
+    [handleSearchLike, handleSearchWishlist, insets.bottom, insets.top, locale, pageHeight]
+  )
+
+  const searchViewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 })
+
   if (isLoading) {
     return <FeedSkeleton />
   }
 
   return (
-    <View className="flex-1 bg-brand-accent-deep">
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+    <View className="flex-1 bg-white">
+      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
-      {items.length === 0 ? (
+      {searchActive ? (
+        // --- Search results overlay ---
+        searchLoading && searchItems.length === 0 ? (
+          <BrandedLoader />
+        ) : searchItems.length === 0 ? (
+          <View className="flex-1 bg-white px-5 pt-24">
+            <EditorialEmptyState
+              icon="search-outline"
+              title="Nema rezultata za ovaj upit"
+              description="Probaj drugi naziv, brend ili kategoriju i feed ce odmah pokazati novi set komada."
+              actionLabel="Obrisi unos"
+              onAction={() => setSearchQuery('')}
+            />
+          </View>
+        ) : (
+          <FlatList
+            data={searchItems}
+            key="search"
+            keyExtractor={(item) => `s-${item._id}`}
+            renderItem={renderSearchItem}
+            showsVerticalScrollIndicator={false}
+            pagingEnabled
+            decelerationRate="fast"
+            snapToInterval={pageHeight}
+            snapToAlignment="start"
+            disableIntervalMomentum
+            initialNumToRender={2}
+            maxToRenderPerBatch={2}
+            windowSize={3}
+            updateCellsBatchingPeriod={40}
+            removeClippedSubviews
+            viewabilityConfig={searchViewabilityConfig.current}
+            onEndReached={onSearchLoadMore}
+            onEndReachedThreshold={0.55}
+            getItemLayout={(_, index) => ({
+              length: pageHeight,
+              offset: pageHeight * index,
+              index,
+            })}
+            ListHeaderComponent={
+              !searchLoading ? (
+                <Animated.View
+                  entering={FadeIn.duration(300)}
+                  className="absolute left-4 z-10"
+                  style={{ top: insets.top + 64 }}
+                >
+                  <View className="rounded-full border border-ink-dark/8 bg-ink-dark/4 px-3 py-2">
+                    <Text className="font-sans text-xs font-semibold text-ink-dark/62">
+                      {searchItems.length} rezultata
+                    </Text>
+                  </View>
+                </Animated.View>
+              ) : null
+            }
+            ListFooterComponent={
+              searchLoadingMore ? (
+                <View className="py-8">
+                  <View className="mx-auto rounded-full border border-ink-dark/8 bg-ink-dark/4 px-5 py-3">
+                    <Text className="font-sans text-sm text-ink-dark/62">Loading more...</Text>
+                  </View>
+                </View>
+              ) : null
+            }
+          />
+        )
+      ) : items.length === 0 ? (
         <View className="flex-1 justify-center bg-base-canvas px-4 pt-20">
           <EditorialEmptyState
             icon={feedMode === 'following' ? 'people-outline' : 'sparkles-outline'}
@@ -336,8 +575,8 @@ export default function FeedScreen() {
           ListFooterComponent={
             isLoadingMore ? (
               <View className="py-8">
-                <View className="mx-auto rounded-full border border-white/18 bg-white/14 px-5 py-3" style={shadows.glass}>
-                  <Text className="font-sans text-sm text-base-canvas/82">Loading more...</Text>
+                <View className="mx-auto rounded-full border border-ink-dark/8 bg-ink-dark/4 px-5 py-3">
+                  <Text className="font-sans text-sm text-ink-dark/62">Loading more...</Text>
                 </View>
               </View>
             ) : null
@@ -350,19 +589,75 @@ export default function FeedScreen() {
         style={{ top: insets.top + 10 }}
         pointerEvents="box-none"
       >
-        <View className="flex-row items-center justify-between">
-          <BrandWordmark width={92} tone="light" />
-
-          <FeedModeToggle feedMode={feedMode} onChangeMode={setFeedMode} />
-
-          <TouchableOpacity
-            className="h-11 w-11 items-center justify-center rounded-full bg-white"
-            activeOpacity={0.86}
-            style={shadows.glass}
-            onPress={() => router.push('/search')}
+        <View className="flex-row items-center justify-between" pointerEvents="box-none">
+          {/* Logo + Toggle - fade out when search expands */}
+          <Animated.View
+            className="flex-1 flex-row items-center justify-between pr-3"
+            style={headerElementsStyle}
+            pointerEvents={searchActive ? 'none' : 'auto'}
           >
-            <Ionicons name="search" size={18} color={colors.inkDark} />
-          </TouchableOpacity>
+            <BrandWordmark width={92} tone="dark" />
+            <FeedModeToggle feedMode={feedMode} onChangeMode={setFeedMode} />
+          </Animated.View>
+
+          {/* Search bar - expands from icon to full width */}
+          <Animated.View
+            className="flex-row items-center bg-ink-dark/6"
+            style={searchBarStyle}
+          >
+            {/* Back button (visible when expanded) */}
+            {searchActive ? (
+              <Animated.View entering={FadeIn.delay(200).duration(200)}>
+                <TouchableOpacity
+                  className="h-11 w-11 items-center justify-center"
+                  activeOpacity={0.86}
+                  onPress={closeSearch}
+                >
+                  <Ionicons name="arrow-back" size={20} color={colors.inkDark} />
+                </TouchableOpacity>
+              </Animated.View>
+            ) : null}
+
+            {/* Search icon (always visible, acts as button when collapsed) */}
+            {!searchActive ? (
+              <TouchableOpacity
+                className="h-11 w-11 items-center justify-center"
+                activeOpacity={0.86}
+                onPress={openSearch}
+              >
+                <Ionicons name="search" size={18} color={colors.inkDark} />
+              </TouchableOpacity>
+            ) : (
+              <View className="mr-1">
+                <Ionicons name="search" size={18} color={colors.inkDark} style={{ opacity: 0.5 }} />
+              </View>
+            )}
+
+            {/* Text input (visible when expanded) */}
+            <Animated.View className="flex-1" style={searchInputOpacity}>
+              <TextInput
+                ref={searchInputRef}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Pretrazi komade, brend..."
+                placeholderTextColor="rgba(43,42,43,0.42)"
+                className="flex-1 py-2 font-sans text-sm text-ink-dark"
+                returnKeyType="search"
+              />
+            </Animated.View>
+
+            {/* Clear button */}
+            {searchActive && searchQuery.length > 0 ? (
+              <Animated.View entering={FadeIn.duration(150)}>
+                <TouchableOpacity
+                  className="mr-2 h-7 w-7 items-center justify-center rounded-full bg-ink-dark/8"
+                  onPress={() => setSearchQuery('')}
+                >
+                  <Ionicons name="close" size={14} color={colors.inkDark} />
+                </TouchableOpacity>
+              </Animated.View>
+            ) : null}
+          </Animated.View>
         </View>
       </View>
 
@@ -436,42 +731,52 @@ function FeedModeToggle({
   onChangeMode: (mode: FeedMode) => void
 }) {
   const tabFrames = useRef<Array<{ x: number; width: number } | null>>([null, null])
-  const [indicatorFrame, setIndicatorFrame] = useState<{ x: number; width: number } | null>(null)
+  const indicatorX = useSharedValue(0)
+  const indicatorW = useSharedValue(0)
+  const ready = useSharedValue(0)
 
   const activeIndex = feedMode === 'following' ? 0 : 1
 
-  const syncIndicator = useCallback((index: number) => {
-    const frame = tabFrames.current[index]
-    if (frame) {
-      setIndicatorFrame(frame)
-    }
-  }, [])
+  const syncIndicator = useCallback(
+    (index: number, animate: boolean) => {
+      const frame = tabFrames.current[index]
+      if (!frame) return
+      if (animate) {
+        indicatorX.value = withSpring(frame.x, { damping: 20, stiffness: 220 })
+        indicatorW.value = withSpring(frame.width, { damping: 20, stiffness: 220 })
+      } else {
+        indicatorX.value = frame.x
+        indicatorW.value = frame.width
+      }
+      ready.value = 1
+    },
+    [indicatorX, indicatorW, ready]
+  )
 
   const onTabLayout = useCallback(
     (index: number) => (e: LayoutChangeEvent) => {
       const { x, width } = e.nativeEvent.layout
       tabFrames.current[index] = { x, width }
-
-      if (index === activeIndex || !indicatorFrame) {
-        syncIndicator(activeIndex)
-      }
+      if (index === activeIndex) syncIndicator(activeIndex, false)
     },
-    [activeIndex, indicatorFrame, syncIndicator]
+    [activeIndex, syncIndicator]
   )
 
   useEffect(() => {
-    syncIndicator(activeIndex)
+    syncIndicator(activeIndex, true)
   }, [activeIndex, syncIndicator])
 
+  const indicatorStyle = useAnimatedStyle(() => ({
+    left: indicatorX.value,
+    width: indicatorW.value,
+    opacity: ready.value,
+  }))
+
   return (
-    <View className="flex-row items-center rounded-full bg-white p-1">
-      <View
-        className="absolute h-[34px] rounded-full bg-brand-accent-deep"
-        style={{
-          left: indicatorFrame?.x ?? 0,
-          width: indicatorFrame?.width ?? 0,
-          opacity: indicatorFrame ? 1 : 0,
-        }}
+    <View className="flex-row items-center rounded-full bg-ink-dark/6 p-1">
+      <Animated.View
+        className="absolute h-[34px] rounded-full bg-ink-dark"
+        style={indicatorStyle}
       />
       {FEED_TABS.map((tab, index) => {
         const active = feedMode === tab.key
@@ -485,7 +790,7 @@ function FeedModeToggle({
           >
             <Text
               className={`font-sans text-sm font-semibold ${
-                active ? 'text-base-canvas' : 'text-ink-dark/45'
+                active ? 'text-white' : 'text-ink-dark/45'
               }`}
             >
               {tab.label}

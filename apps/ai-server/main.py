@@ -196,6 +196,7 @@ def prepare_binary_mask(image: Image.Image) -> tuple[np.ndarray, dict]:
         bbox = (0, 0, width, height)
         coverage = 0.0
         touches_edge = False
+        edges_touched = 0
         aspect_ratio = width / max(height, 1)
         center_offset = 1.0
         subject_mask = combined
@@ -207,7 +208,12 @@ def prepare_binary_mask(image: Image.Image) -> tuple[np.ndarray, dict]:
         h = int(stats[best_index, cv2.CC_STAT_HEIGHT])
         subject_mask = np.where(labels == best_index, 255, 0).astype(np.uint8)
         coverage = float(np.count_nonzero(subject_mask)) / total_pixels
-        touches_edge = x <= 3 or y <= 3 or (x + w) >= (width - 3) or (y + h) >= (height - 3)
+        touches_left = x <= 3
+        touches_top = y <= 3
+        touches_right = (x + w) >= (width - 3)
+        touches_bottom = (y + h) >= (height - 3)
+        edges_touched = int(touches_left) + int(touches_top) + int(touches_right) + int(touches_bottom)
+        touches_edge = edges_touched > 0
         subject_center_x = x + (w / 2.0)
         center_offset = abs(subject_center_x - (width / 2.0)) / max(width / 2.0, 1.0)
         aspect_ratio = w / max(h, 1)
@@ -217,17 +223,20 @@ def prepare_binary_mask(image: Image.Image) -> tuple[np.ndarray, dict]:
     brightness = float(np.mean(gray))
     contrast = float(np.std(gray))
     color_distance = float(np.mean(bg_distance[subject_mask > 0])) if np.count_nonzero(subject_mask) else 0.0
+    sharpness = float(cv2.Laplacian(gray, cv2.CV_64F).var())
 
     return subject_mask, {
         "bbox": bbox,
         "coverage": round(coverage, 4),
         "touchesEdge": touches_edge,
+        "edgesTouched": edges_touched,
         "aspectRatio": round(float(aspect_ratio), 4),
         "centerOffset": round(float(center_offset), 4),
         "brightness": round(brightness / 255.0, 4),
         "contrast": round(contrast / 255.0, 4),
         "borderWhiteness": round(border_whiteness / 255.0, 4),
         "backgroundDistance": round(color_distance / 255.0, 4),
+        "sharpness": round(sharpness, 2),
         "width": width,
         "height": height,
     }
@@ -236,23 +245,48 @@ def prepare_binary_mask(image: Image.Image) -> tuple[np.ndarray, dict]:
 def build_garment_analysis(image: Image.Image) -> dict:
     _, metrics = prepare_binary_mask(image)
 
-    lighting_ok = metrics["brightness"] >= 0.36
-    framing_ok = (
-        0.08 <= metrics["coverage"] <= 0.78
-        and not metrics["touchesEdge"]
-        and metrics["centerOffset"] <= 0.35
-    )
-    contrast_ok = metrics["backgroundDistance"] >= 0.08 and metrics["contrast"] >= 0.14
+    brightness = metrics["brightness"]
+    coverage = metrics["coverage"]
+    contrast = metrics["contrast"]
+    bg_distance = metrics["backgroundDistance"]
+    center_offset = metrics["centerOffset"]
+    edges_touched = metrics.get("edgesTouched", 0)
+    sharpness = metrics.get("sharpness", 100.0)
+
+    too_dark = brightness < 0.22
+    too_bright = brightness > 0.97
+    lighting_ok = not too_dark and not too_bright
+
+    subject_missing = coverage < 0.05
+    detection_failed = coverage > 0.97 and edges_touched >= 4
+    too_cropped = (not detection_failed) and coverage > 0.88 and edges_touched >= 3
+    way_off_center = (not detection_failed) and coverage < 0.85 and center_offset > 0.6
+    framing_ok = not subject_missing and not too_cropped and not way_off_center
+
+    blended_bg = bg_distance < 0.05
+    low_contrast = contrast < 0.10
+    too_blurry = sharpness < 35.0
+    contrast_ok = not blended_bg and not low_contrast and not too_blurry
 
     ready = lighting_ok and framing_ok and contrast_ok
 
     messages = []
-    if not lighting_ok:
-        messages.append("Treba nam malo vise svetla za jasnu teksturu.")
-    if not framing_ok:
-        messages.append("Rasiri artikal da vidimo njegov pun oblik.")
-    if not contrast_ok:
-        messages.append("Dodaj malo kontrasta u pozadini da AI lakse prepozna ivice.")
+    if too_dark:
+        messages.append("Slika je pretamna — pomeri se blize prozoru ili pojacaj svetlo.")
+    elif too_bright:
+        messages.append("Previse svetla — detalji se gube, odmakni od direktnog izvora.")
+
+    if subject_missing:
+        messages.append("Ne vidimo artikal jasno — primakni telefon i stavi artikal u sredinu.")
+    elif too_cropped:
+        messages.append("Artikal je isecen — odmakni telefon da stane ceo u kadar.")
+    elif way_off_center:
+        messages.append("Centriraj artikal u kadru.")
+
+    if too_blurry:
+        messages.append("Slika je mutna — drzi telefon stabilno i pokusaj ponovo.")
+    elif blended_bg or low_contrast:
+        messages.append("Pozadina se stapa sa artiklom — probaj drugu, jednobojnu podlogu.")
 
     return {
         "ready": ready,
@@ -353,6 +387,7 @@ def call_modal_try_on(payload: dict) -> dict:
 @app.on_event("startup")
 def startup_event():
     print("[AI Server] Starting up...")
+    print("[AI Server] Garment analysis version: 2026-04-11-v2 (relaxed framing + sharpness)")
     load_faiss_index()
     try:
         get_rembg()
@@ -367,17 +402,132 @@ def ping():
     return {"status": "ok", "message": "Velve AI server running"}
 
 
+CLIP_COLORS = [
+    "black", "white", "red", "blue", "green", "yellow", "pink", "purple",
+    "brown", "gray", "beige", "navy", "cream", "olive", "burgundy", "teal",
+    "orange", "gold", "silver", "khaki",
+]
+CLIP_PATTERNS = [
+    "solid", "striped", "plaid", "floral", "polka dot",
+    "animal print", "geometric", "tie dye", "camo",
+]
+CLIP_STYLES = [
+    "casual", "formal", "sporty", "elegant", "vintage",
+    "bohemian", "minimalist", "streetwear", "preppy",
+]
+CONDITION_LABELS_SR = {
+    "new": "potpuno novo",
+    "like_new": "kao novo",
+    "good": "dobrom stanju",
+    "fair": "prihvatljivom stanju",
+}
+
+
+def clip_classify(image_pil, labels: list[str], prompt_template: str = "a {} piece of clothing"):
+    import torch
+
+    model, processor = get_clip()
+    prompts = [prompt_template.format(label) for label in labels]
+
+    image_inputs = processor(images=image_pil, return_tensors="pt")
+    text_inputs = processor(text=prompts, return_tensors="pt", padding=True)
+
+    with torch.no_grad():
+        image_features = model.get_image_features(**image_inputs)
+        image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+        text_features = model.get_text_features(**text_inputs)
+        text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+        similarities = (image_features @ text_features.T).squeeze(0)
+        idx = similarities.argmax().item()
+
+    return labels[idx], float(similarities[idx])
+
+
+def detect_garment_attributes(image_url: str) -> dict:
+    try:
+        image_bytes = fetch_image_bytes(image_url)
+        image = bytes_to_pil(image_bytes, mode="RGB")
+
+        color, _ = clip_classify(image, CLIP_COLORS, "a {} colored piece of clothing")
+        pattern, _ = clip_classify(image, CLIP_PATTERNS, "a {} pattern piece of clothing")
+        style, _ = clip_classify(image, CLIP_STYLES, "a {} style piece of clothing")
+
+        print(f"[generate-description] CLIP detected: color={color}, pattern={pattern}, style={style}")
+        return {"color": color, "pattern": pattern, "style": style}
+    except Exception as error:
+        print(f"[generate-description] CLIP detection failed: {error}")
+        return {}
+
+
+def build_template_description(category: str, attrs: dict, brand: str = "", size: str = "", condition: str = "", language: str = "sr") -> dict:
+    color = attrs.get("color", "")
+    pattern = attrs.get("pattern", "")
+    style = attrs.get("style", "")
+    cond_sr = CONDITION_LABELS_SR.get(condition, condition)
+
+    if language == "sr":
+        title_parts = []
+        if brand:
+            title_parts.append(brand)
+        if color:
+            title_parts.append(color.capitalize())
+        title_parts.append(category)
+        if style and style not in ("casual",):
+            title_parts.append(f"- {style}")
+        title = " ".join(title_parts)
+
+        desc_parts = []
+        base = f"{color.capitalize()} {category.lower()}" if color else category
+        if brand:
+            base = f"{brand} {base}"
+        desc_parts.append(f"{base} u {cond_sr}." if cond_sr else f"{base}.")
+        if pattern and pattern != "solid":
+            desc_parts.append(f"{pattern.capitalize()} dezen.")
+        if size:
+            desc_parts.append(f"Velicina {size}.")
+        desc_parts.append("Savrseno za svakodnevno nosenje ili razmenu.")
+        description = " ".join(desc_parts)
+    else:
+        title_parts = []
+        if brand:
+            title_parts.append(brand)
+        if color:
+            title_parts.append(color.capitalize())
+        title_parts.append(category)
+        title = " ".join(title_parts)
+
+        desc_parts = []
+        base = f"{color.capitalize()} {category.lower()}" if color else category
+        if brand:
+            base = f"{brand} {base}"
+        desc_parts.append(f"{base} in {condition} condition." if condition else f"{base}.")
+        if pattern and pattern != "solid":
+            desc_parts.append(f"{pattern.capitalize()} pattern.")
+        if size:
+            desc_parts.append(f"Size {size}.")
+        description = " ".join(desc_parts)
+
+    return {"title": title, "description": description}
+
+
 class DescriptionRequest(BaseModel):
     category: str
     size: str = ""
     brand: str = ""
     condition: str = ""
     color: str = ""
-    language: str = "en"
+    language: str = "sr"
+    image_url: str = ""
 
 
 @app.post("/generate-description")
 def generate_description(req: DescriptionRequest):
+    detected = {}
+    if req.image_url:
+        detected = detect_garment_attributes(req.image_url)
+
+    effective_color = req.color or detected.get("color", "")
+
     details = []
     if req.brand:
         details.append(f"Brand: {req.brand}")
@@ -385,8 +535,14 @@ def generate_description(req: DescriptionRequest):
         details.append(f"Size: {req.size}")
     if req.condition:
         details.append(f"Condition: {req.condition}")
-    if req.color:
-        details.append(f"Color: {req.color}")
+    if effective_color:
+        details.append(f"Color: {effective_color}")
+    pattern = detected.get("pattern", "")
+    if pattern and pattern != "solid":
+        details.append(f"Pattern: {pattern}")
+    style = detected.get("style", "")
+    if style:
+        details.append(f"Style: {style}")
     details.append(f"Category: {req.category}")
     details_str = ", ".join(details)
 
@@ -417,19 +573,29 @@ def generate_description(req: DescriptionRequest):
         )
         response.raise_for_status()
         text = response.json().get("response", "")
+
+        title = ""
+        description = ""
+        for line in text.strip().split("\n"):
+            line = line.strip()
+            if line.lower().startswith("title:"):
+                title = line.split(":", 1)[1].strip()
+            elif line.lower().startswith("description:"):
+                description = line.split(":", 1)[1].strip()
+
+        return {"title": title, "description": description, "raw": text, "source": "ollama"}
     except requests.RequestException as error:
-        raise HTTPException(status_code=502, detail=f"Ollama error: {str(error)}")
+        print(f"[generate-description] Ollama unavailable ({error}), using CLIP template fallback")
 
-    title = ""
-    description = ""
-    for line in text.strip().split("\n"):
-        line = line.strip()
-        if line.lower().startswith("title:"):
-            title = line.split(":", 1)[1].strip()
-        elif line.lower().startswith("description:"):
-            description = line.split(":", 1)[1].strip()
-
-    return {"title": title, "description": description, "raw": text}
+    fallback = build_template_description(
+        category=req.category,
+        attrs={"color": effective_color, **detected},
+        brand=req.brand,
+        size=req.size,
+        condition=req.condition,
+        language=req.language,
+    )
+    return {"title": fallback["title"], "description": fallback["description"], "source": "clip_template"}
 
 
 class EmbedRequest(BaseModel):
@@ -546,7 +712,9 @@ async def analyze_garment_photo(
         image_base64=image_base64,
         mode="RGB",
     )
-    return build_garment_analysis(image)
+    result = build_garment_analysis(image)
+    print(f"[analyze-garment-photo] ready={result['ready']} checks={result['checks']} metrics={result['metrics']}")
+    return result
 
 
 @app.post("/analyze-body-scan")

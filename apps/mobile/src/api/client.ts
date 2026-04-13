@@ -21,9 +21,14 @@ client.interceptors.request.use(async (config) => {
   if (user) {
     const token = await getAuthToken(user)
     config.headers.Authorization = `Bearer ${token}`
-    console.log('[APIClient] Request:', config.method?.toUpperCase(), `${config.baseURL ?? ''}${config.url ?? ''}`, '(with auth)')
+    console.log('[APIClient] Request:', config.method?.toUpperCase(), `${config.baseURL ?? ''}${config.url ?? ''}`, {
+      auth: 'with auth',
+      uid: user.uid,
+    })
   } else {
-    console.log('[APIClient] Request:', config.method?.toUpperCase(), `${config.baseURL ?? ''}${config.url ?? ''}`, '(no auth)')
+    console.log('[APIClient] Request:', config.method?.toUpperCase(), `${config.baseURL ?? ''}${config.url ?? ''}`, {
+      auth: 'no auth',
+    })
   }
   return config
 })
@@ -39,7 +44,11 @@ client.interceptors.response.use(
     const baseURL = error.config?.baseURL || ''
     const status = error.response?.status
 
-    console.log('[APIClient] Error:', status, `${baseURL}${url}`, error.message)
+    console.log('[APIClient] Error:', status, `${baseURL}${url}`, {
+      message: error.message,
+      response: error.response?.data,
+      currentUserUid: auth.currentUser?.uid ?? null,
+    })
 
     // Network/offline error detection
     if (!error.response && error.message?.includes('Network Error')) {
@@ -70,7 +79,9 @@ client.interceptors.response.use(
 
     // Auth expired
     if (status === 401) {
-      console.log('[APIClient] Auth token expired or invalid')
+      console.log('[APIClient] Auth token expired or invalid', {
+        currentUserUid: auth.currentUser?.uid ?? null,
+      })
     }
 
     return Promise.reject(error)

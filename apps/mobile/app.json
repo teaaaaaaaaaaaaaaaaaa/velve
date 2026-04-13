@@ -37,6 +37,13 @@
           "savePhotosPermission": "Velve koristi galeriju da sacuva outfit preview i try-on rezultate."
         }
       ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Velve koristi lokaciju da predlozi tvoj grad za trade.",
+          "locationWhenInUsePermission": "Velve koristi lokaciju da predlozi tvoj grad za trade."
+        }
+      ],
       "@react-native-firebase/app",
       "@react-native-google-signin/google-signin"
     ],

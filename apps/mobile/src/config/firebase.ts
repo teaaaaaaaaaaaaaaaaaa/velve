@@ -16,6 +16,7 @@ const auth = getAuth(firebaseApp)
 const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID?.trim() ?? ''
 
 console.log('[Firebase] React Native Firebase initialized')
+console.log('[Firebase] Initial currentUser:', auth.currentUser ? auth.currentUser.uid : 'none')
 
 function getGoogleOAuthConfigError(clientId: string) {
   if (!clientId) {
@@ -44,7 +45,16 @@ if (googleOAuthConfigError) {
 console.log('[Firebase] Auth module ready')
 
 async function getAuthToken(user: FirebaseAuthTypes.User, forceRefresh = false) {
-  return getIdToken(user, forceRefresh)
+  console.log('[Firebase] getAuthToken:start', {
+    uid: user.uid,
+    forceRefresh,
+  })
+  const token = await getIdToken(user, forceRefresh)
+  console.log('[Firebase] getAuthToken:success', {
+    uid: user.uid,
+    tokenLength: token.length,
+  })
+  return token
 }
 
 export { auth, firebaseApp, googleClientId, googleOAuthConfigError, getAuthToken }

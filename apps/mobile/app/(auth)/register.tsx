@@ -22,6 +22,12 @@ function validateEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
+function maskEmail(email: string) {
+  const [localPart = '', domain = ''] = email.trim().split('@')
+  if (!domain) return `${localPart.slice(0, 2)}***`
+  return `${localPart.slice(0, 2)}***@${domain}`
+}
+
 export default function RegisterScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
@@ -46,21 +52,40 @@ export default function RegisterScreen() {
     setError('')
 
     if (!validateEmail(email)) {
+      console.warn('[RegisterScreen] Registration blocked because email is invalid', {
+        email: maskEmail(email),
+      })
       setError('Unesi ispravan email.')
       return
     }
 
     if (password.length < 8) {
+      console.warn('[RegisterScreen] Registration blocked because password is too short', {
+        email: maskEmail(email),
+        passwordLength: password.length,
+      })
       setError('Lozinka mora imati najmanje 8 karaktera.')
       return
     }
 
+    console.log('[RegisterScreen] Register pressed', {
+      email: maskEmail(email),
+      passwordLength: password.length,
+    })
     setLoading(true)
     try {
       await registerWithEmail(email, password)
+      console.log('[RegisterScreen] Registration request resolved successfully')
     } catch (e: any) {
+      console.error('[RegisterScreen] Registration failed', {
+        code: e?.code,
+        message: e?.message,
+        nativeErrorCode: e?.nativeErrorCode,
+      })
       if (e.code === 'auth/email-already-in-use') {
         setError('Ovaj email je vec registrovan.')
+      } else if (e.code === 'auth/network-request-failed') {
+        setError('Firebase nije dostupan. Proveri internet na emulatoru ili pokreni app ponovo.')
       } else if (e.code === 'auth/invalid-email') {
         setError('Neispravan email format.')
       } else {

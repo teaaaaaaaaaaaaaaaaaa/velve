@@ -39,7 +39,7 @@ async function forwardImageToAi(endpoint, file) {
 
 router.post('/generate-description', requireAuth, async (req, res) => {
   try {
-    const { category, size, brand, condition, color, language } = req.body
+    const { category, size, brand, condition, color, language, image_url } = req.body
 
     if (!category) {
       return res.status(400).json({ error: 'category is required' })
@@ -48,7 +48,7 @@ router.post('/generate-description', requireAuth, async (req, res) => {
     const response = await fetch(`${AI_SERVER_URL}/generate-description`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category, size, brand, condition, color, language: language || 'en' }),
+      body: JSON.stringify({ category, size, brand, condition, color, language: language || 'sr', image_url: image_url || '' }),
     })
 
     if (!response.ok) {
@@ -70,6 +70,11 @@ router.post(
   async (req, res) => {
     try {
       const data = await forwardImageToAi('/analyze-garment-photo', req.file)
+      console.log('[analyze-garment-photo]', JSON.stringify({
+        ready: data?.ready,
+        checks: data?.checks,
+        metrics: data?.metrics,
+      }))
       res.json({ ok: true, data })
     } catch (err) {
       res.status(502).json({ error: `AI server unavailable: ${err.message}` })

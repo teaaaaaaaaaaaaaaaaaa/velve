@@ -327,9 +327,24 @@ async function buildRecommendedItems(userId, limit = 10) {
 // GET /api/users/me - current signed-in user profile
 router.get('/me', requireAuth, async (req, res) => {
   try {
+    console.log('[Users/me] Building current user payload', {
+      uid: req.user?.uid || null,
+      dbUserId: req.dbUser?._id || null,
+      onboardingCompleted: req.dbUser?.onboardingCompleted || false,
+    })
     const payload = await buildUserProfilePayload(req.dbUser, req.dbUser._id)
+    console.log('[Users/me] Returning current user payload', {
+      userId: payload?._id || null,
+      firebaseUid: payload?.firebaseUid || null,
+      itemsCount: payload?.itemsCount ?? null,
+      onboardingCompleted: payload?.onboardingCompleted || false,
+    })
     res.json({ ok: true, data: payload })
   } catch (err) {
+    console.error('[Users/me] Failed to build current user payload', {
+      message: err.message,
+      stack: err.stack,
+    })
     res.status(500).json({ error: err.message })
   }
 })

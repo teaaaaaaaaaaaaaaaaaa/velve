@@ -117,6 +117,7 @@ export default function ItemDetailsScreen() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [markingSold, setMarkingSold] = useState(false);
   const [digitizing, setDigitizing] = useState(false);
+  const [checkingBodyScan, setCheckingBodyScan] = useState(false);
 
   const owner = item && typeof item.userId === 'object' ? item.userId : null;
   const isOwn =
@@ -281,6 +282,23 @@ export default function ItemDetailsScreen() {
       Alert.alert('Greska', 'Clean Cut trenutno nije moguce pokrenuti.');
     } finally {
       setDigitizing(false);
+    }
+  };
+
+  const handleTryOn = async () => {
+    try {
+      setCheckingBodyScan(true);
+      const response = await client.get('/api/users/body-scan');
+      const hasBodyScan = response.data?.data?.exists;
+      if (hasBodyScan) {
+        router.push({ pathname: '/vto/render', params: { itemId: id } });
+      } else {
+        router.push('/vto/body-scan');
+      }
+    } catch {
+      Alert.alert('Greska', 'Nije moguce pokrenuti Virtual Try-On.');
+    } finally {
+      setCheckingBodyScan(false);
     }
   };
 
@@ -852,6 +870,13 @@ export default function ItemDetailsScreen() {
                   accessibilityLabel="Sacuvaj predmet"
                 />
               ) : null}
+              {!isOwn && hasDigitizedImage(item) ? (
+                <GlassCountActionButton
+                  icon="body-outline"
+                  onPress={handleTryOn}
+                  accessibilityLabel="Probaj na sebi"
+                />
+              ) : null}
               {isOwn ? (
                 <>
                   {!hasDigitizedImage(item) ? (
@@ -929,6 +954,21 @@ export default function ItemDetailsScreen() {
                   </Text>
                 </TouchableOpacity>
               ) : null}
+              {!isOwn && hasDigitizedImage(item) ? (
+                <TouchableOpacity
+                  onPress={handleTryOn}
+                  disabled={checkingBodyScan}
+                  className="flex-1 items-center rounded-full bg-brand-highlight px-4 py-4"
+                >
+                  {checkingBodyScan ? (
+                    <ActivityIndicator size="small" color={colors.inkDark} />
+                  ) : (
+                    <Text className="font-sans text-sm font-semibold text-ink-dark">
+                      Probaj na sebi
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              ) : null}
               {isOwn ? (
                 <View className="flex-1 gap-3">
                   {!hasDigitizedImage(item) ? (
@@ -945,10 +985,15 @@ export default function ItemDetailsScreen() {
                     </TouchableOpacity>
                   ) : (
                     <TouchableOpacity
-                      onPress={() => router.push('/vto/archive')}
+                      onPress={handleTryOn}
+                      disabled={checkingBodyScan}
                       className="items-center rounded-full bg-brand-highlight px-4 py-4"
                     >
-                      <Text className="font-sans text-sm font-semibold text-ink-dark">Virtual Try-On</Text>
+                      {checkingBodyScan ? (
+                        <ActivityIndicator size="small" color={colors.inkDark} />
+                      ) : (
+                        <Text className="font-sans text-sm font-semibold text-ink-dark">Virtual Try-On</Text>
+                      )}
                     </TouchableOpacity>
                   )}
 

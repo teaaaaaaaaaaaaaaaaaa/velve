@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { memo, useMemo } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import Animated, { FadeIn, FadeInRight, FadeInUp } from 'react-native-reanimated'
 
 import { colors } from '@/design/tokens'
 import { RemoteImage } from '@/components/RemoteImage'
@@ -103,61 +104,70 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
   )
 
   return (
-    <View style={{ height }} className="w-full bg-brand-accent-deep">
-      {imageUri ? (
-        <RemoteImage
-          uri={imageUri}
-          style={StyleSheet.absoluteFillObject}
-          fallback={
-            <View style={[StyleSheet.absoluteFillObject, styles.imageFallback]}>
-              <Ionicons name="shirt-outline" size={48} color={colors.baseCanvas} />
-            </View>
-          }
-        />
-      ) : (
-        <View style={[StyleSheet.absoluteFillObject, styles.imageFallback]}>
-          <Ionicons name="shirt-outline" size={48} color={colors.baseCanvas} />
-        </View>
-      )}
-
+    <View style={{ height }} className="w-full bg-white">
       <TouchableOpacity
         style={StyleSheet.absoluteFillObject}
         activeOpacity={1}
         onPress={() => router.push(`/items/${item._id}`)}
-      />
+      >
+        {imageUri ? (
+          <RemoteImage
+            uri={imageUri}
+            contentFit="contain"
+            style={styles.containedImage}
+            imageStyle={{ backgroundColor: '#FFFFFF' }}
+            fallback={
+              <View style={[StyleSheet.absoluteFillObject, styles.imageFallback]}>
+                <Ionicons name="shirt-outline" size={48} color={colors.accentDeep} />
+              </View>
+            }
+          />
+        ) : (
+          <View style={[StyleSheet.absoluteFillObject, styles.imageFallback]}>
+            <Ionicons name="shirt-outline" size={48} color={colors.accentDeep} />
+          </View>
+        )}
+      </TouchableOpacity>
 
-      {/* subtle gradient-like fade at bottom only for text readability */}
-      <View style={styles.bottomFade} />
-
-      <View className="absolute left-4 right-24" style={{ top: topInset + 94 }}>
-        <View className="self-start rounded-full bg-white/15 px-3 py-2">
-          <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-base-canvas/80">
+      <Animated.View
+        entering={FadeIn.duration(300)}
+        className="absolute left-4 right-24"
+        style={{ top: topInset + 94 }}
+      >
+        <View className="self-start rounded-full bg-ink-dark/6 px-3 py-2">
+          <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/60">
             {formatFeedDate(item.createdAt)}
           </Text>
         </View>
 
-        <Text className="mt-4 font-display text-[34px] leading-[33px] text-base-canvas" numberOfLines={2}>
+        <Text className="mt-4 font-display text-[34px] leading-[33px] text-ink-dark" numberOfLines={2}>
           {item.title}
         </Text>
 
-        <Text className="mt-3 font-sans text-sm leading-6 text-base-canvas/82" numberOfLines={1}>
+        <Text className="mt-3 font-sans text-sm leading-6 text-ink-dark/62" numberOfLines={1}>
           {metaLine}
         </Text>
-      </View>
+      </Animated.View>
 
-      <View className="absolute right-3 items-center gap-3" style={{ bottom: contentBottomOffset + 102 }}>
+      <Animated.View
+        entering={FadeInRight.duration(400).delay(100)}
+        className="absolute right-3 items-center gap-3"
+        style={{ bottom: contentBottomOffset + 102 }}
+      >
         <GlassCountActionButton
           icon={item.isLiked ? 'heart' : 'heart-outline'}
           count={item.likesCount ?? 0}
           active={!!item.isLiked}
           onPress={() => onLike(item._id, !!item.isLiked)}
           accessibilityLabel="Lajkuj objavu"
+          tone="dark"
         />
         <GlassCountActionButton
           icon="swap-horizontal"
           count={item.tradeRequestsCount ?? 0}
           onPress={() => router.push(`/items/${item._id}?openTrade=true`)}
           accessibilityLabel="Posalji predlog za razmenu"
+          tone="dark"
         />
         <GlassCountActionButton
           icon={item.isWishlisted ? 'bookmark' : 'bookmark-outline'}
@@ -165,17 +175,20 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
           active={!!item.isWishlisted}
           onPress={() => onWishlist(item._id, !!item.isWishlisted)}
           accessibilityLabel="Sacuvaj objavu"
+          tone="dark"
         />
         {onMore ? (
           <GlassCountActionButton
             icon="ellipsis-horizontal"
             onPress={() => onMore(item)}
             accessibilityLabel="Otvori opcije objave"
+            tone="dark"
           />
         ) : null}
-      </View>
+      </Animated.View>
 
-      <View
+      <Animated.View
+        entering={FadeInUp.duration(400).delay(150)}
         className="absolute left-3 right-3 flex-row items-center rounded-[22px] bg-white px-3 py-2.5"
         style={[{ bottom: contentBottomOffset }, styles.bottomCard]}
       >
@@ -230,25 +243,21 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
             <Ionicons name="swap-horizontal" size={18} color={colors.baseCanvas} />
           </TouchableOpacity>
         </View>
-      </View>
+      </Animated.View>
     </View>
   )
 })
 
 const styles = StyleSheet.create({
+  containedImage: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#FFFFFF',
+  },
   imageFallback: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.accentDeep,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 24,
-  },
-  bottomFade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 260,
-    backgroundColor: 'rgba(0,0,0,0.18)',
   },
   bottomCard: {
     shadowColor: '#000',

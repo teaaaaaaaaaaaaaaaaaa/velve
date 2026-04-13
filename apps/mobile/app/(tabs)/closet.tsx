@@ -85,12 +85,14 @@ const ClosetCard = memo(function ClosetCard({
   onQuickAction,
   quickActionLabel,
   onDigitize,
+  onDelete,
 }: {
   item: ClosetItem
   onOpen: () => void
   onQuickAction?: () => void
   quickActionLabel?: string | null
   onDigitize?: () => void
+  onDelete?: () => void
 }) {
   const tone = getStatusTone(item).split(' ')
 
@@ -193,6 +195,15 @@ const ClosetCard = memo(function ClosetCard({
                 <Text className="font-sans text-xs font-semibold text-ink-dark">
                   Clean Cut
                 </Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {onDelete ? (
+              <TouchableOpacity
+                onPress={onDelete}
+                className="rounded-full border border-ink-dark/10 bg-base-canvas px-3 py-2"
+              >
+                <Ionicons name="trash-outline" size={14} color={colors.danger} />
               </TouchableOpacity>
             ) : null}
           </View>
@@ -312,6 +323,23 @@ export default function ClosetScreen() {
     [loadCloset]
   )
 
+  const handleDelete = useCallback(
+    (item: ClosetItem) => {
+      Alert.alert('Obrisi komad', `Da li si siguran/na da zelis da obrises "${item.title}"?`, [
+        { text: 'Odustani', style: 'cancel' },
+        {
+          text: 'Obrisi',
+          style: 'destructive',
+          onPress: () =>
+            withMutation(async () => {
+              await client.delete(`/api/items/${item._id}`)
+            }),
+        },
+      ])
+    },
+    [withMutation]
+  )
+
   const renderClosetItem = useCallback(
     ({ item }: { item: ClosetItem }) => (
       <View className="px-5">
@@ -325,10 +353,11 @@ export default function ClosetScreen() {
           }
           quickActionLabel={quickActionLabel(item)}
           onDigitize={!item.isDigitized && !digitizingItemId ? () => handleDigitize(item) : undefined}
+          onDelete={item.status === 'draft' ? () => handleDelete(item) : undefined}
         />
       </View>
     ),
-    [digitizingItemId, handleDigitize, handleQuickAction, quickActionLabel, router]
+    [digitizingItemId, handleDelete, handleDigitize, handleQuickAction, quickActionLabel, router]
   )
 
   const closetHeader = useMemo(

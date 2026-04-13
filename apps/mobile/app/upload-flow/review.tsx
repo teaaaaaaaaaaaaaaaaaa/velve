@@ -1,11 +1,15 @@
+import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Alert, Text, TouchableOpacity, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import client from '@/api/client'
+import { BrandBackground } from '@/components/BrandBackground'
 import { BrandedLoader } from '@/components/BrandedLoader'
 import { GlassSurface } from '@/components/GlassSurface'
 import { RemoteImage } from '@/components/RemoteImage'
+import { colors } from '@/design/tokens'
 
 type ImagesPayload = {
   imageOriginal: string | null
@@ -15,6 +19,7 @@ type ImagesPayload = {
 
 export default function CleanCutReviewScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { itemId } = useLocalSearchParams<{ itemId: string }>()
   const [payload, setPayload] = useState<ImagesPayload | null>(null)
   const [loading, setLoading] = useState(true)
@@ -32,16 +37,14 @@ export default function CleanCutReviewScreen() {
         if (active) {
           setPayload(response.data?.data)
         }
-      } catch (error) {
+      } catch {
         if (active) {
           Alert.alert('Ne mogu da ucitam rezultat', 'Pokusaj ponovo.', [
             { text: 'Nazad', onPress: () => router.replace('/upload-flow') },
           ])
         }
       } finally {
-        if (active) {
-          setLoading(false)
-        }
+        if (active) setLoading(false)
       }
     })()
 
@@ -52,79 +55,110 @@ export default function CleanCutReviewScreen() {
 
   async function retryFlow() {
     try {
-      if (itemId) {
-        await client.delete(`/api/items/${itemId}`)
-      }
+      if (itemId) await client.delete(`/api/items/${itemId}`)
     } catch {
-      // ignore cleanup failures for retry
+      // ignore cleanup
     } finally {
       router.replace('/upload-flow')
     }
   }
 
-  if (loading) {
-    return <BrandedLoader />
-  }
+  if (loading) return <BrandedLoader />
 
   return (
-    <View className="flex-1 bg-base-canvas px-5 pb-8 pt-14">
-      <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
-        Final review
-      </Text>
-      <Text className="mt-2 font-display text-4xl text-ink-dark">
-        Izgleda li ovo kao tvoj komad?
-      </Text>
+    <View
+      className="flex-1 bg-base-canvas"
+      style={{ paddingTop: insets.top + 8 }}
+    >
+      <BrandBackground />
 
-      <View className="mt-8 flex-row gap-3">
-        <GlassSurface className="flex-1 px-3 py-3">
-          <Text className="mb-3 font-sans text-xs uppercase tracking-[1.2px] text-ink-dark/45">
-            Original
-          </Text>
-          <RemoteImage
-            uri={payload?.imageOriginal || undefined}
-            className="h-[260px] w-full rounded-[26px]"
-          />
-        </GlassSurface>
-
-        <GlassSurface className="flex-1 px-3 py-3">
-          <Text className="mb-3 font-sans text-xs uppercase tracking-[1.2px] text-ink-dark/45">
-            Clean cut
-          </Text>
-          <RemoteImage
-            uri={payload?.imageClean || undefined}
-            className="h-[260px] w-full rounded-[26px]"
-          />
-        </GlassSurface>
+      {/* Header */}
+      <View className="flex-row items-center px-5 pb-2">
+        <TouchableOpacity
+          onPress={() => router.back()}
+          className="mr-3 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
+        >
+          <Ionicons name="arrow-back" size={20} color={colors.inkDark} />
+        </TouchableOpacity>
+        <View className="flex-1" />
+        <Text className="font-sans text-xs text-ink-dark/40">1 / 4</Text>
       </View>
 
-      <View className="mt-6 rounded-[26px] bg-surface-panel px-4 py-4">
-        <Text className="font-sans text-sm leading-6 text-ink-dark/70">
-          Obe verzije se cuvaju u arhivu. Clean varijanta ce se prikazivati kroz closet i postaje osnov za Virtual Try-On.
-        </Text>
+      {/* Progress bar */}
+      <View className="mx-5 mt-3 h-1 overflow-hidden rounded-full bg-ink-dark/8">
+        <View className="h-full w-1/4 rounded-full bg-brand-accent-deep" />
       </View>
 
-      <TouchableOpacity
-        className="mt-auto items-center rounded-full bg-brand-accent-deep px-4 py-4"
-        onPress={() =>
-          router.replace({
-            pathname: '/upload-flow/details',
-            params: { itemId },
-          })
-        }
-      >
-        <Text className="font-sans text-base font-semibold text-base-canvas">
-          Savrseno, nastavi
+      <View className="flex-1 px-5 pt-8">
+        <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
+          Pregled
         </Text>
-      </TouchableOpacity>
+        <Text className="mt-1 font-display text-4xl text-ink-dark">
+          Izgleda li ovo kao tvoj komad?
+        </Text>
 
-      <TouchableOpacity
-        className="mt-3 items-center rounded-full border border-brand-accent-deep/15 bg-base-canvas px-4 py-4"
-        onPress={retryFlow}
-      >
-        <Text className="font-sans text-base font-semibold text-ink-dark">
-          Probaj ponovo
-        </Text>
-      </TouchableOpacity>
+        {/* Side by side comparison */}
+        <View className="mt-8 flex-row gap-3">
+          <GlassSurface className="flex-1 px-3 py-3">
+            <Text className="mb-3 text-center font-sans text-[10px] uppercase tracking-[1.2px] text-ink-dark/40">
+              Original
+            </Text>
+            <RemoteImage
+              uri={payload?.imageOriginal || undefined}
+              className="aspect-[3/4] w-full rounded-[22px]"
+            />
+          </GlassSurface>
+
+          <GlassSurface className="flex-1 px-3 py-3">
+            <Text className="mb-3 text-center font-sans text-[10px] uppercase tracking-[1.2px] text-ink-dark/40">
+              Clean cut
+            </Text>
+            <RemoteImage
+              uri={payload?.imageClean || undefined}
+              className="aspect-[3/4] w-full rounded-[22px]"
+            />
+          </GlassSurface>
+        </View>
+
+        {/* Info note */}
+        <View className="mt-5 flex-row items-start rounded-[20px] bg-brand-accent-light/15 px-4 py-3">
+          <Ionicons
+            name="information-circle-outline"
+            size={18}
+            color={colors.accentDeep}
+            style={{ marginTop: 1 }}
+          />
+          <Text className="ml-2 flex-1 font-sans text-xs leading-5 text-ink-dark/55">
+            Obe verzije se cuvaju. Clean varijanta se koristi za Virtual Try-On i prikaz u tvom closet-u.
+          </Text>
+        </View>
+      </View>
+
+      {/* Bottom CTAs */}
+      <View className="px-5" style={{ paddingBottom: insets.bottom + 12 }}>
+        <TouchableOpacity
+          className="items-center rounded-full bg-brand-accent-deep px-4 py-4"
+          onPress={() =>
+            router.push({
+              pathname: '/upload-flow/category',
+              params: { itemId },
+            })
+          }
+        >
+          <Text className="font-sans text-base font-semibold text-base-canvas">
+            Savrseno, nastavi
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          className="mt-3 items-center rounded-full px-4 py-3"
+          onPress={retryFlow}
+        >
+          <Text className="font-sans text-sm font-semibold text-ink-dark/50">
+            Probaj ponovo
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   )
 }

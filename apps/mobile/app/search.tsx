@@ -17,7 +17,7 @@ import client from '@/api/client'
 import { BrandedLoader } from '@/components/BrandedLoader'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { ImmersiveFeedCard, ImmersiveFeedItem } from '@/components/ImmersiveFeedCard'
-import { colors, shadows } from '@/design/tokens'
+import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
 
 export default function SearchScreen() {
@@ -182,12 +182,12 @@ export default function SearchScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-brand-accent-deep" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
       {items.length === 0 ? (
-        <View className="flex-1 bg-base-canvas px-5 pt-24">
+        <View className="flex-1 bg-white px-5 pt-24">
           <EditorialEmptyState
             icon="search-outline"
             title="Nema rezultata za ovaj upit"
@@ -224,8 +224,8 @@ export default function SearchScreen() {
           ListFooterComponent={
             loadingMore ? (
               <View className="py-8">
-                <View className="mx-auto rounded-full border border-white/18 bg-white/14 px-5 py-3" style={shadows.glass}>
-                  <Text className="font-sans text-sm text-base-canvas/82">Loading more...</Text>
+                <View className="mx-auto rounded-full border border-ink-dark/8 bg-ink-dark/4 px-5 py-3">
+                  <Text className="font-sans text-sm text-ink-dark/62">Loading more...</Text>
                 </View>
               </View>
             ) : null
@@ -237,30 +237,27 @@ export default function SearchScreen() {
         <View className="flex-row items-center gap-3">
           <TouchableOpacity
             onPress={() => router.back()}
-            className="h-11 w-11 items-center justify-center rounded-full border border-white/18 bg-white/14"
-            style={shadows.glass}
+            className="h-11 w-11 items-center justify-center rounded-full bg-ink-dark/6"
           >
-            <Ionicons name="arrow-back" size={20} color={colors.baseCanvas} />
+            <Ionicons name="arrow-back" size={20} color={colors.inkDark} />
           </TouchableOpacity>
 
-          <View
-            className="flex-1 flex-row items-center rounded-full border border-white/18 bg-white/14 px-4 py-3"
-            style={shadows.glass}
-          >
-            <Ionicons name="search" size={18} color={colors.baseCanvas} />
+          <View className="flex-1 flex-row items-center rounded-full bg-ink-dark/6 px-4 py-3">
+            <Ionicons name="search" size={18} color={colors.inkDark} style={{ opacity: 0.5 }} />
             <TextInput
               value={query}
               onChangeText={setQuery}
               placeholder="Pretrazi komade, brend ili kategoriju..."
-              placeholderTextColor="rgba(246,248,237,0.62)"
-              className="ml-3 flex-1 font-sans text-sm text-base-canvas"
+              placeholderTextColor="rgba(43,42,43,0.42)"
+              className="ml-3 flex-1 font-sans text-sm text-ink-dark"
+              autoFocus
             />
           </View>
         </View>
 
         {!loading ? (
-          <View className="mt-3 self-start rounded-full border border-white/16 bg-white/12 px-3 py-2">
-            <Text className="font-sans text-xs font-semibold text-base-canvas/86">
+          <View className="mt-3 self-start rounded-full border border-ink-dark/8 bg-ink-dark/4 px-3 py-2">
+            <Text className="font-sans text-xs font-semibold text-ink-dark/62">
               {items.length} rezultata
             </Text>
           </View>

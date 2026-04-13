@@ -19,8 +19,17 @@ if (!admin.apps.length) {
  * Attachuje MongoDB user na req.dbUser.
  */
 async function attachUserFromToken(token, req) {
+  console.log('[AuthMiddleware] Verifying Firebase token', {
+    method: req.method,
+    url: req.originalUrl,
+    tokenLength: token?.length || 0,
+  })
   const decoded = await admin.auth().verifyIdToken(token)
-  console.log(`[AuthMiddleware] Firebase token verified for uid=${decoded.uid}`)
+  console.log('[AuthMiddleware] Firebase token verified', {
+    uid: decoded.uid,
+    email: decoded.email || null,
+    signInProvider: decoded.firebase?.sign_in_provider || null,
+  })
   req.user = decoded
 
   let dbUser = await User.findOne({ firebaseUid: decoded.uid })
@@ -32,7 +41,11 @@ async function attachUserFromToken(token, req) {
       displayName: decoded.name || emailPrefix || 'Korisnik',
       photoURL: decoded.picture || '',
     })
-    console.log(`[AuthMiddleware] Created MongoDB user for uid=${decoded.uid}`)
+    console.log('[AuthMiddleware] Created MongoDB user', {
+      uid: decoded.uid,
+      dbUserId: dbUser._id,
+      email: dbUser.email,
+    })
   } else if (!dbUser.displayName) {
     const emailPrefix = (dbUser.email || '').split('@')[0]
     dbUser = await User.findByIdAndUpdate(
@@ -43,6 +56,11 @@ async function attachUserFromToken(token, req) {
   }
 
   req.dbUser = dbUser
+  console.log('[AuthMiddleware] Attached MongoDB user', {
+    uid: decoded.uid,
+    dbUserId: dbUser?._id || null,
+    onboardingCompleted: dbUser?.onboardingCompleted || false,
+  })
 }
 
 async function requireAuth(req, res, next) {
@@ -57,7 +75,10 @@ async function requireAuth(req, res, next) {
     await attachUserFromToken(token, req)
     next()
   } catch (err) {
-    console.error(`[AuthMiddleware] Invalid token for ${req.method} ${req.originalUrl}:`, err.message)
+    console.error(`[AuthMiddleware] Invalid token for ${req.method} ${req.originalUrl}:`, {
+      message: err.message,
+      code: err.code || err.errorInfo?.code || null,
+    })
     return res.status(401).json({ error: 'Invalid or expired token' })
   }
 }

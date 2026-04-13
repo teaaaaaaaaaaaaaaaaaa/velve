@@ -67,7 +67,7 @@ export default function Index() {
     if (dbUser.onboardingCompleted) {
       router.replace('/(tabs)/feed')
     } else {
-      router.replace('/onboarding/welcome')
+      router.replace('/onboarding/terms')
     }
   }, [currentUser, dbUser, authLoading, segments])
 

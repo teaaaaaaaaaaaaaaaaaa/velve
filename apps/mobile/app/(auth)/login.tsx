@@ -19,6 +19,12 @@ import { colors } from '@/design/tokens'
 import { useAuth } from '@/hooks/useAuth'
 import { useI18n } from '@/i18n'
 
+function maskEmail(email: string) {
+  const [localPart = '', domain = ''] = email.trim().split('@')
+  if (!domain) return `${localPart.slice(0, 2)}***`
+  return `${localPart.slice(0, 2)}***@${domain}`
+}
+
 export default function LoginScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
@@ -48,6 +54,7 @@ export default function LoginScreen() {
   useEffect(() => {
     if (!showEmailLogin) return
 
+    console.log('[LoginScreen] Email login form opened')
     const timeoutId = setTimeout(() => {
       scrollRef.current?.scrollToEnd({ animated: true })
     }, 120)
@@ -59,16 +66,29 @@ export default function LoginScreen() {
     setError('')
 
     if (!email || !password) {
+      console.warn('[LoginScreen] Email login blocked because fields are empty')
       setError('Unesi email i lozinku.')
       return
     }
 
+    console.log('[LoginScreen] Email login pressed', {
+      email: maskEmail(email),
+      passwordLength: password.length,
+    })
     setLoading(true)
     try {
       await signInWithEmail(email, password)
+      console.log('[LoginScreen] Email login request resolved successfully')
     } catch (e: any) {
+      console.error('[LoginScreen] Email login failed', {
+        code: e?.code,
+        message: e?.message,
+        nativeErrorCode: e?.nativeErrorCode,
+      })
       if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
         setError('Pogresan email ili lozinka.')
+      } else if (e.code === 'auth/network-request-failed') {
+        setError('Firebase nije dostupan. Proveri internet na emulatoru ili pokreni app ponovo.')
       } else if (e.code === 'auth/wrong-password') {
         setError('Pogresna lozinka.')
       } else if (e.code === 'auth/too-many-requests') {
@@ -83,8 +103,14 @@ export default function LoginScreen() {
 
   async function handleGoogleLogin() {
     try {
+      console.log('[LoginScreen] Google login pressed')
       await signInWithGoogle()
+      console.log('[LoginScreen] Google login request resolved successfully')
     } catch (e: any) {
+      console.error('[LoginScreen] Google login failed', {
+        code: e?.code,
+        message: e?.message,
+      })
       if (e.message === 'USER_CANCELLED') {
         return
       }
@@ -228,7 +254,10 @@ export default function LoginScreen() {
                     ? 'mt-3 items-center rounded-pill border border-base-canvas/70 bg-base-canvas/70 px-4 py-4'
                     : 'mt-3 items-center rounded-pill bg-brand-accent-deep px-4 py-4'
                 }
-                onPress={() => setShowEmailLogin(true)}
+                onPress={() => {
+                  console.log('[LoginScreen] Switching to email login form')
+                  setShowEmailLogin(true)
+                }}
               >
                 <Text
                   className={

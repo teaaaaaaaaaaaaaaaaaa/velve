@@ -78,8 +78,30 @@ const USER_CANCELLED = 'USER_CANCELLED'
 let cachedGoogleSignInModule: GoogleSignInModule | null | undefined
 let hasConfiguredGoogleSignin = false
 
+function maskEmail(email?: string | null) {
+  if (!email) return null
+  const [localPart = '', domain = ''] = String(email).split('@')
+  if (!domain) return `${localPart.slice(0, 2)}***`
+  return `${localPart.slice(0, 2)}***@${domain}`
+}
+
+function summarizeUser(user: FirebaseAuthTypes.User | null) {
+  if (!user) {
+    return { state: 'signed-out' }
+  }
+
+  return {
+    uid: user.uid,
+    email: maskEmail(user.email),
+    emailVerified: user.emailVerified,
+    isAnonymous: user.isAnonymous,
+    providers: user.providerData?.map((provider) => provider?.providerId).filter(Boolean) ?? [],
+  }
+}
+
 function getGoogleSignInSupport() {
   if (googleOAuthConfigError) {
+    console.warn('[Google Auth] Support unavailable because OAuth config is invalid')
     return {
       available: false,
       module: null,
@@ -109,6 +131,7 @@ function getGoogleSignInSupport() {
   }
 
   if (!hasConfiguredGoogleSignin) {
+    console.log('[Google Auth] Configuring native Google Sign-In module')
     cachedGoogleSignInModule.GoogleSignin.configure({
       webClientId: googleClientId,
       scopes: ['profile', 'email'],
@@ -131,11 +154,18 @@ export function useAuthProvider() {
   const googleSignInSupport = getGoogleSignInSupport()
 
   async function loadDbUser(user: FirebaseAuthTypes.User) {
-    console.log('[Auth] Loading dbUser for Firebase UID:', user.uid)
+    console.log('[Auth] loadDbUser:start', summarizeUser(user))
     setProfileError(null)
 
     try {
       const response = await client.get('/api/users/me')
+      console.log('[Auth] loadDbUser:response', {
+        status: response.status,
+        ok: response.data?.ok,
+        dbUserId: response.data?.data?._id,
+        dbUserFirebaseUid: response.data?.data?.firebaseUid,
+        onboardingCompleted: response.data?.data?.onboardingCompleted,
+      })
       if (response.data.ok) {
         const fetchedDbUser = response.data.data
 
@@ -153,7 +183,11 @@ export function useAuthProvider() {
         }
 
         setDbUser(fetchedDbUser)
-        console.log('[Auth] dbUser loaded:', fetchedDbUser._id)
+        console.log('[Auth] loadDbUser:success', {
+          dbUserId: fetchedDbUser._id,
+          firebaseUid: fetchedDbUser.firebaseUid,
+          onboardingCompleted: fetchedDbUser.onboardingCompleted,
+        })
         return
       }
 
@@ -163,7 +197,11 @@ export function useAuthProvider() {
     } catch (error: any) {
       const message = error?.response?.data?.error || error?.message || 'UNKNOWN_PROFILE_ERROR'
 
-      console.error('[Auth] Failed to fetch dbUser:', message)
+      console.error('[Auth] loadDbUser:error', {
+        message,
+        status: error?.response?.status,
+        response: error?.response?.data,
+      })
       setDbUser(null)
       setProfileError(message)
     }
@@ -176,14 +214,18 @@ export function useAuthProvider() {
       return
     }
 
+    console.log('[Auth] refreshDbUser:start', summarizeUser(user))
     setLoading(true)
     await loadDbUser(user)
     setLoading(false)
+    console.log('[Auth] refreshDbUser:done', {
+      currentUser: summarizeUser(auth.currentUser),
+    })
   }
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log('[Auth] onAuthStateChanged:', user ? user.uid : 'signed-out')
+      console.log('[Auth] onAuthStateChanged', summarizeUser(user))
       setCurrentUser(user)
       setLoading(true)
 
@@ -201,15 +243,22 @@ export function useAuthProvider() {
 
   async function signInWithGoogle() {
     if (!googleSignInSupport.available || !googleSignInSupport.module) {
+      console.warn('[Google Auth] signInWithGoogle blocked because support is unavailable')
       throw new Error(GOOGLE_SIGNIN_UNAVAILABLE)
     }
 
     try {
+      console.log('[Google Auth] signInWithGoogle:start')
       await googleSignInSupport.module.GoogleSignin.hasPlayServices({
         showPlayServicesUpdateDialog: true,
       })
+      console.log('[Google Auth] Play Services check passed')
 
       const userInfo = await googleSignInSupport.module.GoogleSignin.signIn()
+      console.log('[Google Auth] Native signIn result:', {
+        type: userInfo.type,
+        hasIdToken: userInfo.type === 'success' ? Boolean(userInfo.data?.idToken) : false,
+      })
 
       if (userInfo.type !== 'success') {
         throw new Error(USER_CANCELLED)
@@ -221,7 +270,8 @@ export function useAuthProvider() {
       }
 
       const credential = GoogleAuthProvider.credential(idToken)
-      await signInWithCredential(auth, credential)
+      const signedIn = await signInWithCredential(auth, credential)
+      console.log('[Google Auth] Firebase credential sign-in success', summarizeUser(signedIn.user))
 
       // onAuthStateChanged will automatically fetch dbUser
     } catch (error: any) {
@@ -250,15 +300,49 @@ export function useAuthProvider() {
   }
 
   async function signInWithEmail(email: string, password: string) {
-    return signInWithEmailAndPassword(auth, email, password)
+    console.log('[Auth] signInWithEmail:start', {
+      email: maskEmail(email),
+      passwordLength: password.length,
+    })
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email, password)
+      console.log('[Auth] signInWithEmail:success', summarizeUser(credential.user))
+      return credential
+    } catch (error: any) {
+      console.error('[Auth] signInWithEmail:error', {
+        code: error?.code,
+        message: error?.message,
+        nativeErrorCode: error?.nativeErrorCode,
+        user: summarizeUser(auth.currentUser),
+      })
+      throw error
+    }
   }
 
   async function registerWithEmail(email: string, password: string) {
-    return createUserWithEmailAndPassword(auth, email, password)
+    console.log('[Auth] registerWithEmail:start', {
+      email: maskEmail(email),
+      passwordLength: password.length,
+    })
+    try {
+      const credential = await createUserWithEmailAndPassword(auth, email, password)
+      console.log('[Auth] registerWithEmail:success', summarizeUser(credential.user))
+      return credential
+    } catch (error: any) {
+      console.error('[Auth] registerWithEmail:error', {
+        code: error?.code,
+        message: error?.message,
+        nativeErrorCode: error?.nativeErrorCode,
+        user: summarizeUser(auth.currentUser),
+      })
+      throw error
+    }
   }
 
   async function logout() {
-    return signOut(auth)
+    console.log('[Auth] logout:start', summarizeUser(auth.currentUser))
+    await signOut(auth)
+    console.log('[Auth] logout:done')
   }
 
   return {
