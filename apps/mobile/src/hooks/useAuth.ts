@@ -1,19 +1,22 @@
 import { createContext, useContext, useEffect, useState } from 'react'
+
+import client from '@/api/client'
 import {
-  GoogleAuthProvider,
-  type FirebaseAuthTypes,
+  auth,
+  createGoogleCredential,
   createUserWithEmailAndPassword,
+  googleClientId,
+  googleOAuthConfigError,
+  isExpoGo,
   onAuthStateChanged,
   signInWithCredential,
   signInWithEmailAndPassword,
-  signOut,
-} from '@react-native-firebase/auth'
-
-import client from '@/api/client'
-import { auth, googleClientId, googleOAuthConfigError } from '@/config/firebase'
+  signOutUser,
+  type AuthUser,
+} from '@/config/firebase'
 
 type AuthContextType = {
-  currentUser: FirebaseAuthTypes.User | null
+  currentUser: AuthUser | null
   dbUser: DbUser | null
   loading: boolean
   profileError: string | null
@@ -85,7 +88,7 @@ function maskEmail(email?: string | null) {
   return `${localPart.slice(0, 2)}***@${domain}`
 }
 
-function summarizeUser(user: FirebaseAuthTypes.User | null) {
+function summarizeUser(user: AuthUser | null) {
   if (!user) {
     return { state: 'signed-out' }
   }
@@ -107,6 +110,16 @@ function getGoogleSignInSupport() {
       module: null,
       unavailableReason:
         'Google prijava nije konfigurirana. Proveri EXPO_PUBLIC_GOOGLE_CLIENT_ID.',
+    }
+  }
+
+  if (isExpoGo) {
+    console.log('[Google Auth] Native Google Sign-In disabled in Expo Go')
+    return {
+      available: false,
+      module: null,
+      unavailableReason:
+        'Google prijava nije dostupna u Expo Go. Koristi email prijavu ili pokreni development build.',
     }
   }
 
@@ -147,13 +160,13 @@ function getGoogleSignInSupport() {
 }
 
 export function useAuthProvider() {
-  const [currentUser, setCurrentUser] = useState<FirebaseAuthTypes.User | null>(null)
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
   const [dbUser, setDbUser] = useState<DbUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [profileError, setProfileError] = useState<string | null>(null)
   const googleSignInSupport = getGoogleSignInSupport()
 
-  async function loadDbUser(user: FirebaseAuthTypes.User) {
+  async function loadDbUser(user: AuthUser) {
     console.log('[Auth] loadDbUser:start', summarizeUser(user))
     setProfileError(null)
 
@@ -175,7 +188,7 @@ export function useAuthProvider() {
             firebaseUid: user.uid,
             dbUserFirebaseUid: fetchedDbUser.firebaseUid,
           })
-          await signOut(auth)
+          await signOutUser()
           setCurrentUser(null)
           setDbUser(null)
           setProfileError('USER_MISMATCH')
@@ -269,7 +282,7 @@ export function useAuthProvider() {
         throw new Error(OAUTH_FAILED)
       }
 
-      const credential = GoogleAuthProvider.credential(idToken)
+      const credential = createGoogleCredential(idToken)
       const signedIn = await signInWithCredential(auth, credential)
       console.log('[Google Auth] Firebase credential sign-in success', summarizeUser(signedIn.user))
 
@@ -341,7 +354,7 @@ export function useAuthProvider() {
 
   async function logout() {
     console.log('[Auth] logout:start', summarizeUser(auth.currentUser))
-    await signOut(auth)
+    await signOutUser()
     console.log('[Auth] logout:done')
   }
 
