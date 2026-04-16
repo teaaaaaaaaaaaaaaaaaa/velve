@@ -15,6 +15,10 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, 'node_modules'),
 ];
 config.resolver.disableHierarchicalLookup = true;
+config.resolver.blockList = [
+  /apps[\\/]ai-server[\\/]\.venv[\\/].*/,
+  /apps[\\/]ai-server[\\/]__pycache__[\\/].*/,
+];
 
 // 3. Firebase compatibility
 config.resolver.sourceExts = [...(config.resolver.sourceExts || []), 'cjs'];

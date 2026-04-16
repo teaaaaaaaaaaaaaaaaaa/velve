@@ -64,7 +64,7 @@ export const GlassCountActionButton = memo(function GlassCountActionButton({
       className="items-center px-2 py-3"
       style={[
         isDark ? darkBase : lightBase,
-        isDark ? shadows.soft : shadows.glass,
+        isDark ? null : shadows.glass,
         active ? (isDark ? darkActive : lightActive) : null,
       ]}
     >

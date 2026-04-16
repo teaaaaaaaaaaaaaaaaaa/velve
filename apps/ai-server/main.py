@@ -1,13 +1,16 @@
 import base64
+import html
 import io
 import os
 import pickle
+import string
 import threading
 from typing import Optional
 from urllib.parse import urlparse
 
 import cv2
 import faiss
+import ftfy
 import numpy as np
 import requests
 from dotenv import load_dotenv
@@ -30,6 +33,7 @@ except Exception:
     pass
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "").strip()
 MODAL_ENDPOINT_URL = os.getenv("MODAL_ENDPOINT_URL", "")
 MODAL_API_KEY = os.getenv("MODAL_API_KEY", "")
 IMAGE_FETCH_HEADERS = {
@@ -39,6 +43,10 @@ IMAGE_FETCH_HEADERS = {
 
 FAISS_INDEX_PATH = "data/faiss_index.bin"
 FAISS_IDS_PATH = "data/faiss_ids.pkl"
+# Marqo/marqo-fashionSigLIP is ViT-B-16-SigLIP (webli) -> 768-dim normalized embeddings
+EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL", "Marqo/marqo-fashionSigLIP")
+FAISS_DIM_DEFAULT = int(os.getenv("EMBEDDING_DIM", "768"))
+EMBEDDING_DEVICE = os.getenv("EMBEDDING_DEVICE", "").strip()
 
 clip_model = None
 clip_processor = None
@@ -48,22 +56,252 @@ rembg_session = None
 rembg_remove = None
 rembg_lock = threading.Lock()
 
+ollama_model_name = None
+ollama_lock = threading.Lock()
+
 faiss_index = None
-faiss_ids = []
+faiss_ids: list[str] = []
+faiss_id_to_pos: dict[str, int] = {}
 faiss_lock = threading.Lock()
 
 
+def _basic_clean(text: str) -> str:
+    text = ftfy.fix_text(text)
+    text = html.unescape(html.unescape(text))
+    return text.strip()
+
+
+def _canonicalize_text(text: str) -> str:
+    translation_table = str.maketrans("", "", string.punctuation)
+    text = text.replace("_", " ")
+    text = text.translate(translation_table)
+    text = text.lower()
+    return " ".join(text.split()).strip()
+
+
+def _clean_embedding_text(text: str) -> str:
+    return _canonicalize_text(_basic_clean(text))
+
+
+def _pick_ollama_model_from_tags() -> str:
+    preferred_models = []
+    if OLLAMA_MODEL:
+        preferred_models.append(OLLAMA_MODEL)
+    preferred_models.extend(
+        [
+            "qwen2.5:7b",
+            "qwen2.5-coder:7b",
+            "qwen2.5-coder:14b",
+            "qwen3-coder:30b",
+        ]
+    )
+
+    response = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
+    response.raise_for_status()
+    models = response.json().get("models", [])
+    available = [model.get("name", "") for model in models if model.get("name")]
+
+    for preferred in preferred_models:
+        if preferred in available:
+            return preferred
+
+    for available_name in available:
+        if available_name.startswith("qwen"):
+            return available_name
+
+    if available:
+        return available[0]
+
+    raise RuntimeError("Ollama returned no installed models")
+
+
+def get_ollama_model() -> str:
+    global ollama_model_name
+    if ollama_model_name:
+        return ollama_model_name
+
+    with ollama_lock:
+        if ollama_model_name:
+            return ollama_model_name
+
+        if OLLAMA_MODEL:
+            ollama_model_name = OLLAMA_MODEL
+            return ollama_model_name
+
+        try:
+            ollama_model_name = _pick_ollama_model_from_tags()
+            print(f"[Ollama] Using model {ollama_model_name}")
+        except Exception as error:
+            ollama_model_name = "qwen2.5:7b"
+            print(f"[Ollama] Model auto-detect failed ({error}); falling back to {ollama_model_name}")
+
+        return ollama_model_name
+
+
+def _fallback_translate_query(text: str) -> str:
+    token_map = {
+        "haljin": "dress",
+        "majic": "top",
+        "majica": "top",
+        "kosulj": "shirt",
+        "pantal": "pants",
+        "farmerk": "jeans",
+        "suknj": "skirt",
+        "jakn": "jacket",
+        "kaput": "coat",
+        "dzemper": "sweater",
+        "dzemper": "sweater",
+        "dukser": "hoodie",
+        "patik": "sneakers",
+        "cipe": "shoes",
+        "sand": "sandals",
+        "cizm": "boots",
+        "crven": "red",
+        "plav": "blue",
+        "zelen": "green",
+        "bel": "white",
+        "bijel": "white",
+        "crn": "black",
+        "roze": "pink",
+        "pink": "pink",
+        "ljubic": "purple",
+        "zut": "yellow",
+        "narand": "orange",
+        "bez": "beige",
+        "braon": "brown",
+        "siv": "gray",
+        "cvet": "floral",
+        "cvetn": "floral",
+        "karir": "plaid",
+        "prug": "striped",
+        "tack": "polka dot",
+        "eleg": "elegant",
+        "sport": "sporty",
+        "vint": "vintage",
+        "casual": "casual",
+    }
+
+    normalized = _canonicalize_text(text)
+    translated = []
+    for token in normalized.split():
+        mapped = None
+        for stem, english in token_map.items():
+            if token.startswith(stem):
+                mapped = english
+                break
+        translated.append(mapped or token)
+
+    deduped = []
+    for token in translated:
+        if not deduped or deduped[-1] != token:
+            deduped.append(token)
+    return " ".join(deduped).strip() or text
+
+
+class FashionSiglipProcessor:
+    """Minimal local replacement for Marqo's trust_remote_code processor."""
+
+    def __init__(self, image_processor, tokenizer):
+        self.image_processor = image_processor
+        self.tokenizer = tokenizer
+
+    def __call__(
+        self,
+        text=None,
+        images=None,
+        padding=False,
+        truncation=None,
+        max_length=None,
+        return_tensors="pt",
+    ):
+        if text is None and images is None:
+            raise ValueError("You have to specify either text or images.")
+
+        encoding = None
+        if text is not None:
+            if isinstance(text, str):
+                text = [text]
+            text = [_clean_embedding_text(raw_text) for raw_text in text]
+            encoding = self.tokenizer(
+                text,
+                return_tensors=return_tensors,
+                padding=padding,
+                truncation=truncation,
+                max_length=max_length,
+            )
+
+        if images is not None:
+            if isinstance(images, list):
+                normalized_images = []
+                for image in images:
+                    normalized_images.append(image.convert("RGB") if hasattr(image, "convert") else image)
+                images = normalized_images
+            elif hasattr(images, "convert"):
+                images = images.convert("RGB")
+
+            image_features = self.image_processor(images=images, return_tensors=return_tensors)
+            if encoding is None:
+                return image_features
+
+            encoding["pixel_values"] = image_features["pixel_values"]
+
+        return encoding
+
+
+class FashionSiglipModel:
+    """Adapter that preserves the get_*_features API used by the rest of the server."""
+
+    def __init__(self, model, device: str):
+        self.model = model
+        self.device = device
+
+    def eval(self):
+        self.model.eval()
+        return self
+
+    def get_image_features(self, pixel_values, normalize: bool = False):
+        import torch
+
+        with torch.inference_mode():
+            return self.model.encode_image(pixel_values.to(self.device), normalize=normalize).cpu()
+
+    def get_text_features(self, input_ids, normalize: bool = False):
+        import torch
+
+        with torch.inference_mode():
+            return self.model.encode_text(input_ids.to(self.device), normalize=normalize).cpu()
+
+
 def get_clip():
+    """Lazy-load fashion embedding model.
+
+    We bypass Marqo's transformers AutoModel wrapper because recent
+    transformers/open_clip combinations can instantiate it on the meta device
+    and crash while moving weights. open_clip can load the exact same weights
+    directly from hf-hub, so we keep the same API with a thin local adapter.
+    """
     global clip_model, clip_processor
     if clip_model is None:
         with clip_lock:
             if clip_model is None:
-                from transformers import CLIPModel, CLIPProcessor
+                import torch
+                from open_clip import create_model
+                from transformers import SiglipImageProcessor, T5TokenizerFast
 
-                model_name = "openai/clip-vit-base-patch32"
-                clip_processor = CLIPProcessor.from_pretrained(model_name)
-                clip_model = CLIPModel.from_pretrained(model_name)
+                device = EMBEDDING_DEVICE or ("cuda" if torch.cuda.is_available() else "cpu")
+
+                print(f"[Embedding] Loading model {EMBEDDING_MODEL_NAME} on {device}...")
+                image_processor = SiglipImageProcessor.from_pretrained(EMBEDDING_MODEL_NAME)
+                tokenizer = T5TokenizerFast.from_pretrained(EMBEDDING_MODEL_NAME)
+                open_clip_model = create_model(
+                    f"hf-hub:{EMBEDDING_MODEL_NAME}",
+                    output_dict=True,
+                    device=device,
+                )
+                clip_processor = FashionSiglipProcessor(image_processor, tokenizer)
+                clip_model = FashionSiglipModel(open_clip_model, device)
                 clip_model.eval()
+                print(f"[Embedding] Model {EMBEDDING_MODEL_NAME} ready")
     return clip_model, clip_processor
 
 
@@ -79,15 +317,42 @@ def get_rembg():
     return rembg_session, rembg_remove
 
 
+def _rebuild_id_to_pos_locked():
+    global faiss_id_to_pos
+    faiss_id_to_pos = {item_id: pos for pos, item_id in enumerate(faiss_ids)}
+
+
+def _delete_faiss_files():
+    for path in (FAISS_INDEX_PATH, FAISS_IDS_PATH):
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+                print(f"[FAISS] Deleted stale file {path}")
+        except Exception as error:
+            print(f"[FAISS] Failed to delete {path}: {error}")
+
+
 def load_faiss_index():
     global faiss_index, faiss_ids
     try:
         if os.path.exists(FAISS_INDEX_PATH) and os.path.exists(FAISS_IDS_PATH):
             with faiss_lock:
-                faiss_index = faiss.read_index(FAISS_INDEX_PATH)
+                loaded_index = faiss.read_index(FAISS_INDEX_PATH)
+                if loaded_index.d != FAISS_DIM_DEFAULT:
+                    print(
+                        f"[FAISS] Dimension mismatch on disk: index dim={loaded_index.d} "
+                        f"but model dim={FAISS_DIM_DEFAULT}. Discarding stale index."
+                    )
+                    faiss_index = None
+                    faiss_ids = []
+                    _rebuild_id_to_pos_locked()
+                    _delete_faiss_files()
+                    return
+                faiss_index = loaded_index
                 with open(FAISS_IDS_PATH, "rb") as handle:
                     faiss_ids = pickle.load(handle)
-            print(f"[FAISS] Loaded index with {len(faiss_ids)} items from disk")
+                _rebuild_id_to_pos_locked()
+            print(f"[FAISS] Loaded index with {len(faiss_ids)} items (dim={FAISS_DIM_DEFAULT}) from disk")
         else:
             print("[FAISS] No persisted index found, starting fresh")
     except Exception as error:
@@ -458,14 +723,13 @@ def clip_classify(image_pil, labels: list[str], prompt_template: str = "a {} pie
     model, processor = get_clip()
     prompts = [prompt_template.format(label) for label in labels]
 
+    # SigLIP processor requires padding='max_length'; outputs are pre-normalized when normalize=True
     image_inputs = processor(images=image_pil, return_tensors="pt")
-    text_inputs = processor(text=prompts, return_tensors="pt", padding=True)
+    text_inputs = processor(text=prompts, return_tensors="pt", padding="max_length")
 
     with torch.no_grad():
-        image_features = model.get_image_features(**image_inputs)
-        image_features = image_features / image_features.norm(dim=-1, keepdim=True)
-        text_features = model.get_text_features(**text_inputs)
-        text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+        image_features = model.get_image_features(image_inputs["pixel_values"], normalize=True)
+        text_features = model.get_text_features(text_inputs["input_ids"], normalize=True)
         similarities = (image_features @ text_features.T).squeeze(0)
         idx = similarities.argmax().item()
 
@@ -597,7 +861,7 @@ def generate_description(req: DescriptionRequest):
     try:
         response = requests.post(
             f"{OLLAMA_URL}/api/generate",
-            json={"model": "qwen2.5:7b", "prompt": prompt, "stream": False},
+            json={"model": get_ollama_model(), "prompt": prompt, "stream": False},
             timeout=60,
         )
         response.raise_for_status()
@@ -640,12 +904,10 @@ def embed_image(req: EmbedRequest):
     model, processor = get_clip()
     inputs = processor(images=image, return_tensors="pt")
     with torch.no_grad():
-        embedding = model.get_image_features(**inputs)
+        embedding = model.get_image_features(inputs["pixel_values"], normalize=True)
 
-    embedding = embedding / embedding.norm(dim=-1, keepdim=True)
     vector = embedding.squeeze().tolist()
-
-    return {"embedding": vector, "dimensions": len(vector)}
+    return {"embedding": vector, "dimensions": len(vector), "model": EMBEDDING_MODEL_NAME}
 
 
 class IndexItem(BaseModel):
@@ -665,10 +927,17 @@ def rebuild_index(req: IndexRequest):
         with faiss_lock:
             faiss_index = None
             faiss_ids = []
-        save_faiss_index()
-        return {"ok": True, "indexed": 0}
+            _rebuild_id_to_pos_locked()
+        _delete_faiss_files()
+        return {"ok": True, "indexed": 0, "model": EMBEDDING_MODEL_NAME}
 
     dim = len(req.items[0].embedding)
+    if dim != FAISS_DIM_DEFAULT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Embedding dim {dim} does not match expected {FAISS_DIM_DEFAULT} for model {EMBEDDING_MODEL_NAME}",
+        )
+
     vectors = np.array([item.embedding for item in req.items], dtype=np.float32)
     ids = [item.item_id for item in req.items]
 
@@ -678,10 +947,171 @@ def rebuild_index(req: IndexRequest):
     with faiss_lock:
         faiss_index = index
         faiss_ids = ids
+        _rebuild_id_to_pos_locked()
 
     save_faiss_index()
 
-    return {"ok": True, "indexed": len(ids)}
+    return {"ok": True, "indexed": len(ids), "dim": dim, "model": EMBEDDING_MODEL_NAME}
+
+
+@app.post("/reset-index")
+def reset_index():
+    """Wipe in-memory FAISS state AND on-disk files. Use after model swap."""
+    global faiss_index, faiss_ids
+    with faiss_lock:
+        faiss_index = None
+        faiss_ids = []
+        _rebuild_id_to_pos_locked()
+    _delete_faiss_files()
+    return {"ok": True, "message": "FAISS index reset", "model": EMBEDDING_MODEL_NAME, "expected_dim": FAISS_DIM_DEFAULT}
+
+
+@app.post("/index-add")
+def index_add(req: IndexRequest):
+    """Append vectors to existing index without full rebuild.
+
+    If index does not yet exist it is created from this batch.
+    Items whose item_id is already present are skipped (next /index call replaces them).
+    """
+    global faiss_index, faiss_ids
+
+    if not req.items:
+        return {"ok": True, "added": 0, "skipped": 0}
+
+    new_items = []
+    skipped = 0
+    with faiss_lock:
+        for item in req.items:
+            if not item.embedding:
+                skipped += 1
+                continue
+            if item.item_id in faiss_id_to_pos:
+                skipped += 1
+                continue
+            new_items.append(item)
+
+        if not new_items:
+            return {"ok": True, "added": 0, "skipped": skipped}
+
+        dim = len(new_items[0].embedding)
+        if dim != FAISS_DIM_DEFAULT:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Embedding dim {dim} does not match expected {FAISS_DIM_DEFAULT} for model {EMBEDDING_MODEL_NAME}",
+            )
+
+        vectors = np.array([item.embedding for item in new_items], dtype=np.float32)
+
+        if faiss_index is None:
+            faiss_index = faiss.IndexFlatIP(dim)
+        elif faiss_index.d != dim:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Index dim mismatch: existing {faiss_index.d} vs new {dim}. Call /reset-index first.",
+            )
+
+        start_pos = len(faiss_ids)
+        faiss_index.add(vectors)
+        for offset, item in enumerate(new_items):
+            faiss_ids.append(item.item_id)
+            faiss_id_to_pos[item.item_id] = start_pos + offset
+
+    save_faiss_index()
+    return {"ok": True, "added": len(new_items), "skipped": skipped, "total": len(faiss_ids)}
+
+
+def looks_like_english(text: str) -> bool:
+    """Cheap heuristic: ASCII-only + no Cyrillic/diacritics -> assume English and skip Ollama."""
+    if not text:
+        return True
+    try:
+        text.encode("ascii")
+    except UnicodeEncodeError:
+        return False
+    lowered = text.lower()
+    common_non_english = (
+        "haljin", "kosulj", "pantal", "patik", "suknja", "dzemper", "jakna",
+        "crven", "plav", "zelen", "beli", "crn", "zut",
+        "cvet", "prug", "karir",
+    )
+    return not any(token in lowered for token in common_non_english)
+
+
+def translate_to_english(text: str, timeout_s: int = 8) -> str:
+    """Best-effort translation via Ollama qwen2.5. Falls back to original on failure."""
+    if looks_like_english(text):
+        return text
+
+    prompt = (
+        "Translate the following clothing search query to short, lowercase English. "
+        "Keep it natural and concise (2-6 words). Output ONLY the translation, no labels, no quotes.\n\n"
+        f"Query: {text}\nTranslation:"
+    )
+    try:
+        response = requests.post(
+            f"{OLLAMA_URL}/api/generate",
+            json={"model": get_ollama_model(), "prompt": prompt, "stream": False},
+            timeout=timeout_s,
+        )
+        response.raise_for_status()
+        translated = response.json().get("response", "").strip()
+        first_line = translated.splitlines()[0] if translated else ""
+        cleaned = first_line.strip(" .\"'`\n\r\t").lower()
+        return cleaned or text
+    except Exception as error:
+        fallback = _fallback_translate_query(text)
+        print(f"[text-search] Ollama translation failed ({error}), using fallback '{fallback}'")
+        return fallback
+
+
+def embed_text(query: str):
+    import torch
+
+    model, processor = get_clip()
+    text_inputs = processor(text=[query], return_tensors="pt", padding="max_length")
+    with torch.no_grad():
+        features = model.get_text_features(text_inputs["input_ids"], normalize=True)
+    return features.squeeze().cpu().numpy().astype(np.float32)
+
+
+class TextSearchRequest(BaseModel):
+    query: str
+    top_k: int = 20
+    translate: bool = True
+    exclude_id: str = ""
+
+
+@app.post("/text-search")
+def text_search(req: TextSearchRequest):
+    if not req.query or not req.query.strip():
+        raise HTTPException(status_code=400, detail="query must not be empty")
+    if faiss_index is None or faiss_index.ntotal == 0:
+        return {"results": [], "query": req.query, "translated": "", "model": EMBEDDING_MODEL_NAME}
+
+    translated = translate_to_english(req.query.strip()) if req.translate else req.query.strip()
+    vector = embed_text(translated)
+
+    query_arr = np.array([vector], dtype=np.float32)
+    k = min(req.top_k + 5, faiss_index.ntotal)
+    distances, indices = faiss_index.search(query_arr, k)
+
+    results = []
+    for distance, index in zip(distances[0], indices[0]):
+        if index < 0 or index >= len(faiss_ids):
+            continue
+        item_id = faiss_ids[index]
+        if item_id == req.exclude_id:
+            continue
+        results.append({"item_id": item_id, "score": float(distance)})
+        if len(results) >= req.top_k:
+            break
+
+    return {
+        "results": results,
+        "query": req.query,
+        "translated": translated,
+        "model": EMBEDDING_MODEL_NAME,
+    }
 
 
 class SimilarRequest(BaseModel):

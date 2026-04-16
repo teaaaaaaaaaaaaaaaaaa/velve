@@ -62,7 +62,7 @@ export default function CleanCutStartScreen() {
 
       <View className="flex-1 px-5 pb-10 pt-14">
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => router.replace('/(tabs)/feed')}
           className="mb-6 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
         >
           <Ionicons name="arrow-back" size={20} color={colors.inkDark} />

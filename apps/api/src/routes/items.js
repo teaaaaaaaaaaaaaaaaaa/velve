@@ -16,8 +16,8 @@ const { sendPushToUser } = require('../lib/pushNotifications')
 const { getBlockedUserIds, getHiddenItemIds } = require('../lib/discovery')
 const { withPrimaryImage } = require('../lib/itemPresentation')
 const { createItemCleanKey, uploadBuffer } = require('../lib/r2')
+const { AI_SERVER_URL, generateEmbedding, addEmbeddingToIndex } = require('../lib/aiClient')
 
-const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:8000'
 const OWNER_ACTIVE_STATUSES = ['available', 'pending_trade', 'unavailable']
 const OWNER_DRAFT_STATUSES = ['draft']
 const OWNER_ARCHIVE_STATUSES = ['archived', 'sold', 'swapped', 'traded']
@@ -46,20 +46,20 @@ function toObjectId(id) {
   return new mongoose.Types.ObjectId(id)
 }
 
-// Fire-and-forget: generate CLIP embedding for first image and save to DB
+// Fire-and-forget: generate CLIP embedding and push to FAISS index.
+// On failure the periodic retryMissingEmbeddings job will catch it.
 function generateEmbeddingAsync(itemId, imageUrl) {
-  fetch(`${AI_SERVER_URL}/embed`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image_url: imageUrl }),
-  })
-    .then((r) => r.json())
-    .then((data) => {
-      if (data.embedding) {
-        Item.findByIdAndUpdate(itemId, { embedding: data.embedding }).exec()
-      }
-    })
-    .catch((err) => console.error(`Embedding failed for item ${itemId}:`, err.message))
+  ;(async () => {
+    try {
+      const embedding = await generateEmbedding(imageUrl)
+      await Item.findByIdAndUpdate(itemId, { embedding })
+      await addEmbeddingToIndex(itemId, embedding).catch((err) =>
+        console.warn(`[Embeddings] Index-add failed for ${itemId}: ${err.message}`)
+      )
+    } catch (err) {
+      console.error(`Embedding failed for item ${itemId}: ${err.message}`)
+    }
+  })()
 }
 
 async function recordItemView(userId, itemId) {
@@ -876,7 +876,7 @@ router.post('/', requireAuth, async (req, res) => {
       generateEmbeddingAsync(item._id, item.images[0])
     }
 
-    res.status(201).json({ ok: true, data: item })
+    res.status(201).json({ ok: true, data: withPrimaryImage(item.toObject()) })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -1045,7 +1045,9 @@ router.get('/:id/similar', maybeAuth, async (req, res) => {
       .lean()
 
     const sortedItems = sortItemsByRequestedIds(similarItems, similarIds)
-    const data = req.dbUser ? await enrichItems(sortedItems, req.dbUser._id) : sortedItems
+    const data = req.dbUser
+      ? await enrichItems(sortedItems, req.dbUser._id)
+      : sortedItems.map((entry) => withPrimaryImage(entry))
 
     res.json({ ok: true, data })
   } catch (err) {
@@ -1128,7 +1130,7 @@ router.put('/:id', requireAuth, async (req, res) => {
       generateEmbeddingAsync(updated._id, updated.images[0])
     }
 
-    res.json({ ok: true, data: updated })
+    res.json({ ok: true, data: withPrimaryImage(updated.toObject()) })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -1188,7 +1190,7 @@ router.put('/:id/sold', requireAuth, async (req, res) => {
     }
 
     if (['sold', 'swapped', 'traded'].includes(item.status)) {
-      return res.json({ ok: true, data: item })
+      return res.json({ ok: true, data: serializeClosetItem(item.toObject()) })
     }
 
     const updated = await Item.findByIdAndUpdate(
@@ -1202,7 +1204,7 @@ router.put('/:id/sold', requireAuth, async (req, res) => {
       { new: true }
     )
 
-    res.json({ ok: true, data: updated })
+    res.json({ ok: true, data: serializeClosetItem(updated.toObject()) })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

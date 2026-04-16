@@ -1,19 +1,24 @@
 const Item = require('../models/Item')
+const { pingAiServer, generateEmbedding, addEmbeddingToIndex } = require('./aiClient')
 
-const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:8000'
+const BATCH_SIZE = 50
+const PER_ITEM_DELAY_MS = 200
 
 /**
  * Retry generating embeddings for items that have images but no embedding vector.
- * This handles cases where AI server was down or embedding generation failed.
- *
- * Call this periodically (every 10-15 minutes recommended)
+ * Skips early if AI server is unreachable so we don't spam ECONNREFUSED errors.
  */
 async function retryMissingEmbeddings() {
   console.log('[Embeddings] Starting retry for missing embeddings...')
   const startTime = Date.now()
 
+  const aiUp = await pingAiServer()
+  if (!aiUp) {
+    console.warn('[Embeddings] AI server unreachable - skipping retry until next interval')
+    return { skipped: true }
+  }
+
   try {
-    // Find items with images but no embedding (or empty embedding)
     const items = await Item.find({
       images: { $ne: [] },
       $or: [
@@ -22,12 +27,12 @@ async function retryMissingEmbeddings() {
       ],
       isDeleted: false,
     })
-      .limit(50) // Process max 50 items per run to avoid overload
+      .limit(BATCH_SIZE)
       .lean()
 
     if (items.length === 0) {
       console.log('[Embeddings] No items need embedding retry')
-      return
+      return { processed: 0 }
     }
 
     console.log(`[Embeddings] Retrying ${items.length} items...`)
@@ -35,43 +40,35 @@ async function retryMissingEmbeddings() {
     let successCount = 0
     let failCount = 0
 
-    // Process items sequentially to avoid overwhelming AI server
     for (const item of items) {
-      try {
-        const sourceImage = item.imageClean || item.images[0]
-        const response = await fetch(`${AI_SERVER_URL}/embed`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_url: sourceImage }),
-          timeout: 30000, // 30s timeout
-        })
-
-        if (!response.ok) {
-          throw new Error(`AI server responded with ${response.status}`)
-        }
-
-        const data = await response.json()
-
-        if (data.embedding && Array.isArray(data.embedding)) {
-          await Item.findByIdAndUpdate(item._id, { embedding: data.embedding })
-          successCount++
-        } else {
-          failCount++
-          console.warn(`[Embeddings] Invalid embedding response for item ${item._id}`)
-        }
-      } catch (err) {
-        failCount++
-        console.error(`[Embeddings] Failed to generate embedding for item ${item._id}:`, err.message)
+      const sourceImage = item.imageClean || item.images?.[0]
+      if (!sourceImage) {
+        failCount += 1
+        continue
       }
 
-      // Small delay between requests to avoid rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 200))
+      try {
+        const embedding = await generateEmbedding(sourceImage)
+        await Item.findByIdAndUpdate(item._id, { embedding })
+        successCount += 1
+
+        addEmbeddingToIndex(item._id, embedding).catch((err) =>
+          console.warn(`[Embeddings] Index-add failed for ${item._id}: ${err.message}`)
+        )
+      } catch (err) {
+        failCount += 1
+        console.error(`[Embeddings] Failed for item ${item._id}: ${err.message}`)
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, PER_ITEM_DELAY_MS))
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2)
     console.log(`[Embeddings] Retry completed in ${duration}s - Success: ${successCount}, Failed: ${failCount}`)
+    return { processed: items.length, successCount, failCount }
   } catch (err) {
     console.error('[Embeddings] Retry failed:', err.message)
+    return { error: err.message }
   }
 }
 

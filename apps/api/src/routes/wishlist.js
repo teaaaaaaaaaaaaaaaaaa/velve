@@ -5,6 +5,7 @@ const { requireAuth } = require('../middleware/auth')
 const Wishlist = require('../models/Wishlist')
 const Item = require('../models/Item')
 const { enrichItems } = require('../lib/enrichItems')
+const { withPrimaryImage } = require('../lib/itemPresentation')
 
 // POST /api/wishlist/:itemId — Add item to wishlist (idempotent)
 router.post('/:itemId', requireAuth, async (req, res) => {
@@ -71,10 +72,10 @@ router.get('/', requireAuth, async (req, res) => {
       .limit(limit + 1)
       .populate({
         path: 'itemId',
-        select: 'title images userId category condition status isDeleted',
+        select: 'title images imageClean isDigitized userId category brand size condition listingType price status isDeleted',
         populate: {
           path: 'userId',
-          select: 'displayName photoURL',
+          select: 'displayName photoURL averageRating completedTrades location',
         },
       })
       .lean()
@@ -85,7 +86,7 @@ router.get('/', requireAuth, async (req, res) => {
 
     const hasMore = validItems.length > limit
     const enriched = await enrichItems(validItems.slice(0, limit), req.dbUser._id)
-    const data = enriched.map((item) => ({ ...item, isWishlisted: true }))
+    const data = enriched.map((item) => withPrimaryImage({ ...item, isWishlisted: true }))
 
     res.json({ ok: true, data, page, hasMore })
   } catch (err) {

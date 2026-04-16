@@ -1,5 +1,7 @@
 function getPrimaryImage(item = {}) {
-  return item.imageClean || item.images?.[0] || ''
+  if (item.imageClean) return item.imageClean
+  if (item.isDigitized) return ''
+  return item.images?.[0] || ''
 }
 
 function withPrimaryImage(item = {}) {

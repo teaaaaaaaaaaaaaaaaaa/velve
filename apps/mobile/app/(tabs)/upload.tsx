@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'expo-router'
 import { InteractionManager } from 'react-native'
 
@@ -6,16 +6,15 @@ import { BrandedLoader } from '@/components/BrandedLoader'
 
 export default function UploadTabEntry() {
   const router = useRouter()
-  const [navigated, setNavigated] = useState(false)
 
   useEffect(() => {
-    if (navigated) return
     const task = InteractionManager.runAfterInteractions(() => {
-      setNavigated(true)
-      router.push('/upload-flow')
+      // Replace the temporary tab route so back navigation never gets stuck
+      // on this loader screen.
+      router.replace('/upload-flow')
     })
     return () => task.cancel()
-  }, [router, navigated])
+  }, [router])
 
   return <BrandedLoader label="Otvaram Clean Cut studio" />
 }

@@ -7,7 +7,11 @@ type ItemLike = {
 
 export function getPrimaryItemImage(item?: ItemLike | null) {
   if (!item) return null
-  return item.primaryImage || item.imageClean || item.images?.[0] || null
+  // Once a piece is digitized, always prefer the clean cut asset and never
+  // fall back to the old original image in UI surfaces like profile/saved/feed.
+  if (item.imageClean) return item.imageClean
+  if (item.isDigitized) return null
+  return item.primaryImage || item.images?.[0] || null
 }
 
 export function hasDigitizedImage(item?: ItemLike | null) {

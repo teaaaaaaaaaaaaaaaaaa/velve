@@ -10,6 +10,10 @@ const { initSentry, Sentry } = require('./config/sentry')
 const { initSocket } = require('./lib/socket')
 const { updateEngagementScores } = require('./lib/updateEngagementScores')
 const { retryMissingEmbeddings } = require('./lib/retryMissingEmbeddings')
+const { rebuildAiIndex, pingAiServer } = require('./lib/aiClient')
+
+const EMBEDDING_RETRY_INTERVAL_MS = 15 * 60 * 1000 // 15 min
+const FAISS_REINDEX_INTERVAL_MS = 60 * 60 * 1000 // 1 h
 
 const itemsRouter = require('./routes/items')
 const feedRouter = require('./routes/feed')
@@ -23,6 +27,7 @@ const aiRouter = require('./routes/ai')
 const verificationRouter = require('./routes/verification')
 const wishlistRouter = require('./routes/wishlist')
 const vtoRouter = require('./routes/vto')
+const searchRouter = require('./routes/search')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -153,6 +158,7 @@ app.use('/api/ai', aiRouter)
 app.use('/api/verification', verificationRouter)
 app.use('/api/wishlist', wishlistRouter)
 app.use('/api/vto', vtoRouter)
+app.use('/api/search', searchRouter)
 
 // Sentry error handler (must be before other error middleware)
 app.use(Sentry.Handlers.errorHandler())
@@ -179,6 +185,33 @@ mongoose
     retryMissingEmbeddings().catch((err) => {
       console.error('Initial embedding retry failed:', err.message)
     })
+
+    // Initial FAISS index sync on startup (so /similar works after restart)
+    pingAiServer().then((up) => {
+      if (!up) {
+        console.warn('[FAISS] AI server down on boot - skipping initial reindex')
+        return
+      }
+      rebuildAiIndex()
+        .then((data) => console.log(`[FAISS] Initial reindex done: ${JSON.stringify(data)}`))
+        .catch((err) => console.error('[FAISS] Initial reindex failed:', err.message))
+    })
+
+    // Periodic background workers
+    setInterval(() => {
+      retryMissingEmbeddings().catch((err) =>
+        console.error('[Embeddings] Periodic retry failed:', err.message)
+      )
+    }, EMBEDDING_RETRY_INTERVAL_MS).unref()
+
+    setInterval(() => {
+      pingAiServer().then((up) => {
+        if (!up) return
+        rebuildAiIndex()
+          .then((data) => console.log(`[FAISS] Periodic reindex done: ${JSON.stringify(data)}`))
+          .catch((err) => console.error('[FAISS] Periodic reindex failed:', err.message))
+      })
+    }, FAISS_REINDEX_INTERVAL_MS).unref()
 
     server.listen(PORT, () => {
       const lanIp = getLocalLanIp()

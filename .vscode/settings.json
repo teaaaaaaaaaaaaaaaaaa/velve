@@ -1,0 +1,10 @@
+{
+  "java.import.gradle.java.home": "C:\\Program Files\\Android\\Android Studio\\jbr",
+  "java.jdt.ls.java.home": "C:\\Program Files\\Android\\Android Studio\\jbr",
+  "java.import.exclusions": [
+    "android/**",
+    "**/node_modules/**",
+    "**/.gradle/**",
+    "**/build/**"
+  ]
+}

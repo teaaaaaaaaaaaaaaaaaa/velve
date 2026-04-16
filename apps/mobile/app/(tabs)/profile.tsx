@@ -302,9 +302,6 @@ export default function ProfileScreen() {
           <View className="mb-5 flex-row items-center justify-between">
             <View className="flex-1 pr-4">
               <BrandWordmark width={118} />
-              <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
-                {t('profile.eyebrow')}
-              </Text>
               <Text className="font-display text-4xl text-ink-dark">{t('profile.title')}</Text>
             </View>
             <TouchableOpacity
