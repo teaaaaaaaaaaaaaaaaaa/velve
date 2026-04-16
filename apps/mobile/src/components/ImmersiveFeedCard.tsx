@@ -132,7 +132,7 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
       <Animated.View
         entering={FadeIn.duration(300)}
         className="absolute left-4 right-24"
-        style={{ top: topInset + 94 }}
+        style={{ top: topInset + 62 }}
       >
         <View className="self-start rounded-full bg-ink-dark/6 px-3 py-2">
           <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/60">

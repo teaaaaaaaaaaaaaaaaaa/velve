@@ -34,13 +34,13 @@ const lightActive: ViewStyle = {
 const darkBase: ViewStyle = {
   width: 58,
   borderRadius: 22,
-  borderWidth: 1,
-  borderColor: 'rgba(43,42,43,0.10)',
-  backgroundColor: 'rgba(43,42,43,0.06)',
+  borderWidth: 0,
+  borderColor: 'transparent',
+  backgroundColor: 'transparent',
 }
 
 const darkActive: ViewStyle = {
-  backgroundColor: 'rgba(43,42,43,0.12)',
+  backgroundColor: 'rgba(43,42,43,0.08)',
 }
 
 export const GlassCountActionButton = memo(function GlassCountActionButton({

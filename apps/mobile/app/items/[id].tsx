@@ -1014,20 +1014,15 @@ export default function ItemDetailsScreen() {
           ) : null}
           <View className="mt-8">
             <Text className="font-display text-3xl text-ink-dark">Slicni komadi</Text>
-            <Text className="mt-1 font-sans text-sm text-ink-dark/60">
-              Vizuelno i ukusno bliski predlozi iz discovery sloja.
-            </Text>
             {loadingSimilar ? (
               <View className="items-center py-8">
                 <ActivityIndicator size="small" color="#431A43" />
               </View>
             ) : similarItems.length === 0 ? (
-              <View className="pt-4">
-                <EditorialEmptyState
-                  icon="sparkles-outline"
-                  title="Jos nema slicnih komada"
-                  description="Kada embedding i discovery signali dobiju vise podataka, ovde ce stizati precizniji predlozi."
-                />
+              <View className="items-center py-8">
+                <Text className="font-sans text-sm text-ink-dark/50">
+                  Jos uvek nema slicnih komada
+                </Text>
               </View>
             ) : (
               <ScrollView

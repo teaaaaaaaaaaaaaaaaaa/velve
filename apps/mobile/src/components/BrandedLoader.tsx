@@ -1,13 +1,15 @@
-import { View } from 'react-native'
+import { ActivityIndicator, View } from 'react-native'
 
 import { BrandWordmark } from '@/components/BrandWordmark'
+import { colors } from '@/design/tokens'
 
 type LoaderProps = {
   label?: string
   dark?: boolean
+  showSpinner?: boolean
 }
 
-export function BrandedLoader({ dark = false }: LoaderProps) {
+export function BrandedLoader({ dark = false, showSpinner = false }: LoaderProps) {
   return (
     <View
       className={`flex-1 items-center justify-center ${
@@ -15,6 +17,13 @@ export function BrandedLoader({ dark = false }: LoaderProps) {
       }`}
     >
       <BrandWordmark width={168} tone={dark ? 'light' : 'deep'} />
+      {showSpinner ? (
+        <ActivityIndicator
+          size="large"
+          color={dark ? colors.baseCanvas : colors.accentDeep}
+          style={{ marginTop: 32 }}
+        />
+      ) : null}
     </View>
   )
 }
@@ -24,9 +33,9 @@ export function FeedSkeleton() {
 }
 
 export function ProfileSkeleton() {
-  return <BrandedLoader />
+  return <BrandedLoader showSpinner />
 }
 
 export function ChatSkeleton() {
-  return <BrandedLoader />
+  return <BrandedLoader showSpinner />
 }

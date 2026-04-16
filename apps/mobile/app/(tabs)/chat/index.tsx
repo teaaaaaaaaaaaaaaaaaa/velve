@@ -193,19 +193,19 @@ export default function ChatListScreen() {
     () => (
       <View className="px-5 pb-4 pt-14">
         <BrandBackground />
-        <View className="mb-5 flex-row items-end justify-between">
-          <View className="flex-1 pr-4">
+        <View className="mb-5 flex-row items-end">
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="mb-1 mr-3 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
+          >
+            <Ionicons name="arrow-back" size={22} color={colors.inkDark} />
+          </TouchableOpacity>
+          <View className="flex-1">
             <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
               {t('chat.eyebrow')}
             </Text>
             <Text className="font-display text-4xl text-ink-dark">{t('chat.title')}</Text>
           </View>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="mb-1 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
-          >
-            <Ionicons name="arrow-back" size={22} color={colors.inkDark} />
-          </TouchableOpacity>
         </View>
       </View>
     ),

@@ -461,7 +461,7 @@ export default function FeedScreen() {
       {searchActive ? (
         // --- Search results overlay ---
         searchLoading && searchItems.length === 0 ? (
-          <BrandedLoader />
+          <BrandedLoader showSpinner />
         ) : searchItems.length === 0 ? (
           <View className="flex-1 bg-white px-5 pt-24">
             <EditorialEmptyState
@@ -481,8 +481,6 @@ export default function FeedScreen() {
             showsVerticalScrollIndicator={false}
             pagingEnabled
             decelerationRate="fast"
-            snapToInterval={pageHeight}
-            snapToAlignment="start"
             disableIntervalMomentum
             initialNumToRender={2}
             maxToRenderPerBatch={2}
@@ -554,8 +552,6 @@ export default function FeedScreen() {
           showsVerticalScrollIndicator={false}
           pagingEnabled
           decelerationRate="fast"
-          snapToInterval={pageHeight}
-          snapToAlignment="start"
           disableIntervalMomentum
           initialNumToRender={2}
           maxToRenderPerBatch={2}
@@ -592,12 +588,14 @@ export default function FeedScreen() {
         <View className="flex-row items-center justify-between" pointerEvents="box-none">
           {/* Logo + Toggle - fade out when search expands */}
           <Animated.View
-            className="flex-1 flex-row items-center justify-between pr-3"
+            className="flex-1 flex-row items-center pr-3"
             style={headerElementsStyle}
             pointerEvents={searchActive ? 'none' : 'auto'}
           >
             <BrandWordmark width={92} tone="dark" />
-            <FeedModeToggle feedMode={feedMode} onChangeMode={setFeedMode} />
+            <View className="flex-1 items-center" style={{ marginRight: 32 }}>
+              <FeedModeToggle feedMode={feedMode} onChangeMode={setFeedMode} />
+            </View>
           </Animated.View>
 
           {/* Search bar - expands from icon to full width */}

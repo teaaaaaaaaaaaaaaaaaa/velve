@@ -438,49 +438,6 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          <View
-            className="mt-5 rounded-[28px] bg-surface-panel px-5 py-5"
-            style={{
-              shadowColor: colors.inkDark,
-              shadowOpacity: 0.06,
-              shadowRadius: 18,
-              shadowOffset: { width: 0, height: 4 },
-              elevation: 4,
-            }}
-          >
-            <Text className="font-display text-3xl text-ink-dark">Closet pregled</Text>
-            <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/60">
-              Jednostavan pregled aktivnih, draft i arhiviranih komada.
-            </Text>
-
-            <View className="mt-4 flex-row gap-3">
-              <View className="flex-1 rounded-[22px] bg-surface-soft px-4 py-4">
-                <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
-                  Live
-                </Text>
-                <Text className="mt-1 font-display text-3xl text-ink-dark">
-                  {profile.closetCounts.live}
-                </Text>
-              </View>
-              <View className="flex-1 rounded-[22px] bg-surface-soft px-4 py-4">
-                <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
-                  Drafts
-                </Text>
-                <Text className="mt-1 font-display text-3xl text-ink-dark">
-                  {profile.closetCounts.drafts}
-                </Text>
-              </View>
-              <View className="flex-1 rounded-[22px] bg-surface-soft px-4 py-4">
-                <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/45">
-                  Archive
-                </Text>
-                <Text className="mt-1 font-display text-3xl text-ink-dark">
-                  {profile.closetCounts.archive}
-                </Text>
-              </View>
-            </View>
-          </View>
-
           <View className="mt-6">
             <View className="mb-4 flex-row rounded-[22px] bg-surface-panel p-1">
               {([
