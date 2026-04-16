@@ -19,6 +19,7 @@ build/
 # Android build cache
 .gradle-local/
 .gradle/
+.tmp-android-sdk/
 
 # Expo / React Native
 .expo/

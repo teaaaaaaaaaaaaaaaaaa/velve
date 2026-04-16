@@ -197,6 +197,10 @@ def prepare_binary_mask(image: Image.Image) -> tuple[np.ndarray, dict]:
         coverage = 0.0
         touches_edge = False
         edges_touched = 0
+        touches_left = False
+        touches_top = False
+        touches_right = False
+        touches_bottom = False
         aspect_ratio = width / max(height, 1)
         center_offset = 1.0
         subject_mask = combined
@@ -229,6 +233,10 @@ def prepare_binary_mask(image: Image.Image) -> tuple[np.ndarray, dict]:
         "bbox": bbox,
         "coverage": round(coverage, 4),
         "touchesEdge": touches_edge,
+        "touchesLeft": touches_left,
+        "touchesTop": touches_top,
+        "touchesRight": touches_right,
+        "touchesBottom": touches_bottom,
         "edgesTouched": edges_touched,
         "aspectRatio": round(float(aspect_ratio), 4),
         "centerOffset": round(float(center_offset), 4),
@@ -237,6 +245,8 @@ def prepare_binary_mask(image: Image.Image) -> tuple[np.ndarray, dict]:
         "borderWhiteness": round(border_whiteness / 255.0, 4),
         "backgroundDistance": round(color_distance / 255.0, 4),
         "sharpness": round(sharpness, 2),
+        "bboxWidthRatio": round(float(bbox[2] / max(width, 1)), 4),
+        "bboxHeightRatio": round(float(bbox[3] / max(height, 1)), 4),
         "width": width,
         "height": height,
     }
@@ -251,7 +261,13 @@ def build_garment_analysis(image: Image.Image) -> dict:
     bg_distance = metrics["backgroundDistance"]
     center_offset = metrics["centerOffset"]
     edges_touched = metrics.get("edgesTouched", 0)
+    touches_left = metrics.get("touchesLeft", False)
+    touches_top = metrics.get("touchesTop", False)
+    touches_right = metrics.get("touchesRight", False)
+    touches_bottom = metrics.get("touchesBottom", False)
     sharpness = metrics.get("sharpness", 100.0)
+    bbox_width_ratio = metrics.get("bboxWidthRatio", 1.0)
+    bbox_height_ratio = metrics.get("bboxHeightRatio", 1.0)
 
     too_dark = brightness < 0.22
     too_bright = brightness > 0.97
@@ -259,7 +275,20 @@ def build_garment_analysis(image: Image.Image) -> dict:
 
     subject_missing = coverage < 0.05
     detection_failed = coverage > 0.97 and edges_touched >= 4
-    too_cropped = (not detection_failed) and coverage > 0.88 and edges_touched >= 3
+    slim_full_length_garment = (
+        touches_top
+        and touches_bottom
+        and not (touches_left and touches_right)
+        and bbox_height_ratio >= 0.94
+        and bbox_width_ratio <= 0.72
+        and center_offset <= 0.24
+    )
+    too_cropped = (
+        (not detection_failed)
+        and coverage > 0.88
+        and edges_touched >= 3
+        and not slim_full_length_garment
+    )
     way_off_center = (not detection_failed) and coverage < 0.85 and center_offset > 0.6
     framing_ok = not subject_missing and not too_cropped and not way_off_center
 
