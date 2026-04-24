@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Tabs, usePathname } from 'expo-router'
+import { Tabs, usePathname, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { io, Socket } from 'socket.io-client'
 import { View } from 'react-native'
@@ -13,10 +13,12 @@ export default function TabsLayout() {
   const { dbUser } = useAuth()
   const { t } = useI18n()
   const pathname = usePathname()
+  const router = useRouter()
   const [unreadCount, setUnreadCount] = useState(0)
   const socketRef = useRef<Socket | null>(null)
-  const hideFloatingBar =
-    pathname.includes('/chat') || pathname.endsWith('/closet') || pathname.endsWith('/trades')
+  // Hide only inside a specific conversation (e.g. /chat/<id>). The chat list
+  // (/chat), closet, and trades keep the floating nav visible.
+  const hideFloatingBar = /\/chat\/[^/]+$/.test(pathname)
 
   // Resetuj badge kad korisnik otvori chat
   useEffect(() => {
@@ -122,6 +124,15 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="add-circle-outline" size={size} color={color} />
           ),
+        }}
+        listeners={{
+          tabPress: (event) => {
+            // Fabric crashes (addViewAt) when redirecting from a tab screen
+            // via router.replace inside useEffect. Intercept the tab tap and
+            // navigate directly so the upload tab itself never mounts.
+            event.preventDefault()
+            router.push('/upload-flow')
+          },
         }}
       />
       <Tabs.Screen

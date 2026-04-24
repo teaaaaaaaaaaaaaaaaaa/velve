@@ -183,8 +183,15 @@ export default function VtoSelectScreen() {
         />
 
         <View
-          className="border-t border-ink-dark/8 bg-base-canvas px-5 pt-3"
-          style={{ paddingBottom: Math.max(insets.bottom, 16) + 4 }}
+          className="bg-base-canvas px-5 pt-3"
+          style={{
+            paddingBottom: Math.max(insets.bottom, 16) + 4,
+            shadowColor: '#2B2A2B',
+            shadowOpacity: 0.07,
+            shadowRadius: 14,
+            shadowOffset: { width: 0, height: -4 },
+            elevation: 6,
+          }}
         >
           <TouchableOpacity
             disabled={!selectedItemId}

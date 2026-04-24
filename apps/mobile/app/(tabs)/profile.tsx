@@ -516,7 +516,7 @@ export default function ProfileScreen() {
         onRequestClose={() => setModalVisible(false)}
       >
         <View className="flex-1 bg-base-canvas">
-          <View className="flex-row items-center justify-between border-b border-ink-dark/10 px-6 pb-4 pt-12">
+          <View className="flex-row items-center justify-between border-b border-ink-dark/4 px-6 pb-4 pt-12">
             <TouchableOpacity onPress={() => setModalVisible(false)}>
               <Text className="font-sans text-base text-ink-dark">Zatvori</Text>
             </TouchableOpacity>

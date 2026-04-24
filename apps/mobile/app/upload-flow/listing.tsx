@@ -319,8 +319,15 @@ export default function ListingScreen() {
 
       {/* Bottom CTA */}
       <View
-        className="absolute bottom-0 left-0 right-0 border-t border-ink-dark/6 bg-base-canvas px-5 pt-3"
-        style={{ paddingBottom: insets.bottom + 12 }}
+        className="absolute bottom-0 left-0 right-0 bg-base-canvas px-5 pt-3"
+        style={{
+          paddingBottom: insets.bottom + 12,
+          shadowColor: '#2B2A2B',
+          shadowOpacity: 0.07,
+          shadowRadius: 14,
+          shadowOffset: { width: 0, height: -4 },
+          elevation: 6,
+        }}
       >
         <TouchableOpacity
           disabled={!canContinue}

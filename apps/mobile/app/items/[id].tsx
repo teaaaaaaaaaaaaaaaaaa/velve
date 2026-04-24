@@ -476,7 +476,7 @@ export default function ItemDetailsScreen() {
       onRequestClose={() => setShowTradeModal(false)}
     >
       <View className="flex-1 bg-base-canvas">
-        <View className="flex-row items-center justify-between border-b border-ink-dark/10 px-6 pb-4 pt-10">
+        <View className="flex-row items-center justify-between border-b border-ink-dark/4 px-6 pb-4 pt-10">
           <TouchableOpacity onPress={() => setShowTradeModal(false)}>
             <Ionicons name="close" size={26} color="#2B2A2B" />
           </TouchableOpacity>
@@ -609,7 +609,7 @@ export default function ItemDetailsScreen() {
           <View className="h-24" />
         </ScrollView>
         {(proposalMode === 'buy' || currentUserItems.length > 0) ? (
-          <View className="border-t border-ink-dark/10 px-6 py-4">
+          <View className="border-t border-ink-dark/4 px-6 py-4">
             <TouchableOpacity
               onPress={handleSubmitProposal}
               disabled={(proposalMode === 'trade' && !selectedItemId) || (proposalMode === 'buy' && !offeredPrice.trim()) || submittingTrade}
@@ -637,7 +637,7 @@ export default function ItemDetailsScreen() {
       onRequestClose={() => setShowEditModal(false)}
     >
       <View className="flex-1 bg-base-canvas">
-        <View className="flex-row items-center justify-between border-b border-ink-dark/10 px-6 pb-4 pt-10">
+        <View className="flex-row items-center justify-between border-b border-ink-dark/4 px-6 pb-4 pt-10">
           <TouchableOpacity onPress={() => setShowEditModal(false)}>
             <Ionicons name="close" size={26} color="#2B2A2B" />
           </TouchableOpacity>

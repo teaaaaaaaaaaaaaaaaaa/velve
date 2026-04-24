@@ -1,20 +1,9 @@
-import { useEffect } from 'react'
-import { useRouter } from 'expo-router'
-import { InteractionManager } from 'react-native'
+import { View } from 'react-native'
 
-import { BrandedLoader } from '@/components/BrandedLoader'
-
-export default function UploadTabEntry() {
-  const router = useRouter()
-
-  useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      // Replace the temporary tab route so back navigation never gets stuck
-      // on this loader screen.
-      router.replace('/upload-flow')
-    })
-    return () => task.cancel()
-  }, [router])
-
-  return <BrandedLoader label="Otvaram Clean Cut studio" />
+// Placeholder route. The upload tab tap is intercepted in (tabs)/_layout.tsx
+// (listeners.tabPress -> router.push('/upload-flow')) so this screen never
+// actually renders. The file exists only because expo-router needs a file to
+// register the "upload" Tabs.Screen entry.
+export default function UploadTabPlaceholder() {
+  return <View />
 }

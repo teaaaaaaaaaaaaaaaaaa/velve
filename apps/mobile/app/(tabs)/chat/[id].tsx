@@ -173,12 +173,12 @@ const ProposalMessageCard = memo(function ProposalMessageCard({
 }) {
   return (
     <View
-      className="mx-4 my-2 overflow-hidden rounded-[24px] border border-brand-accent-deep/8 bg-surface-panel px-4 py-4"
+      className="mx-4 my-2 overflow-hidden rounded-[24px] bg-surface-panel px-4 py-4"
       style={{
         shadowColor: colors.accentDeep,
         shadowOpacity: 0.08,
         shadowRadius: 14,
-        shadowOffset: { width: 0, height: 3 },
+        shadowOffset: { width: 0, height: 4 },
         elevation: 4,
       }}
     >
@@ -234,7 +234,14 @@ const ProposalMessageCard = memo(function ProposalMessageCard({
           <TouchableOpacity
             onPress={onReject}
             disabled={submittingDecision}
-            className="flex-1 items-center rounded-full border border-ink-dark/10 bg-base-canvas px-4 py-3"
+            className="flex-1 items-center rounded-full bg-base-canvas px-4 py-3"
+            style={{
+              shadowColor: colors.inkDark,
+              shadowOpacity: 0.05,
+              shadowRadius: 8,
+              shadowOffset: { width: 0, height: 2 },
+              elevation: 2,
+            }}
           >
             <Text className="font-sans text-sm font-semibold text-ink-dark">Odbij</Text>
           </TouchableOpacity>
@@ -246,7 +253,16 @@ const ProposalMessageCard = memo(function ProposalMessageCard({
 
 const TradeStatusTicket = memo(function TradeStatusTicket({ statusData }: { statusData: StatusData }) {
   return (
-    <View className="mx-4 my-2 overflow-hidden rounded-[22px] border border-ink-dark/8 bg-surface-panel px-4 py-4">
+    <View
+      className="mx-4 my-2 overflow-hidden rounded-[22px] bg-surface-panel px-4 py-4"
+      style={{
+        shadowColor: colors.accentDeep,
+        shadowOpacity: 0.06,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 3,
+      }}
+    >
       <View className="flex-row items-center">
         <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-accent-light/25">
           <Ionicons name="sparkles-outline" size={18} color={colors.accentDeep} />
@@ -480,8 +496,25 @@ export default function ChatScreen() {
             <View className={`mb-1 px-4 ${isMine ? 'items-end' : 'items-start'}`}>
               <View
                 className={`max-w-[82%] rounded-[22px] px-4 py-3 ${
-                  isMine ? 'bg-brand-accent-deep' : 'border border-ink-dark/8 bg-surface-panel'
+                  isMine ? 'bg-brand-accent-deep' : 'bg-surface-panel'
                 }`}
+                style={
+                  isMine
+                    ? {
+                        shadowColor: colors.accentDeep,
+                        shadowOpacity: 0.2,
+                        shadowRadius: 12,
+                        shadowOffset: { width: 0, height: 4 },
+                        elevation: 4,
+                      }
+                    : {
+                        shadowColor: colors.inkDark,
+                        shadowOpacity: 0.05,
+                        shadowRadius: 8,
+                        shadowOffset: { width: 0, height: 2 },
+                        elevation: 2,
+                      }
+                }
               >
                 <Text
                   className={`font-sans text-[15px] leading-6 ${
@@ -517,14 +550,23 @@ export default function ChatScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-base-canvas"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : insets.top + 10}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
     >
       <BrandBackground />
 
       <View
-        className="flex-row items-center border-b border-ink-dark/8 px-4 pb-4"
-        style={{ paddingTop: insets.top + 8 }}
+        className="flex-row items-center px-4 pb-4"
+        style={{
+          paddingTop: insets.top + 8,
+          shadowColor: colors.inkDark,
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 6 },
+          elevation: 4,
+          backgroundColor: colors.baseCanvas,
+          zIndex: 2,
+        }}
       >
         <TouchableOpacity
           onPress={() => router.back()}
@@ -596,8 +638,16 @@ export default function ChatScreen() {
       />
 
       <View
-        className="flex-row items-end border-t border-ink-dark/8 bg-base-canvas px-4 pt-3"
-        style={{ paddingBottom: Math.max(insets.bottom, 16) + 4 }}
+        className="flex-row items-end bg-base-canvas px-4 pt-3"
+        style={{
+          paddingBottom: Math.max(insets.bottom, 12),
+          shadowColor: colors.inkDark,
+          shadowOpacity: 0.07,
+          shadowRadius: 14,
+          shadowOffset: { width: 0, height: -4 },
+          elevation: 6,
+          zIndex: 2,
+        }}
       >
         <TextInput
           value={inputText}
@@ -610,7 +660,14 @@ export default function ChatScreen() {
           multiline
           maxLength={1000}
           textAlignVertical="top"
-          className="max-h-[120px] flex-1 rounded-[24px] border border-ink-dark/10 bg-surface-panel px-4 py-3 font-sans text-[15px] leading-6 text-ink-dark"
+          className="max-h-[120px] flex-1 rounded-[24px] bg-surface-panel px-4 py-3 font-sans text-[15px] leading-6 text-ink-dark"
+          style={{
+            shadowColor: colors.accentDeep,
+            shadowOpacity: 0.06,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 2 },
+            elevation: 2,
+          }}
         />
         <TouchableOpacity
           onPress={handleSend}

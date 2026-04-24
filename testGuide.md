@@ -14,6 +14,7 @@
 ## Pokretanje (3 terminala)
 
 ```bash
+
 # Terminal 1 — AI Server
 cd apps/ai-server
 .venv\Scripts\activate
@@ -24,6 +25,7 @@ python main.py
 cd apps/api
 npm run dev
 # ocekuj: Server running on port 3000
+
 
 # Terminal 3 — Mobile (Expo)
 cd apps/mobile
