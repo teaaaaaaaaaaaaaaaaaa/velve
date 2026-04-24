@@ -15,6 +15,7 @@ import numpy as np
 import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from PIL import Image, ImageOps
 from pydantic import BaseModel, Field
@@ -26,6 +27,13 @@ os.environ.setdefault("MKL_NUM_THREADS", "1")
 load_dotenv()
 
 app = FastAPI(title="Velve AI Server")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://velveapp.com", "https://www.velveapp.com"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 try:
     faiss.omp_set_num_threads(1)
