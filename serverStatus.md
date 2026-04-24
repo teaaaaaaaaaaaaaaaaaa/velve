@@ -1,88 +1,120 @@
-PROJECT STATUS – VELVE BACKEND INFRASTRUCTURE
+PROJECT STATUS – VELVE BACKEND (FINAL VERIFIED STATE)
 
-Server environment is fully set up and running in production mode.
+---
 
-BACKEND (AI SERVER)
+1. SERVER ENVIRONMENT
 
-* Framework: FastAPI (Python)
-* Running on: localhost:8000
-* Managed via: PM2
-* Status: ONLINE
-* Health endpoint: /ping → returns {status: "ok"}
-
-DEPENDENCIES
-
-* numpy==1.26.4
-* opencv-python-headless==4.8.1.78
-* All compatibility issues resolved
-
-PROCESS MANAGEMENT
-
-* PM2 is used for backend process management
-* Process name: velve-ai
-* Auto-restart enabled
-* PM2 startup configured and saved
-
-REVERSE PROXY (LOCAL)
-
-* Nginx installed and running
-* Configured for:
-
-  * api.velveapp.com → proxy to 127.0.0.1:8000
-  * velveapp.com → static frontend (dist build)
-* Nginx active and enabled via systemd
-
-NETWORK CONSTRAINT
-
+* OS: Ubuntu 22.04.5 LTS
 * Server is behind CGNAT (no direct public port access)
-* Ports 80/443 not reachable externally
-* Therefore using Cloudflare Tunnel instead of direct exposure
+* Public access handled via Cloudflare Tunnel
 
-CLOUDFLARE TUNNEL (PRODUCTION SETUP)
+---
 
-* Tunnel type: Named Tunnel
+2. RUNNING SERVICES (PM2)
+
+* velve-api (Node.js API)
+
+  * Port: 3000
+  * Status: ONLINE
+  * Memory: ~100MB
+  * Health endpoint: /ping → {"status":200,"message":"Velve API running"}
+
+* velve-ai (FastAPI AI server)
+
+  * Port: 8000
+  * Status: ONLINE
+  * Memory: ~98MB
+  * Health endpoint: /ping → {"status":"ok","message":"Velve AI server running"}
+
+PM2:
+
+* Both processes running
+* Auto-restart enabled
+* pm2 save executed
+
+---
+
+3. CLOUDFLARE TUNNEL
+
 * Tunnel name: velve-api
 * Tunnel ID: d32e8bf9-e9d1-4ab7-9e8e-8072b5a9c758
-* Config location: /etc/cloudflared/config.yml
-* Credentials: ~/.cloudflared/*.json
-* Managed via: systemd service (cloudflared)
-* Status: ACTIVE (auto-start enabled)
+* Running via systemd (cloudflared.service)
+* Status: ACTIVE (healthy connections established)
 
-DOMAIN SETUP
+Ingress routing:
+
+* api.velveapp.com → http://localhost:3000 (Node API)
+* ai.velveapp.com → http://localhost:8000 (AI server)
+
+---
+
+4. DOMAIN & DNS
 
 * Domain: velveapp.com
-* Subdomain: api.velveapp.com
-* Nameservers switched to Cloudflare:
+* DNS provider: Cloudflare
+* Nameservers:
 
   * lou.ns.cloudflare.com
   * rachel.ns.cloudflare.com
-* DNS record:
 
-  * api.velveapp.com → Cloudflare proxy → tunnel
+DNS records:
 
-SSL / HTTPS
+* api.velveapp.com → proxied via Cloudflare Tunnel
+* ai.velveapp.com → proxied via Cloudflare Tunnel
 
-* Handled by Cloudflare (no certbot used)
-* Full HTTPS working externally
+Global DNS resolution confirmed via:
 
-PUBLIC ACCESS
+* dig @1.1.1.1 → returns Cloudflare IPs
 
-* API endpoint:
-  https://api.velveapp.com/ping
-* Confirmed working from external networks (mobile)
+---
 
-CURRENT STATUS
+5. PUBLIC ACCESS VERIFICATION
 
-* Backend: 100% operational
-* Public API: accessible via HTTPS
-* Infra: stable
-* Remaining: none critical (DNS fully propagated globally)
+Verified via direct Cloudflare edge resolution:
 
-NOTES
+* https://ai.velveapp.com/ping → {"status":"ok","message":"Velve AI server running"}
+* https://api.velveapp.com/ping → {"status":200,"message":"Velve API running"}
 
-* Do NOT use localhost or server IP in frontend
-* Always use https://api.velveapp.com
-* No need for certbot due to Cloudflare SSL
-* Server is not directly exposed to internet (tunnel-only access)
+Mobile network test: both endpoints confirmed working via HTTPS
 
-SYSTEM IS READY FOR MOBILE / EXPO / PRODUCTION USE
+---
+
+6. NETWORK BEHAVIOR
+
+* Local server curl may fail due to DNS caching (expected behavior)
+* External/mobile access works correctly
+* Cloudflare handles all routing and HTTPS termination
+
+---
+
+7. NGINX
+
+* Installed and running
+* Configured for local reverse proxy
+* Not used for public routing (Cloudflare Tunnel bypasses it)
+
+---
+
+8. SECURITY MODEL
+
+* Ports 3000/8000 not exposed directly to internet
+* All traffic routed through Cloudflare Tunnel
+* HTTPS termination handled by Cloudflare (no certbot needed)
+
+---
+
+9. IMPORTANT NOTES
+
+Use only:
+  https://api.velveapp.com   ← Node.js API (mobile app target)
+  https://ai.velveapp.com    ← AI server (internal, not for mobile)
+
+Do NOT use:
+  localhost or server IP in frontend/mobile code
+
+AI_SERVER_URL in apps/api/.env stays http://localhost:8000 (internal call, same host)
+
+---
+
+FINAL STATE: SYSTEM FULLY DEPLOYED AND PRODUCTION-READY
+Last verified: 2026-04-24
