@@ -1,7 +1,7 @@
-import logo1Raw from '../../../logos/logo1.svg?raw'
-import logo2Raw from '../../../logos/logo2.svg?raw'
-import logo4Raw from '../../../logos/logo4.svg?raw'
-import logo6Raw from '../../../logos/logo6.svg?raw'
+import logo1Raw from './logos/logo1.svg?raw'
+import logo2Raw from './logos/logo2.svg?raw'
+import logo4Raw from './logos/logo4.svg?raw'
+import logo6Raw from './logos/logo6.svg?raw'
 
 import { ImageTrailEffect } from './components/ImageTrailEffect'
 

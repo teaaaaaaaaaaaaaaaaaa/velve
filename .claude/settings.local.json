@@ -38,7 +38,13 @@
       "Bash(\"/c/Program Files/Microsoft/jdk-21.0.10/bin/java\" -version)",
       "Bash(export JAVA_HOME=\"/c/Program Files/Java/jdk-21.0.10\")",
       "Bash(\"$JAVA_HOME/bin/java\" -version)",
-      "Bash(npm audit *)"
+      "Bash(npm audit *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(gh auth *)",
+      "Bash(git config *)",
+      "WebSearch"
     ]
   }
 }
