@@ -17,10 +17,6 @@
     "android": "npm run android --workspace=apps/mobile",
     "ios": "npm run ios --workspace=apps/mobile"
   },
-  "overrides": {
-    "react-native-reanimated": "4.1.1",
-    "react-native-worklets": "0.5.1"
-  },
   "devDependencies": {
     "expo": "~54.0.0",
     "eslint": "^8.50.0",
