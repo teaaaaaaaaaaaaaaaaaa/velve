@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { memo, useMemo } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import Animated, { FadeIn, FadeInRight, FadeInUp } from 'react-native-reanimated'
 
 import { colors } from '@/design/tokens'
 import { RemoteImage } from '@/components/RemoteImage'
@@ -129,11 +128,7 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
         )}
       </TouchableOpacity>
 
-      <Animated.View
-        entering={FadeIn.duration(300)}
-        className="absolute left-4 right-24"
-        style={{ top: topInset + 62 }}
-      >
+      <View className="absolute left-4 right-24" style={{ top: topInset + 62 }}>
         <View className="self-start rounded-full bg-ink-dark/6 px-3 py-2">
           <Text className="font-sans text-[11px] uppercase tracking-[1.2px] text-ink-dark/60">
             {formatFeedDate(item.createdAt)}
@@ -147,10 +142,9 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
         <Text className="mt-3 font-sans text-sm leading-6 text-ink-dark/62" numberOfLines={1}>
           {metaLine}
         </Text>
-      </Animated.View>
+      </View>
 
-      <Animated.View
-        entering={FadeInRight.duration(400).delay(100)}
+      <View
         className="absolute right-3 items-center gap-3"
         style={{ bottom: contentBottomOffset + 102 }}
       >
@@ -185,10 +179,9 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
             tone="dark"
           />
         ) : null}
-      </Animated.View>
+      </View>
 
-      <Animated.View
-        entering={FadeInUp.duration(400).delay(150)}
+      <View
         className="absolute left-3 right-3 flex-row items-center rounded-[22px] bg-white px-3 py-2.5"
         style={[{ bottom: contentBottomOffset }, styles.bottomCard]}
       >
@@ -243,7 +236,7 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
             <Ionicons name="swap-horizontal" size={18} color={colors.baseCanvas} />
           </TouchableOpacity>
         </View>
-      </Animated.View>
+      </View>
     </View>
   )
 })

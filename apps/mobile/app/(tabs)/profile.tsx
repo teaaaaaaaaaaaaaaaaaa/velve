@@ -433,6 +433,17 @@ export default function ProfileScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+
+            <View className="mt-3 flex-row justify-end">
+              <TouchableOpacity
+                className="rounded-full bg-base-canvas px-4 py-2.5"
+                onPress={() => router.push('/trade-archive')}
+              >
+                <Text className="font-sans text-xs font-semibold text-ink-dark/70">
+                  Arhiva tradeova
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View className="mt-6">

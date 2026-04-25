@@ -7,6 +7,7 @@ const Item = require('../models/Item')
 const Chat = require('../models/Chat')
 const Message = require('../models/Message')
 const { sendPushToUser } = require('../lib/pushNotifications')
+const { getPrimaryImage } = require('../lib/itemPresentation')
 
 const TRADE_EXPIRY_HOURS = Math.max(Number(process.env.TRADE_EXPIRY_HOURS) || 72, 1)
 const FINAL_ITEM_STATUSES = new Set(['sold', 'swapped', 'archived', 'traded'])
@@ -192,6 +193,18 @@ function serializeTrade(trade, viewerId) {
         (userRole === 'sender' && trade.status === 'accepted')),
     canComplete: trade.status === 'accepted' && !trade.completedAt,
     canRate,
+    offeredItemId: trade.offeredItemId
+      ? {
+          ...trade.offeredItemId,
+          primaryImage: getPrimaryImage(trade.offeredItemId),
+        }
+      : null,
+    requestedItemId: trade.requestedItemId
+      ? {
+          ...trade.requestedItemId,
+          primaryImage: getPrimaryImage(trade.requestedItemId),
+        }
+      : null,
   }
 }
 
@@ -246,8 +259,8 @@ async function buildTradeQueryPayload(req) {
     .sort({ updatedAt: -1, _id: -1 })
     .populate('senderId', 'displayName photoURL averageRating completedTrades')
     .populate('receiverId', 'displayName photoURL averageRating completedTrades')
-    .populate('offeredItemId', 'title images status listingType')
-    .populate('requestedItemId', 'title images status listingType')
+    .populate('offeredItemId', 'title images imageClean isDigitized status listingType')
+    .populate('requestedItemId', 'title images imageClean isDigitized status listingType')
     .lean()
 
   return trades
@@ -406,7 +419,7 @@ router.post('/', requireAuth, async (req, res) => {
           tradeRequestId: trade._id,
           requestedItemId: requestedItem._id,
           requestedItemTitle: requestedItem.title,
-          requestedItemImage: requestedItem.images[0] || '',
+          requestedItemImage: getPrimaryImage(requestedItem),
           ...(normalizedOfferedPrice != null ? { offeredPrice: normalizedOfferedPrice } : {}),
         },
       })
@@ -420,10 +433,10 @@ router.post('/', requireAuth, async (req, res) => {
           tradeRequestId: trade._id,
           offeredItemId: offeredItem._id,
           offeredItemTitle: offeredItem.title,
-          offeredItemImage: offeredItem.images[0] || '',
+          offeredItemImage: getPrimaryImage(offeredItem),
           requestedItemId: requestedItem._id,
           requestedItemTitle: requestedItem.title,
-          requestedItemImage: requestedItem.images[0] || '',
+          requestedItemImage: getPrimaryImage(requestedItem),
         },
       })
     }

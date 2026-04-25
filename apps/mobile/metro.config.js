@@ -5,10 +5,8 @@ const path = require('path');
 const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, '../..');
 
-// 1. Dobavi Expo default config
-let config = getDefaultConfig(projectRoot);
+const config = getDefaultConfig(projectRoot);
 
-// 2. Primeni monorepo konfiguraciju
 config.watchFolders = [workspaceRoot];
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
@@ -20,10 +18,10 @@ config.resolver.blockList = [
   /apps[\\/]ai-server[\\/]__pycache__[\\/].*/,
 ];
 
-// 3. Firebase compatibility
-config.resolver.sourceExts = [...(config.resolver.sourceExts || []), 'cjs'];
+if (!config.resolver.sourceExts.includes('cjs')) {
+  config.resolver.sourceExts.push('cjs');
+}
+
 config.resolver.unstable_enablePackageExports = false;
 
-
-// 5. Na kraju wrappuj sa NativeWind
 module.exports = withNativeWind(config, { input: './global.css' });

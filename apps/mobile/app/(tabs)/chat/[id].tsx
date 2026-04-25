@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Text,
@@ -92,6 +93,18 @@ function getDisplayName(participant: Participant | null) {
   return participant.displayName || participant.email?.split('@')[0] || 'Korisnik'
 }
 
+function getSenderDisplayName(
+  message: MessageRecord,
+  isMine: boolean,
+  otherUser: Participant | null
+) {
+  if (typeof message.senderId === 'object' && message.senderId?.displayName) {
+    return isMine ? 'Ti' : message.senderId.displayName
+  }
+
+  return isMine ? 'Ti' : getDisplayName(otherUser)
+}
+
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleTimeString('sr-Latn', {
     hour: '2-digit',
@@ -115,35 +128,46 @@ function isSameDay(a?: string, b?: string) {
 const ProposalItemCard = memo(function ProposalItemCard({
   title,
   imageUri,
+  label,
   eyebrow,
+  onPress,
 }: {
   title: string
   imageUri?: string
+  label: string
   eyebrow: string
+  onPress: () => void
 }) {
   return (
     <View className="flex-1">
-      <View className="overflow-hidden rounded-[16px] bg-base-canvas">
-        {imageUri ? (
-          <RemoteImage
-            uri={imageUri}
-            className="aspect-square w-full"
-            fallback={
-              <View className="aspect-square w-full items-center justify-center bg-brand-accent-light/20">
-                <Ionicons name="shirt-outline" size={24} color={colors.accentDeep} />
-              </View>
-            }
-          />
-        ) : (
-          <View className="aspect-square w-full items-center justify-center bg-brand-accent-light/20">
-            <Ionicons name="shirt-outline" size={24} color={colors.accentDeep} />
-          </View>
-        )}
-      </View>
-      <Text className="mt-2 font-sans text-[11px] uppercase tracking-[1.1px] text-ink-dark/45">
+      <Text className="font-sans text-xs font-semibold text-ink-dark/62" numberOfLines={1}>
+        {label}
+      </Text>
+      <Text className="mt-1 font-sans text-[11px] uppercase tracking-[1.1px] text-ink-dark/40">
         {eyebrow}
       </Text>
-      <Text className="font-sans text-sm font-semibold leading-5 text-ink-dark" numberOfLines={2}>
+
+      <TouchableOpacity activeOpacity={0.9} onPress={onPress} className="mt-3">
+        <View className="overflow-hidden rounded-[18px] bg-base-canvas">
+          {imageUri ? (
+            <RemoteImage
+              uri={imageUri}
+              className="aspect-square w-full"
+              fallback={
+                <View className="aspect-square w-full items-center justify-center bg-brand-accent-light/20">
+                  <Ionicons name="shirt-outline" size={24} color={colors.accentDeep} />
+                </View>
+              }
+            />
+          ) : (
+            <View className="aspect-square w-full items-center justify-center bg-brand-accent-light/20">
+              <Ionicons name="shirt-outline" size={24} color={colors.accentDeep} />
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+
+      <Text className="mt-3 font-sans text-sm font-semibold leading-5 text-ink-dark" numberOfLines={2}>
         {title}
       </Text>
     </View>
@@ -152,22 +176,26 @@ const ProposalItemCard = memo(function ProposalItemCard({
 
 const ProposalMessageCard = memo(function ProposalMessageCard({
   title,
-  subtitle,
   tradeData,
   buyData,
-  onViewRequested,
+  offeredLabel,
+  requestedLabel,
   showDecisionActions,
   submittingDecision,
+  onOpenOfferedItem,
+  onOpenRequestedItem,
   onAccept,
   onReject,
 }: {
   title: string
-  subtitle: string
   tradeData?: TradeData
   buyData?: BuyData
-  onViewRequested: () => void
+  offeredLabel?: string
+  requestedLabel?: string
   showDecisionActions?: boolean
   submittingDecision?: boolean
+  onOpenOfferedItem?: () => void
+  onOpenRequestedItem: () => void
   onAccept?: () => void
   onReject?: () => void
 }) {
@@ -183,22 +211,25 @@ const ProposalMessageCard = memo(function ProposalMessageCard({
       }}
     >
       <Text className="font-display text-2xl text-ink-dark">{title}</Text>
-      <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/65">{subtitle}</Text>
 
       {tradeData ? (
-        <View className="mt-4 flex-row items-center gap-3">
+        <View className="mt-4 flex-row items-start gap-3">
           <ProposalItemCard
             title={tradeData.offeredItemTitle}
             imageUri={tradeData.offeredItemImage}
+            label={offeredLabel || 'Korisnik'}
             eyebrow="Nudi"
+            onPress={onOpenOfferedItem || onOpenRequestedItem}
           />
-          <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-accent-deep/8">
+          <View className="mt-16 h-10 w-10 items-center justify-center rounded-full bg-brand-accent-deep/8">
             <Ionicons name="swap-horizontal" size={18} color={colors.accentDeep} />
           </View>
           <ProposalItemCard
             title={tradeData.requestedItemTitle}
             imageUri={tradeData.requestedItemImage}
+            label={requestedLabel || 'Predmet'}
             eyebrow="Trazi"
+            onPress={onOpenRequestedItem}
           />
         </View>
       ) : buyData ? (
@@ -206,20 +237,15 @@ const ProposalMessageCard = memo(function ProposalMessageCard({
           <ProposalItemCard
             title={buyData.requestedItemTitle}
             imageUri={buyData.requestedItemImage}
-            eyebrow={buyData.offeredPrice != null ? `Ponuda ${buyData.offeredPrice} EUR` : 'Kupovina'}
+            label={buyData.offeredPrice != null ? `Ponuda ${buyData.offeredPrice} EUR` : 'Kupovina'}
+            eyebrow="Predmet"
+            onPress={onOpenRequestedItem}
           />
         </View>
       ) : null}
 
-      <TouchableOpacity
-        onPress={onViewRequested}
-        className="mt-4 items-center rounded-full bg-base-canvas px-4 py-3"
-      >
-        <Text className="font-sans text-sm font-semibold text-ink-dark">Otvori predmet</Text>
-      </TouchableOpacity>
-
       {showDecisionActions ? (
-        <View className="mt-3 flex-row gap-3">
+        <View className="mt-4 flex-row gap-3">
           <TouchableOpacity
             onPress={onAccept}
             disabled={submittingDecision}
@@ -293,6 +319,8 @@ export default function ChatScreen() {
   const [otherUser, setOtherUser] = useState<Participant | null>(null)
   const [typingUser, setTypingUser] = useState<string | null>(null)
   const [tradeRequest, setTradeRequest] = useState<TradeState | null>(null)
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const [composerHeight, setComposerHeight] = useState(86)
 
   const socketRef = useRef<Socket | null>(null)
   const flatListRef = useRef<FlatList<MessageRecord>>(null)
@@ -320,6 +348,27 @@ export default function ChatScreen() {
       .catch(() => undefined)
       .finally(() => setLoading(false))
   }, [fetchChat])
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
+
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      if (Platform.OS === 'android') {
+        setKeyboardHeight(Math.max(0, event.endCoordinates.height - insets.bottom))
+      }
+    })
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      if (Platform.OS === 'android') {
+        setKeyboardHeight(0)
+      }
+    })
+
+    return () => {
+      showSub.remove()
+      hideSub.remove()
+    }
+  }, [insets.bottom])
 
   useEffect(() => {
     let socket: Socket | null = null
@@ -455,6 +504,8 @@ export default function ChatScreen() {
         !!activeTradeId &&
         proposalId === activeTradeId &&
         !isMine
+      const senderDisplayName = getSenderDisplayName(item, isMine, otherUser)
+      const requestedLabel = isMine ? getDisplayName(otherUser) : 'Ti'
 
       return (
         <View>
@@ -467,9 +518,11 @@ export default function ChatScreen() {
           {item.type === 'trade' && item.tradeData ? (
             <ProposalMessageCard
               title="Trade proposal"
-              subtitle="Jedan jasan predlog razmene bez dodatnog trade desk toka."
               tradeData={item.tradeData}
-              onViewRequested={() => router.push(`/items/${item.tradeData!.requestedItemId}`)}
+              offeredLabel={senderDisplayName}
+              requestedLabel={requestedLabel}
+              onOpenOfferedItem={() => router.push(`/items/${item.tradeData!.offeredItemId}`)}
+              onOpenRequestedItem={() => router.push(`/items/${item.tradeData!.requestedItemId}`)}
               showDecisionActions={showDecisionActions}
               submittingDecision={submittingDecision}
               onAccept={() => handleTradeDecision('accepted')}
@@ -478,13 +531,9 @@ export default function ChatScreen() {
           ) : item.type === 'buy' && item.buyData ? (
             <ProposalMessageCard
               title="Ponuda"
-              subtitle={
-                item.buyData.offeredPrice != null
-                  ? `Kupac nudi ${item.buyData.offeredPrice} EUR za ovaj komad.`
-                  : 'Kupac zeli da kupi ovaj komad.'
-              }
               buyData={item.buyData}
-              onViewRequested={() => router.push(`/items/${item.buyData!.requestedItemId}`)}
+              requestedLabel={getDisplayName(otherUser)}
+              onOpenRequestedItem={() => router.push(`/items/${item.buyData!.requestedItemId}`)}
               showDecisionActions={showDecisionActions}
               submittingDecision={submittingDecision}
               onAccept={() => handleTradeDecision('accepted')}
@@ -538,6 +587,7 @@ export default function ChatScreen() {
       dbUser?._id,
       getSenderId,
       handleTradeDecision,
+      otherUser,
       router,
       submittingDecision,
     ]
@@ -569,7 +619,7 @@ export default function ChatScreen() {
         }}
       >
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => router.replace('/(tabs)/chat')}
           className="mr-3 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
         >
           <Ionicons name="arrow-back" size={22} color={colors.inkDark} />
@@ -609,79 +659,85 @@ export default function ChatScreen() {
         </View>
       </View>
 
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item._id}
-        renderItem={renderMessage}
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 8 }}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-        onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
-        keyboardShouldPersistTaps="handled"
-        initialNumToRender={15}
-        maxToRenderPerBatch={10}
-        windowSize={7}
-        removeClippedSubviews
-        ListEmptyComponent={
-          <View className="items-center justify-center px-6 py-20">
-            <Ionicons
-              name="chatbubble-outline"
-              size={48}
-              color={colors.inkDark}
-              style={{ opacity: 0.15 }}
-            />
-            <Text className="mt-4 font-sans text-sm text-ink-dark/45">
-              {t('chat.threadEmpty')}
-            </Text>
-          </View>
-        }
-      />
-
-      <View
-        className="flex-row items-end bg-base-canvas px-4 pt-3"
-        style={{
-          paddingBottom: Math.max(insets.bottom, 12),
-          shadowColor: colors.inkDark,
-          shadowOpacity: 0.07,
-          shadowRadius: 14,
-          shadowOffset: { width: 0, height: -4 },
-          elevation: 6,
-          zIndex: 2,
-        }}
-      >
-        <TextInput
-          value={inputText}
-          onChangeText={(text) => {
-            setInputText(text)
-            handleTyping()
-          }}
-          placeholder={t('chat.placeholder')}
-          placeholderTextColor={colors.mutedText}
-          multiline
-          maxLength={1000}
-          textAlignVertical="top"
-          className="max-h-[120px] flex-1 rounded-[24px] bg-surface-panel px-4 py-3 font-sans text-[15px] leading-6 text-ink-dark"
-          style={{
-            shadowColor: colors.accentDeep,
-            shadowOpacity: 0.06,
-            shadowRadius: 10,
-            shadowOffset: { width: 0, height: 2 },
-            elevation: 2,
-          }}
+      <View className="flex-1">
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item._id}
+          renderItem={renderMessage}
+          contentContainerStyle={{ paddingTop: 16, paddingBottom: composerHeight + 24, flexGrow: 1 }}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          initialNumToRender={15}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          removeClippedSubviews
+          ListEmptyComponent={
+            <View className="items-center justify-center px-6 py-20">
+              <Ionicons
+                name="chatbubble-outline"
+                size={48}
+                color={colors.inkDark}
+                style={{ opacity: 0.15 }}
+              />
+              <Text className="mt-4 font-sans text-sm text-ink-dark/45">
+                {t('chat.threadEmpty')}
+              </Text>
+            </View>
+          }
         />
-        <TouchableOpacity
-          onPress={handleSend}
-          disabled={!inputText.trim() || sending}
-          className={`ml-3 h-12 w-12 items-center justify-center rounded-full ${
-            inputText.trim() && !sending ? 'bg-brand-accent-deep' : 'bg-ink-dark/10'
-          }`}
+
+        <View
+          className="absolute left-0 right-0 px-4"
+          onLayout={(event) => {
+            setComposerHeight(event.nativeEvent.layout.height)
+          }}
+          style={{
+            bottom: Platform.OS === 'android' ? keyboardHeight : 0,
+            paddingBottom: Math.max(insets.bottom, 12),
+          }}
         >
-          <Ionicons
-            name="send"
-            size={18}
-            color={inputText.trim() && !sending ? colors.baseCanvas : colors.mutedText}
-          />
-        </TouchableOpacity>
+          <View
+            className="flex-row items-end rounded-[30px] bg-base-canvas px-2 py-2"
+            style={{
+              shadowColor: colors.inkDark,
+              shadowOpacity: 0.1,
+              shadowRadius: 14,
+              shadowOffset: { width: 0, height: 6 },
+              elevation: 8,
+            }}
+          >
+            <TextInput
+              value={inputText}
+              onChangeText={(text) => {
+                setInputText(text)
+                handleTyping()
+              }}
+              placeholder={t('chat.placeholder')}
+              placeholderTextColor={colors.mutedText}
+              multiline
+              maxLength={1000}
+              textAlignVertical="top"
+              className="max-h-[120px] flex-1 rounded-[24px] px-4 py-3 font-sans text-[15px] leading-6 text-ink-dark"
+            />
+            <TouchableOpacity
+              onPress={handleSend}
+              disabled={!inputText.trim() || sending}
+              activeOpacity={0.88}
+              className={`ml-2 h-11 w-11 items-center justify-center rounded-full ${
+                inputText.trim() && !sending ? 'bg-brand-accent-deep' : 'bg-ink-dark/10'
+              }`}
+            >
+              <Ionicons
+                name="arrow-up"
+                size={18}
+                color={inputText.trim() && !sending ? colors.baseCanvas : colors.mutedText}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     </KeyboardAvoidingView>
   )

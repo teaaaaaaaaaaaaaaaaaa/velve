@@ -4,7 +4,55 @@ const router = express.Router()
 const { requireAuth } = require('../middleware/auth')
 const Chat = require('../models/Chat')
 const Message = require('../models/Message')
+const Item = require('../models/Item')
+const { getPrimaryImage } = require('../lib/itemPresentation')
 const { sendPushToUser } = require('../lib/pushNotifications')
+
+async function enrichTradeImages(messages = []) {
+  const itemIds = new Set()
+
+  for (const message of messages) {
+    if (message.tradeData?.offeredItemId) {
+      itemIds.add(String(message.tradeData.offeredItemId))
+    }
+    if (message.tradeData?.requestedItemId) {
+      itemIds.add(String(message.tradeData.requestedItemId))
+    }
+    if (message.buyData?.requestedItemId) {
+      itemIds.add(String(message.buyData.requestedItemId))
+    }
+  }
+
+  if (itemIds.size === 0) {
+    return messages
+  }
+
+  const items = await Item.find({ _id: { $in: [...itemIds] } })
+    .select('images imageClean isDigitized')
+    .lean()
+
+  const imageMap = new Map(items.map((item) => [String(item._id), getPrimaryImage(item)]))
+
+  return messages.map((message) => ({
+    ...message,
+    tradeData: message.tradeData
+      ? {
+          ...message.tradeData,
+          offeredItemImage:
+            imageMap.get(String(message.tradeData.offeredItemId)) || message.tradeData.offeredItemImage || '',
+          requestedItemImage:
+            imageMap.get(String(message.tradeData.requestedItemId)) || message.tradeData.requestedItemImage || '',
+        }
+      : message.tradeData,
+    buyData: message.buyData
+      ? {
+          ...message.buyData,
+          requestedItemImage:
+            imageMap.get(String(message.buyData.requestedItemId)) || message.buyData.requestedItemImage || '',
+        }
+      : message.buyData,
+  }))
+}
 
 // GET /api/chat — lista chat soba korisnika
 router.get('/', requireAuth, async (req, res) => {
@@ -105,10 +153,11 @@ router.get('/:id', requireAuth, async (req, res) => {
       .populate('senderId', 'displayName photoURL')
       .lean()
 
-    // Reverse to chronological order
+    // Reverse to chronological order and hydrate proposal images from current item assets.
     messages.reverse()
+    const enrichedMessages = await enrichTradeImages(messages)
 
-    res.json({ ok: true, data: { ...chat, messages } })
+    res.json({ ok: true, data: { ...chat, messages: enrichedMessages } })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

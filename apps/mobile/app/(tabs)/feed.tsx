@@ -4,7 +4,6 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert,
   FlatList,
-  LayoutChangeEvent,
   Modal,
   Pressable,
   RefreshControl,
@@ -16,14 +15,6 @@ import {
   View,
   ViewToken,
 } from 'react-native'
-import Animated, {
-  Extrapolation,
-  FadeIn,
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import client from '@/api/client'
@@ -75,16 +66,11 @@ export default function FeedScreen() {
   const [searchHasMore, setSearchHasMore] = useState(false)
   const searchInputRef = useRef<TextInput>(null)
 
-  // Animation shared value: 0 = closed, 1 = expanded
-  const searchProgress = useSharedValue(0)
-  const headerWidth = windowWidth - 32 // full width minus horizontal padding (left-4 right-4 = 32)
-
   const openSearch = useCallback(() => {
     setSearchActive(true)
     setSearchLoading(true)
-    searchProgress.value = withSpring(1, { damping: 22, stiffness: 240 })
-    setTimeout(() => searchInputRef.current?.focus(), 350)
-  }, [searchProgress])
+    setTimeout(() => searchInputRef.current?.focus(), 120)
+  }, [])
 
   const finishCloseSearch = useCallback(() => {
     setSearchActive(false)
@@ -95,30 +81,8 @@ export default function FeedScreen() {
 
   const closeSearch = useCallback(() => {
     searchInputRef.current?.blur()
-    searchProgress.value = withSpring(0, { damping: 22, stiffness: 240 })
-    setTimeout(finishCloseSearch, 300)
-  }, [searchProgress, finishCloseSearch])
-
-  // Animated style for logo + toggle (fade out when searching)
-  const headerElementsStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(searchProgress.value, [0, 0.4], [1, 0], Extrapolation.CLAMP),
-    transform: [
-      { scale: interpolate(searchProgress.value, [0, 0.5], [1, 0.92], Extrapolation.CLAMP) },
-    ],
-  }))
-
-  // Animated style for search bar (expands from right to left)
-  const searchBarStyle = useAnimatedStyle(() => ({
-    width: interpolate(searchProgress.value, [0, 1], [44, headerWidth], Extrapolation.CLAMP),
-    height: 44,
-    borderRadius: 22,
-    overflow: 'hidden' as const,
-  }))
-
-  // Animated style for search input inside the expanded bar
-  const searchInputOpacity = useAnimatedStyle(() => ({
-    opacity: interpolate(searchProgress.value, [0.5, 0.85], [0, 1], Extrapolation.CLAMP),
-  }))
+    finishCloseSearch()
+  }, [finishCloseSearch])
 
   // Search data fetching
   const loadSearchResults = useCallback(
@@ -497,17 +461,13 @@ export default function FeedScreen() {
             })}
             ListHeaderComponent={
               !searchLoading ? (
-                <Animated.View
-                  entering={FadeIn.duration(300)}
-                  className="absolute left-4 z-10"
-                  style={{ top: insets.top + 64 }}
-                >
+                <View className="absolute left-4 z-10" style={{ top: insets.top + 64 }}>
                   <View className="rounded-full border border-ink-dark/8 bg-ink-dark/4 px-3 py-2">
                     <Text className="font-sans text-xs font-semibold text-ink-dark/62">
                       {searchItems.length} rezultata
                     </Text>
                   </View>
-                </Animated.View>
+                </View>
               ) : null
             }
             ListFooterComponent={
@@ -586,53 +546,18 @@ export default function FeedScreen() {
         pointerEvents="box-none"
       >
         <View className="flex-row items-center justify-between" pointerEvents="box-none">
-          {/* Logo + Toggle - fade out when search expands */}
-          <Animated.View
-            className="flex-1 flex-row items-center pr-3"
-            style={headerElementsStyle}
-            pointerEvents={searchActive ? 'none' : 'auto'}
-          >
-            <BrandWordmark width={92} tone="dark" />
-            <View className="flex-1 items-center" style={{ marginRight: 32 }}>
-              <FeedModeToggle feedMode={feedMode} onChangeMode={setFeedMode} />
-            </View>
-          </Animated.View>
-
-          {/* Search bar - expands from icon to full width */}
-          <Animated.View
-            className="flex-row items-center bg-ink-dark/6"
-            style={searchBarStyle}
-          >
-            {/* Back button (visible when expanded) */}
-            {searchActive ? (
-              <Animated.View entering={FadeIn.delay(200).duration(200)}>
-                <TouchableOpacity
-                  className="h-11 w-11 items-center justify-center"
-                  activeOpacity={0.86}
-                  onPress={closeSearch}
-                >
-                  <Ionicons name="arrow-back" size={20} color={colors.inkDark} />
-                </TouchableOpacity>
-              </Animated.View>
-            ) : null}
-
-            {/* Search icon (always visible, acts as button when collapsed) */}
-            {!searchActive ? (
+          {searchActive ? (
+            <View className="flex-1 flex-row items-center rounded-full bg-ink-dark/6 px-2">
               <TouchableOpacity
                 className="h-11 w-11 items-center justify-center"
                 activeOpacity={0.86}
-                onPress={openSearch}
+                onPress={closeSearch}
               >
-                <Ionicons name="search" size={18} color={colors.inkDark} />
+                <Ionicons name="arrow-back" size={20} color={colors.inkDark} />
               </TouchableOpacity>
-            ) : (
               <View className="mr-1">
                 <Ionicons name="search" size={18} color={colors.inkDark} style={{ opacity: 0.5 }} />
               </View>
-            )}
-
-            {/* Text input (visible when expanded) */}
-            <Animated.View className="flex-1" style={searchInputOpacity}>
               <TextInput
                 ref={searchInputRef}
                 value={searchQuery}
@@ -642,20 +567,32 @@ export default function FeedScreen() {
                 className="flex-1 py-2 font-sans text-sm text-ink-dark"
                 returnKeyType="search"
               />
-            </Animated.View>
-
-            {/* Clear button */}
-            {searchActive && searchQuery.length > 0 ? (
-              <Animated.View entering={FadeIn.duration(150)}>
+              {searchQuery.length > 0 ? (
                 <TouchableOpacity
                   className="mr-2 h-7 w-7 items-center justify-center rounded-full bg-ink-dark/8"
                   onPress={() => setSearchQuery('')}
                 >
                   <Ionicons name="close" size={14} color={colors.inkDark} />
                 </TouchableOpacity>
-              </Animated.View>
-            ) : null}
-          </Animated.View>
+              ) : null}
+            </View>
+          ) : (
+            <>
+              <View className="flex-1 flex-row items-center pr-3">
+                <BrandWordmark width={92} tone="dark" />
+                <View className="flex-1 items-center" style={{ marginRight: 32 }}>
+                  <FeedModeToggle feedMode={feedMode} onChangeMode={setFeedMode} />
+                </View>
+              </View>
+              <TouchableOpacity
+                className="h-11 w-11 items-center justify-center rounded-full bg-ink-dark/6"
+                activeOpacity={0.86}
+                onPress={openSearch}
+              >
+                <Ionicons name="search" size={18} color={colors.inkDark} />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </View>
 
@@ -728,54 +665,8 @@ function FeedModeToggle({
   feedMode: FeedMode
   onChangeMode: (mode: FeedMode) => void
 }) {
-  const tabFrames = useRef<Array<{ x: number; width: number } | null>>([null, null])
-  const indicatorX = useSharedValue(0)
-  const indicatorW = useSharedValue(0)
-  const ready = useSharedValue(0)
-
-  const activeIndex = feedMode === 'following' ? 0 : 1
-
-  const syncIndicator = useCallback(
-    (index: number, animate: boolean) => {
-      const frame = tabFrames.current[index]
-      if (!frame) return
-      if (animate) {
-        indicatorX.value = withSpring(frame.x, { damping: 20, stiffness: 220 })
-        indicatorW.value = withSpring(frame.width, { damping: 20, stiffness: 220 })
-      } else {
-        indicatorX.value = frame.x
-        indicatorW.value = frame.width
-      }
-      ready.value = 1
-    },
-    [indicatorX, indicatorW, ready]
-  )
-
-  const onTabLayout = useCallback(
-    (index: number) => (e: LayoutChangeEvent) => {
-      const { x, width } = e.nativeEvent.layout
-      tabFrames.current[index] = { x, width }
-      if (index === activeIndex) syncIndicator(activeIndex, false)
-    },
-    [activeIndex, syncIndicator]
-  )
-
-  useEffect(() => {
-    syncIndicator(activeIndex, true)
-  }, [activeIndex, syncIndicator])
-
-  const indicatorStyle = useAnimatedStyle(() => ({
-    left: indicatorX.value,
-    width: indicatorW.value,
-    opacity: ready.value,
-  }))
-
   return (
     <View className="flex-row items-center rounded-full bg-ink-dark/6 p-1">
-      <Animated.View
-        className="absolute h-[34px] rounded-full bg-ink-dark"
-        style={indicatorStyle}
-      />
       {FEED_TABS.map((tab, index) => {
         const active = feedMode === tab.key
         return (
@@ -783,8 +674,7 @@ function FeedModeToggle({
             key={tab.key}
             activeOpacity={0.86}
             onPress={() => onChangeMode(tab.key)}
-            onLayout={onTabLayout(index)}
-            className="rounded-full px-4 py-2"
+            className={`rounded-full px-4 py-2 ${active ? 'bg-ink-dark' : ''}`}
           >
             <Text
               className={`font-sans text-sm font-semibold ${
