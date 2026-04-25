@@ -55,9 +55,10 @@ app.use(Sentry.Handlers.tracingHandler())
 app.use(
   cors({
     origin: [
-      'exp://localhost:8081', // Expo dev (iOS/Android)
-      'http://localhost:8081', // Expo dev (web)
-      'https://velve.app', // Production web (add your actual domain)
+      'exp://localhost:8081',
+      'http://localhost:8081',
+      'https://velveapp.com',
+      'https://www.velveapp.com',
     ],
     credentials: true,
   })

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import client from '@/api/client'
 import { BrandBackground } from '@/components/BrandBackground'
 import { BrandedLoader } from '@/components/BrandedLoader'
+import { FullscreenImageModal } from '@/components/FullscreenImageModal'
 import { GlassSurface } from '@/components/GlassSurface'
 import { RemoteImage } from '@/components/RemoteImage'
 import { colors } from '@/design/tokens'
@@ -23,6 +24,10 @@ export default function CleanCutReviewScreen() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>()
   const [payload, setPayload] = useState<ImagesPayload | null>(null)
   const [loading, setLoading] = useState(true)
+  const [fullscreenTarget, setFullscreenTarget] = useState<{
+    title: string
+    imageUri?: string | null
+  } | null>(null)
 
   useEffect(() => {
     if (!itemId) {
@@ -99,25 +104,49 @@ export default function CleanCutReviewScreen() {
 
         {/* Side by side comparison */}
         <View className="mt-8 flex-row gap-3">
-          <GlassSurface className="flex-1 px-3 py-3">
-            <Text className="mb-3 text-center font-sans text-[10px] uppercase tracking-[1.2px] text-ink-dark/40">
-              Original
-            </Text>
-            <RemoteImage
-              uri={payload?.imageOriginal || undefined}
-              className="aspect-[3/4] w-full rounded-[22px]"
-            />
-          </GlassSurface>
+          <TouchableOpacity
+            activeOpacity={0.88}
+            className="flex-1"
+            onPress={() =>
+              setFullscreenTarget({
+                title: 'Original',
+                imageUri: payload?.imageOriginal,
+              })
+            }
+          >
+            <GlassSurface className="px-3 py-3">
+              <Text className="mb-3 text-center font-sans text-[10px] uppercase tracking-[1.2px] text-ink-dark/40">
+                Original
+              </Text>
+              <RemoteImage
+                uri={payload?.imageOriginal || undefined}
+                className="aspect-[3/4] w-full rounded-[22px]"
+                contentFit="contain"
+              />
+            </GlassSurface>
+          </TouchableOpacity>
 
-          <GlassSurface className="flex-1 px-3 py-3">
-            <Text className="mb-3 text-center font-sans text-[10px] uppercase tracking-[1.2px] text-ink-dark/40">
-              Clean cut
-            </Text>
-            <RemoteImage
-              uri={payload?.imageClean || undefined}
-              className="aspect-[3/4] w-full rounded-[22px]"
-            />
-          </GlassSurface>
+          <TouchableOpacity
+            activeOpacity={0.88}
+            className="flex-1"
+            onPress={() =>
+              setFullscreenTarget({
+                title: 'Clean cut',
+                imageUri: payload?.imageClean,
+              })
+            }
+          >
+            <GlassSurface className="px-3 py-3">
+              <Text className="mb-3 text-center font-sans text-[10px] uppercase tracking-[1.2px] text-ink-dark/40">
+                Clean cut
+              </Text>
+              <RemoteImage
+                uri={payload?.imageClean || undefined}
+                className="aspect-[3/4] w-full rounded-[22px]"
+                contentFit="contain"
+              />
+            </GlassSurface>
+          </TouchableOpacity>
         </View>
 
         {/* Info note */}
@@ -129,7 +158,7 @@ export default function CleanCutReviewScreen() {
             style={{ marginTop: 1 }}
           />
           <Text className="ml-2 flex-1 font-sans text-xs leading-5 text-ink-dark/55">
-            Obe verzije se cuvaju. Clean varijanta se koristi za Virtual Try-On i prikaz u tvom closet-u.
+            Dodirni bilo koju sliku da je otvoris preko celog ekrana. Clean varijanta se koristi za Virtual Try-On i prikaz u tvom closet-u.
           </Text>
         </View>
       </View>
@@ -159,6 +188,13 @@ export default function CleanCutReviewScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      <FullscreenImageModal
+        visible={!!fullscreenTarget}
+        title={fullscreenTarget?.title || ''}
+        imageUri={fullscreenTarget?.imageUri}
+        onClose={() => setFullscreenTarget(null)}
+      />
     </View>
   )
 }

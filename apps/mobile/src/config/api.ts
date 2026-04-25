@@ -57,6 +57,11 @@ function normalizeConfiguredUrl(input?: string) {
 
 export function getApiBaseUrl() {
   const configuredUrl = normalizeConfiguredUrl(process.env.EXPO_PUBLIC_API_URL)
+  const configuredHost = extractHost(configuredUrl)
+
+  if (configuredUrl && configuredHost && !LOCALHOST_ALIASES.has(configuredHost)) {
+    return configuredUrl
+  }
 
   if (!__DEV__) {
     return configuredUrl ?? `http://localhost:${DEFAULT_PORT}`

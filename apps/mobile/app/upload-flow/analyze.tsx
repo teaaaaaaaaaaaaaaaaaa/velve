@@ -6,10 +6,12 @@ import {
   Alert,
   Animated,
   Easing,
+  ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RemoteImage } from '@/components/RemoteImage';
 import { colors } from '@/design/tokens';
@@ -43,9 +45,11 @@ function CheckRow({ label, ok }: { label: string; ok: boolean }) {
 export default function CleanCutAnalyzeScreen() {
   const router = useRouter();
   const { imageUri } = useLocalSearchParams<{ imageUri: string }>();
+  const insets = useSafeAreaInsets();
   const [analysis, setAnalysis] = useState<AnalysisPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const scan = useRef(new Animated.Value(0)).current;
+  const hasAutoNavigated = useRef(false);
 
   useEffect(() => {
     Animated.loop(
@@ -105,79 +109,114 @@ export default function CleanCutAnalyzeScreen() {
     [scan]
   );
 
+  useEffect(() => {
+    if (!analysis?.ready || loading || hasAutoNavigated.current) return;
+
+    hasAutoNavigated.current = true;
+
+    const timeout = setTimeout(() => {
+      router.replace({
+        pathname: '/upload-flow/transform',
+        params: { imageUri },
+      });
+    }, 900);
+
+    return () => clearTimeout(timeout);
+  }, [analysis?.ready, imageUri, loading, router]);
+
   return (
-    <View className="flex-1 bg-base-canvas px-5 pb-8 pt-14">
-      <TouchableOpacity
-        onPress={() => router.back()}
-        className="mb-5 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
+    <SafeAreaView className="flex-1 bg-base-canvas" edges={['top', 'bottom']}>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingHorizontal: 20,
+          paddingTop: 12,
+          paddingBottom: Math.max(insets.bottom, 16) + 20,
+        }}
+        showsVerticalScrollIndicator={false}
+        bounces
       >
-        <Ionicons name="arrow-back" size={20} color={colors.inkDark} />
-      </TouchableOpacity>
-
-      <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
-        AI analiza
-      </Text>
-      <Text className="mt-2 font-display text-4xl text-ink-dark">Real-time feedback</Text>
-
-      <View className="mt-6 overflow-hidden rounded-[34px] bg-surface-panel px-3 py-3">
-        <View className="overflow-hidden rounded-[28px] bg-base-canvas">
-          <RemoteImage uri={imageUri} className="aspect-[3/4] w-full" contentFit="contain" />
-          <Animated.View
-            style={{
-              top: '38%',
-              transform: [{ translateY: scanTranslate }],
-              opacity: 0.8,
-            }}
-            className="absolute left-0 right-0 h-16 bg-brand-accent-light/55"
-          />
-        </View>
-      </View>
-
-      <View className="mt-6 gap-3">
-        <CheckRow label="Svetlo" ok={!!analysis?.checks?.lighting?.ok} />
-        <CheckRow label="Kadar" ok={!!analysis?.checks?.framing?.ok} />
-        <CheckRow label="Kontrast" ok={!!analysis?.checks?.contrast?.ok} />
-      </View>
-
-      <View className="mt-5 rounded-[24px] bg-surface-panel px-4 py-4">
-        {loading ? (
-          <View className="flex-row items-center">
-            <ActivityIndicator size="small" color={colors.accentDeep} />
-            <Text className="ml-3 font-sans text-sm text-ink-dark/65">
-              Velve proverava svetlo, kadar i kontrast...
-            </Text>
-          </View>
-        ) : analysis?.messages?.length ? (
-          analysis.messages.map((message) => (
-            <Text key={message} className="mb-2 font-sans text-sm leading-6 text-ink-dark/70">
-              {message}
-            </Text>
-          ))
-        ) : (
-          <Text className="font-sans text-sm leading-6 text-ink-dark/70">
-            Sve izgleda dobro. Mozemo da generisemo digitalni artikal.
-          </Text>
-        )}
-      </View>
-
-      <TouchableOpacity
-        disabled={!analysis?.ready || loading}
-        onPress={() =>
-          router.push({
-            pathname: '/upload-flow/transform',
-            params: { imageUri },
-          })
-        }
-        className={`mt-auto items-center rounded-full px-4 py-4 ${
-          analysis?.ready && !loading ? 'bg-brand-accent-deep' : 'bg-brand-accent-deep/25'
-        }`}
-      >
-        <Text
-          className={`font-sans text-base font-semibold ${analysis?.ready && !loading ? 'text-base-canvas' : 'text-ink-dark/45'}`}
+        <TouchableOpacity
+          onPress={() => router.back()}
+          className="mb-5 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
         >
-          Generisi digitalni artikal
+          <Ionicons name="arrow-back" size={20} color={colors.inkDark} />
+        </TouchableOpacity>
+
+        <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
+          AI analiza
         </Text>
-      </TouchableOpacity>
-    </View>
+        <Text className="mt-2 font-display text-4xl text-ink-dark">Real-time feedback</Text>
+
+        <View className="mt-6 overflow-hidden rounded-[34px] bg-surface-panel px-3 py-3">
+          <View className="overflow-hidden rounded-[28px] bg-base-canvas">
+            <RemoteImage uri={imageUri} className="aspect-[3/4] w-full" contentFit="contain" />
+            <Animated.View
+              style={{
+                top: '38%',
+                transform: [{ translateY: scanTranslate }],
+                opacity: 0.8,
+              }}
+              className="absolute left-0 right-0 h-16 bg-brand-accent-light/55"
+            />
+          </View>
+        </View>
+
+        <View className="mt-6 gap-3">
+          <CheckRow label="Svetlo" ok={!!analysis?.checks?.lighting?.ok} />
+          <CheckRow label="Kadar" ok={!!analysis?.checks?.framing?.ok} />
+          <CheckRow label="Kontrast" ok={!!analysis?.checks?.contrast?.ok} />
+        </View>
+
+        <View className="mt-5 rounded-[24px] bg-surface-panel px-4 py-4">
+          {loading ? (
+            <View className="flex-row items-center">
+              <ActivityIndicator size="small" color={colors.accentDeep} />
+              <Text className="ml-3 flex-1 font-sans text-sm text-ink-dark/65">
+                Velve proverava svetlo, kadar i kontrast...
+              </Text>
+            </View>
+          ) : analysis?.messages?.length ? (
+            analysis.messages.map((message) => (
+              <Text key={message} className="mb-2 font-sans text-sm leading-6 text-ink-dark/70">
+                {message}
+              </Text>
+            ))
+          ) : (
+            <Text className="font-sans text-sm leading-6 text-ink-dark/70">
+              Sve izgleda dobro. Mozemo da generisemo digitalni artikal.
+            </Text>
+          )}
+        </View>
+
+        {analysis?.ready && !loading ? (
+          <Text className="mt-4 font-sans text-sm text-ink-dark/55">
+            Sve je spremno, nastavljamo automatski...
+          </Text>
+        ) : null}
+
+        <View className="mt-6">
+          <TouchableOpacity
+            disabled={!analysis?.ready || loading}
+            onPress={() =>
+              router.push({
+                pathname: '/upload-flow/transform',
+                params: { imageUri },
+              })
+            }
+            className={`items-center rounded-full px-4 py-4 ${
+              analysis?.ready && !loading ? 'bg-brand-accent-deep' : 'bg-brand-accent-deep/25'
+            }`}
+          >
+            <Text
+              className={`font-sans text-base font-semibold ${analysis?.ready && !loading ? 'text-base-canvas' : 'text-ink-dark/45'}`}
+            >
+              Generisi digitalni artikal
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }

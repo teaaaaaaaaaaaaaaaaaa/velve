@@ -32,8 +32,8 @@ type ItemPayload = {
 const AI_STEPS = [
   'Analiziramo sliku...',
   'Prepoznajemo boju i stil...',
-  'Generisemo naslov...',
-  'Pisemo opis...',
+  'Prepoznajemo detalje komada...',
+  'Pisemo opis na srpskom...',
 ]
 
 function AiLoadingOverlay() {
@@ -150,7 +150,6 @@ export default function DescriptionScreen() {
       )
 
       const payload = response.data?.data
-      if (payload?.title) setTitle(payload.title)
       if (payload?.description) setDescription(payload.description)
       setGenerated(true)
     } catch {
@@ -244,7 +243,7 @@ export default function DescriptionScreen() {
             Opisi svoj komad
           </Text>
           <Text className="mt-2 font-sans text-sm leading-6 text-ink-dark/55">
-            Koristi AI da automatski generise naslov i opis, ili popuni rucno.
+            Naslov smislis ti, a AI moze da predlozi samo opis koji zatim slobodno doradis.
           </Text>
 
           {/* AI Generate Button */}
@@ -270,7 +269,7 @@ export default function DescriptionScreen() {
                     Generisi AI opis
                   </Text>
                   <Text className="mt-0.5 font-sans text-xs text-ink-dark/50">
-                    AI analizira sliku i popunjava polja
+                    AI analizira sliku i predlaze opis na prirodnom srpskom
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.mutedText} />
@@ -280,7 +279,7 @@ export default function DescriptionScreen() {
             <View className="mt-6 flex-row items-center rounded-[20px] bg-brand-highlight/20 px-4 py-3">
               <Ionicons name="checkmark-circle" size={20} color={colors.accentDeep} />
               <Text className="ml-2 flex-1 font-sans text-sm text-ink-dark/70">
-                AI opis generisan — mozete ga izmeniti ispod
+                AI opis je generisan. Naslov ostaje tvoj, a tekst mozes odmah da izmenis ispod.
               </Text>
               <TouchableOpacity onPress={generateAiDescription}>
                 <Ionicons name="refresh" size={18} color={colors.accentDeep} />
@@ -303,7 +302,7 @@ export default function DescriptionScreen() {
             <TextInput
               value={title}
               onChangeText={setTitle}
-              placeholder="Naziv tvog komada"
+              placeholder="Ti smisli naslov svog komada"
               placeholderTextColor={colors.mutedText}
               className="rounded-[20px] border border-ink-dark/8 bg-surface-panel px-5 py-4 font-sans text-sm text-ink-dark"
             />
@@ -315,7 +314,7 @@ export default function DescriptionScreen() {
             <TextInput
               value={description}
               onChangeText={setDescription}
-              placeholder="Opisi komad — materijal, boja, kako stoji..."
+              placeholder="Opisi komad prirodno: boja, kroj, detalji, stanje..."
               placeholderTextColor={colors.mutedText}
               multiline
               textAlignVertical="top"

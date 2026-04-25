@@ -12,12 +12,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import client from '@/api/client';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { DiscoveryCardItem, DiscoveryItemCard } from '@/components/DiscoveryItemCard';
 import { EditorialEmptyState } from '@/components/EditorialEmptyState';
 import { GlassCountActionButton } from '@/components/GlassCountActionButton';
+import { ItemHeroOverlay } from '@/components/ItemHeroOverlay';
 import { RemoteImage } from '@/components/RemoteImage';
 import { colors } from '@/design/tokens';
 import { useAuth } from '@/hooks/useAuth';
@@ -85,6 +87,7 @@ export default function ItemDetailsScreen() {
   }>();
   const router = useRouter();
   const { dbUser } = useAuth();
+  const insets = useSafeAreaInsets();
   const isViewOnly = viewOnly === 'true';
 
   const [item, setItem] = useState<Item | null>(null);
@@ -456,17 +459,10 @@ export default function ItemDetailsScreen() {
     (item.listingType === 'sell' || item.listingType === 'both') && item.price != null;
   const showTradeFor =
     (item.listingType === 'trade' || item.listingType === 'both') && !!item.tradeFor;
-  const metadataLine = [
-    item.category,
-    item.brand,
-    item.size ? item.size.toUpperCase() : null,
-    CONDITION_LABELS[item.condition],
-  ]
-    .filter(Boolean)
-    .join(' / ');
   const sellerLocation = owner?.location?.city
     ? `${owner.location.city}${owner.location.region ? `, ${owner.location.region}` : ''}`
     : null;
+  const heroCardBottomOffset = 126;
 
   const renderTradeModal = () => (
     <Modal
@@ -775,6 +771,7 @@ export default function ItemDetailsScreen() {
             <RemoteImage
               uri={heroImage}
               className="h-full w-full"
+              contentFit="contain"
               fallback={
                 <View className="h-full w-full items-center justify-center bg-brand-accent-deep">
                   <Ionicons name="shirt-outline" size={56} color="#F6F8ED" />
@@ -789,63 +786,44 @@ export default function ItemDetailsScreen() {
           <View className="absolute inset-0 bg-black/20" />
           <TouchableOpacity
             onPress={() => router.back()}
-            className="absolute left-4 top-14 h-11 w-11 items-center justify-center rounded-full bg-black/30"
+            className="absolute left-4 h-11 w-11 items-center justify-center rounded-full bg-black/30"
+            style={{ top: insets.top + 10 }}
           >
             <Ionicons name="arrow-back" size={22} color="white" />
           </TouchableOpacity>
           {!isOwn && !isViewOnly ? (
             <TouchableOpacity
               onPress={showActions}
-              className="absolute right-4 top-14 h-11 w-11 items-center justify-center rounded-full bg-black/30"
+              className="absolute right-4 h-11 w-11 items-center justify-center rounded-full bg-black/30"
+              style={{ top: insets.top + 10 }}
             >
               <Ionicons name="ellipsis-horizontal" size={22} color="white" />
             </TouchableOpacity>
           ) : null}
-          <View className="absolute bottom-[230px] left-4 right-24">
-            <Text className="font-display text-3xl text-base-canvas">{item.title}</Text>
-            <Text className="mt-2 font-sans text-sm text-base-canvas/90">{metadataLine}</Text>
-          </View>
-          {owner ? (
-            <TouchableOpacity
-              className="absolute bottom-[130px] left-4 right-24 flex-row items-center rounded-[24px] bg-white/15 px-3 py-3"
-              activeOpacity={0.85}
-              onPress={() =>
-                !isOwn && router.push({ pathname: '/users/[id]', params: { id: owner._id } })
-              }
-            >
-              {owner.photoURL ? (
-                <RemoteImage
-                  uri={owner.photoURL}
-                  className="h-10 w-10 rounded-full"
-                  fallback={
-                    <View className="h-full w-full items-center justify-center rounded-full bg-brand-accent-light">
-                      <Text className="font-display text-xl text-brand-accent-deep">
-                        {owner.displayName.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                  }
-                />
-              ) : (
-                <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-accent-light">
-                  <Text className="font-display text-xl text-brand-accent-deep">
-                    {owner.displayName.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-              )}
-              <View className="ml-3 flex-1">
-                <Text className="font-sans text-sm font-semibold text-base-canvas">
-                  @{owner.displayName}
-                </Text>
-                <Text className="font-sans text-xs text-base-canvas/75">
-                  {owner.averageRating ? `${owner.averageRating.toFixed(1)} rating` : 'Novi profil'}{' '}
-                  / {owner.completedTrades || 0} razmena
-                </Text>
-              </View>
-              {!isOwn ? <Ionicons name="arrow-forward" size={18} color="#F6F8ED" /> : null}
-            </TouchableOpacity>
-          ) : null}
+          <ItemHeroOverlay
+            title={item.title}
+            category={item.category}
+            brand={item.brand}
+            size={item.size}
+            condition={item.condition}
+            createdAt={item.createdAt}
+            price={showPrice ? item.price : undefined}
+            listingType={item.listingType}
+            owner={owner}
+            topInset={insets.top}
+            bottomOffset={heroCardBottomOffset}
+            onOwnerPress={
+              owner && !isOwn
+                ? () => router.push({ pathname: '/users/[id]', params: { id: owner._id } })
+                : undefined
+            }
+            actionIcon={!isOwn && showProposalButton ? 'swap-horizontal' : undefined}
+            actionAccessibilityLabel="Posalji predlog"
+            onActionPress={!isOwn && showProposalButton ? openTradeComposer : undefined}
+            showOwnerArrow={!isOwn}
+          />
           {!isViewOnly ? (
-            <View className="absolute bottom-24 right-3 items-center gap-3">
+            <View className="absolute right-3 items-center gap-3" style={{ bottom: heroCardBottomOffset + 110 }}>
               <GlassCountActionButton
                 icon={isLiked ? 'heart' : 'heart-outline'}
                 count={likesCount}
@@ -912,11 +890,39 @@ export default function ItemDetailsScreen() {
               </Text>
             </View>
             {showPrice ? (
-              <Text className="font-sans text-base font-semibold text-brand-accent-deep">
+              <Text className="font-sans text-lg font-semibold text-brand-accent-deep">
                 {item.price} EUR
               </Text>
             ) : null}
           </View>
+
+          <View className="mb-5 flex-row flex-wrap gap-3">
+            <View className="min-w-[46%] flex-1 rounded-[22px] bg-surface-panel px-4 py-4">
+              <Text className="font-sans text-[11px] uppercase text-ink-dark/45">Kategorija</Text>
+              <Text className="mt-1 font-sans text-sm font-semibold text-ink-dark">
+                {item.category || 'Nije uneto'}
+              </Text>
+            </View>
+            <View className="min-w-[46%] flex-1 rounded-[22px] bg-surface-panel px-4 py-4">
+              <Text className="font-sans text-[11px] uppercase text-ink-dark/45">Velicina</Text>
+              <Text className="mt-1 font-sans text-sm font-semibold text-ink-dark">
+                {item.size ? item.size.toUpperCase() : 'Nije uneto'}
+              </Text>
+            </View>
+            <View className="min-w-[46%] flex-1 rounded-[22px] bg-surface-panel px-4 py-4">
+              <Text className="font-sans text-[11px] uppercase text-ink-dark/45">Stanje</Text>
+              <Text className="mt-1 font-sans text-sm font-semibold text-ink-dark">
+                {CONDITION_LABELS[item.condition]}
+              </Text>
+            </View>
+            <View className="min-w-[46%] flex-1 rounded-[22px] bg-surface-panel px-4 py-4">
+              <Text className="font-sans text-[11px] uppercase text-ink-dark/45">Brend</Text>
+              <Text className="mt-1 font-sans text-sm font-semibold text-ink-dark">
+                {item.brand || 'Bez brenda'}
+              </Text>
+            </View>
+          </View>
+
           <Text className="font-sans text-[15px] leading-6 text-ink-dark">
             {item.description ||
               'Ovaj komad jos nema opis, ali slicni predlozi i seller signal ispod daju dodatni kontekst.'}

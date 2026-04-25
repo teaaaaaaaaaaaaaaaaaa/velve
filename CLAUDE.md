@@ -47,6 +47,41 @@ cd apps/ai-server && python -m venv .venv && .venv/Scripts/activate && pip insta
 | CLIP pipeline, FAISS, Ollama, feed ranking | `ai-ml` |
 | Security audit, validacija, performance | `qa-security` |
 
+## Production server arhitektura
+
+| Domen | Servis | Port |
+|---|---|---|
+| `api.velveapp.com` | Node.js API (apps/api) | 3000 |
+| `ai.velveapp.com` | Python AI Server (apps/ai-server) | 8000 |
+
+- Oba servera su na istom Ubuntu 22.04 hostu, iza Cloudflare Tunnel (velve-api)
+- AI_SERVER_URL u apps/api uvek ostaje `http://localhost:8000` (interni poziv)
+- NIKAD ne stavljati `ai.velveapp.com` u API .env — AI server nije javni API za mobile
+
+## Git pull na serveru — uputstvo
+
+**Svaki put kada pushuješ promene na `dev` branch, uradi sledeće na serveru:**
+
+```bash
+# 1. SSH na server i idi u repo
+cd ~/velve          # ili gde god je kloniran repo
+
+# 2. Pull latest
+git pull origin dev
+
+# 3a. Ako su se promenili fajlovi u apps/api → restart velve-api
+pm2 restart velve-api
+
+# 3b. Ako su se promenili fajlovi u apps/ai-server → restart velve-ai
+pm2 restart velve-ai
+
+# 4. Proveri da su oba online
+pm2 status
+```
+
+> **Napomena:** `.env` fajlovi se NE commituju i NE menjaju se pull-om.
+> Ako si dodao novu env varijablu, ručno je dodaj na serveru u odgovarajući `.env`.
+
 ## Važna pravila
 - NIKAD ne commitovati `.env` fajlove (samo `.env.example`)
 - Koristiti semantic NativeWind klase (`bg-base-canvas`, `text-ink-dark`) — ne hardcoded hex vrednosti u JSX

@@ -1,6 +1,7 @@
 import base64
 import html
 import io
+import json
 import os
 import pickle
 import string
@@ -15,6 +16,7 @@ import numpy as np
 import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from PIL import Image, ImageOps
 from pydantic import BaseModel, Field
@@ -26,6 +28,13 @@ os.environ.setdefault("MKL_NUM_THREADS", "1")
 load_dotenv()
 
 app = FastAPI(title="Velve AI Server")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://velveapp.com", "https://www.velveapp.com"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 try:
     faiss.omp_set_num_threads(1)
@@ -710,10 +719,53 @@ CLIP_STYLES = [
     "bohemian", "minimalist", "streetwear", "preppy",
 ]
 CONDITION_LABELS_SR = {
-    "new": "potpuno novo",
-    "like_new": "kao novo",
-    "good": "dobrom stanju",
-    "fair": "prihvatljivom stanju",
+    "new": "deluje potpuno novo",
+    "like_new": "deluje kao novo",
+    "good": "u dobrom je stanju",
+    "fair": "u korektnom je stanju",
+}
+COLOR_LABELS_SR = {
+    "black": "crnoj",
+    "white": "beloj",
+    "red": "crvenoj",
+    "blue": "plavoj",
+    "green": "zelenoj",
+    "yellow": "zutoj",
+    "pink": "roze",
+    "purple": "ljubicastoj",
+    "brown": "braon",
+    "gray": "sivoj",
+    "beige": "bez",
+    "navy": "teget",
+    "cream": "krem",
+    "olive": "maslinastoj",
+    "burgundy": "bordo",
+    "teal": "petrol",
+    "orange": "narandzastoj",
+    "gold": "zlatnoj",
+    "silver": "srebrnoj",
+    "khaki": "kaki",
+}
+PATTERN_LABELS_SR = {
+    "striped": "prugastim dezenom",
+    "plaid": "kariranim dezenom",
+    "floral": "cvetnim dezenom",
+    "polka dot": "tufnastim dezenom",
+    "animal print": "animal print dezenom",
+    "geometric": "geometrijskim dezenom",
+    "tie dye": "tie-dye efektom",
+    "camo": "maskirnim dezenom",
+}
+STYLE_LABELS_SR = {
+    "casual": "za svakodnevno nosenje",
+    "formal": "formalnijeg izgleda",
+    "sporty": "sportskijeg izgleda",
+    "elegant": "elegantnijeg izgleda",
+    "vintage": "retro utiska",
+    "bohemian": "boho utiska",
+    "minimalist": "ciste i jednostavne siluete",
+    "streetwear": "urbanijeg izgleda",
+    "preppy": "urednijeg i klasicnijeg izgleda",
 }
 
 
@@ -756,51 +808,69 @@ def build_template_description(category: str, attrs: dict, brand: str = "", size
     color = attrs.get("color", "")
     pattern = attrs.get("pattern", "")
     style = attrs.get("style", "")
-    cond_sr = CONDITION_LABELS_SR.get(condition, condition)
 
     if language == "sr":
-        title_parts = []
+        base = category.strip() or "Komad garderobe"
         if brand:
-            title_parts.append(brand)
-        if color:
-            title_parts.append(color.capitalize())
-        title_parts.append(category)
-        if style and style not in ("casual",):
-            title_parts.append(f"- {style}")
-        title = " ".join(title_parts)
+            base = f"{brand} {base.lower()}"
 
-        desc_parts = []
-        base = f"{color.capitalize()} {category.lower()}" if color else category
-        if brand:
-            base = f"{brand} {base}"
-        desc_parts.append(f"{base} u {cond_sr}." if cond_sr else f"{base}.")
-        if pattern and pattern != "solid":
-            desc_parts.append(f"{pattern.capitalize()} dezen.")
+        sentence_parts = [base[:1].upper() + base[1:]]
+
+        color_label = COLOR_LABELS_SR.get(color, color)
+        if color_label:
+            sentence_parts.append(f"u {color_label} boji")
+
+        pattern_label = PATTERN_LABELS_SR.get(pattern, "") if pattern and pattern != "solid" else ""
+        if pattern_label:
+            sentence_parts.append(f"sa {pattern_label}")
+
+        description = " ".join(sentence_parts).strip() + "."
+
+        detail_parts = []
+        style_label = STYLE_LABELS_SR.get(style, "") if style else ""
+        if style_label:
+            detail_parts.append(f"Komad deluje {style_label}.")
         if size:
-            desc_parts.append(f"Velicina {size}.")
-        desc_parts.append("Savrseno za svakodnevno nosenje ili razmenu.")
-        description = " ".join(desc_parts)
-    else:
-        title_parts = []
-        if brand:
-            title_parts.append(brand)
-        if color:
-            title_parts.append(color.capitalize())
-        title_parts.append(category)
-        title = " ".join(title_parts)
+            detail_parts.append(f"Velicina je {size}.")
+        condition_label = CONDITION_LABELS_SR.get(condition, "")
+        if condition_label:
+            detail_parts.append(f"Po fotografiji {condition_label}.")
 
-        desc_parts = []
-        base = f"{color.capitalize()} {category.lower()}" if color else category
-        if brand:
-            base = f"{brand} {base}"
-        desc_parts.append(f"{base} in {condition} condition." if condition else f"{base}.")
-        if pattern and pattern != "solid":
-            desc_parts.append(f"{pattern.capitalize()} pattern.")
-        if size:
-            desc_parts.append(f"Size {size}.")
-        description = " ".join(desc_parts)
+        if detail_parts:
+            description = f"{description} {' '.join(detail_parts[:2])}".strip()
 
-    return {"title": title, "description": description}
+        return {"title": "", "description": description}
+
+    base = f"{brand} {category}".strip()
+    description = f"{base}."
+    if size:
+        description += f" Size {size}."
+    if condition:
+        description += f" Condition: {condition}."
+    return {"title": "", "description": description.strip()}
+
+
+def extract_description_from_ollama(raw_text: str) -> str:
+    cleaned = _basic_clean(raw_text or "")
+    if not cleaned:
+        return ""
+
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        try:
+            payload = json.loads(cleaned[start:end + 1])
+            description = _basic_clean(str(payload.get("description", "")))
+            if description:
+                return " ".join(description.split())
+        except Exception:
+            pass
+
+    lowered = cleaned.lower()
+    if lowered.startswith("description:"):
+        cleaned = cleaned.split(":", 1)[1].strip()
+
+    return " ".join(cleaned.split())
 
 
 class DescriptionRequest(BaseModel):
@@ -841,9 +911,14 @@ def generate_description(req: DescriptionRequest):
 
     if req.language == "sr":
         prompt = (
-            "Ti si copywriter za aplikaciju za razmenu garderobe. "
-            f"Napravi kratak naslov (max 8 reci) i opis (max 2 recenice) za ovaj predmet: {details_str}. "
-            "Odgovori SAMO u formatu:\nTitle: ...\nDescription: ..."
+            "Ti si asistent koji za Velve pise kratke i tacne opise garderobe. "
+            "Pisi iskljucivo normalnim srpskim jezikom, latinicom. "
+            "Ne smisljaj naslov. Ne izmisljaj materijal, brend, kroj, priliku ili detalje koji nisu dati ili jasno vidljivi. "
+            "Ne koristi engleske modne fraze ako postoji prirodan srpski izraz. "
+            "Opis neka bude 2 do 3 kratke recenice i neka zvuci prirodno, kao opis stvarnog komada iz oglasa. "
+            f"Poznati podaci o komadu: {details_str}. "
+            "Vrati iskljucivo validan JSON bez markdowna i bez dodatnog teksta, u formatu: "
+            '{"description":"..."}'
         )
     elif req.language == "ru":
         prompt = (
@@ -867,16 +942,9 @@ def generate_description(req: DescriptionRequest):
         response.raise_for_status()
         text = response.json().get("response", "")
 
-        title = ""
-        description = ""
-        for line in text.strip().split("\n"):
-            line = line.strip()
-            if line.lower().startswith("title:"):
-                title = line.split(":", 1)[1].strip()
-            elif line.lower().startswith("description:"):
-                description = line.split(":", 1)[1].strip()
-
-        return {"title": title, "description": description, "raw": text, "source": "ollama"}
+        description = extract_description_from_ollama(text)
+        if description:
+            return {"title": "", "description": description, "raw": text, "source": "ollama"}
     except requests.RequestException as error:
         print(f"[generate-description] Ollama unavailable ({error}), using CLIP template fallback")
 
