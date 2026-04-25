@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
   createContext,
   ReactNode,
@@ -10,6 +9,7 @@ import {
 } from 'react'
 
 import { detectLocaleFromDevice, localeTags, SupportedLocale } from '@/design/tokens'
+import { getStorage } from '@/lib/storage'
 
 const STORAGE_KEY = '@velve:locale'
 
@@ -349,7 +349,8 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<SupportedLocale>(detectLocaleFromDevice())
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
+    getStorage()
+      .getItem(STORAGE_KEY)
       .then((stored) => {
         if (stored === 'sr' || stored === 'en' || stored === 'ru') {
           setLocaleState(stored)
@@ -360,7 +361,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   const setLocale = useCallback(async (nextLocale: SupportedLocale) => {
     setLocaleState(nextLocale)
-    await AsyncStorage.setItem(STORAGE_KEY, nextLocale)
+    await getStorage().setItem(STORAGE_KEY, nextLocale)
   }, [])
 
   const t = useCallback(
