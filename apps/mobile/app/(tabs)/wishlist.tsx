@@ -17,6 +17,7 @@ import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { DiscoveryCardItem, DiscoveryItemCard } from '@/components/DiscoveryItemCard'
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
+import { getApiErrorMessage } from '@/lib/apiErrors'
 
 type WishlistItem = DiscoveryCardItem & {
   isWishlisted?: boolean
@@ -28,6 +29,7 @@ export default function WishlistScreen() {
   const [items, setItems] = useState<WishlistItem[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   const copy = {
     sr: {
@@ -75,11 +77,16 @@ export default function WishlistScreen() {
     try {
       const response = await client.get('/api/wishlist')
       if (response.data.ok) {
-        setItems(response.data.data)
+        setItems(
+          (response.data.data as WishlistItem[]).filter(
+            (item) => !item.status || item.status === 'available'
+          )
+        )
+        setErrorMessage('')
       }
     } catch (error: any) {
       console.error('[Wishlist] Error:', error.message)
-      Alert.alert('Velve', copy[locale].loadError)
+      setErrorMessage(getApiErrorMessage(error, copy[locale].loadError))
     }
   }
 
@@ -122,7 +129,17 @@ export default function WishlistScreen() {
         </GlassSurface>
       </View>
 
-      {items.length === 0 ? (
+      {errorMessage ? (
+        <View className="px-4 pt-4">
+          <EditorialEmptyState
+            icon="cloud-offline-outline"
+            title="Sacuvano nije ucitano"
+            description={errorMessage}
+            actionLabel="Pokusaj ponovo"
+            onAction={fetchWishlist}
+          />
+        </View>
+      ) : items.length === 0 ? (
         <View className="px-4 pt-4">
           <EditorialEmptyState
             icon="bookmark-outline"

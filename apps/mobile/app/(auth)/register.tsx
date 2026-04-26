@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   KeyboardAvoidingView,
   Platform,
@@ -6,6 +6,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native'
 import { useRouter } from 'expo-router'
@@ -28,9 +29,28 @@ function maskEmail(email: string) {
   return `${localPart.slice(0, 2)}***@${domain}`
 }
 
+function getEmailRegisterError(error: any) {
+  const code = error?.code || error?.nativeErrorCode || ''
+
+  if (code === 'auth/email-already-in-use') {
+    return 'Ovaj email vec ima nalog. Vrati se na prijavu.'
+  }
+  if (code === 'auth/invalid-email') return 'Unesi ispravan email.'
+  if (code === 'auth/weak-password') return 'Lozinka je preslaba. Koristi najmanje 8 karaktera.'
+  if (code === 'auth/operation-not-allowed') {
+    return 'Email registracija trenutno nije ukljucena za ovu aplikaciju.'
+  }
+  if (code === 'auth/network-request-failed' || error?.message?.includes('Network')) {
+    return 'Nema stabilne internet konekcije. Proveri mrezu i pokusaj ponovo.'
+  }
+
+  return 'Nije moguce napraviti nalog trenutno. Pokusaj ponovo.'
+}
+
 export default function RegisterScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const { height } = useWindowDimensions()
   const { registerWithEmail } = useAuth()
   const { t } = useI18n()
 
@@ -42,18 +62,13 @@ export default function RegisterScreen() {
   const passwordRef = useRef<TextInput>(null)
   const scrollRef = useRef<ScrollView>(null)
 
-  const scrollToForm = useCallback(() => {
-    setTimeout(() => {
-      scrollRef.current?.scrollToEnd({ animated: true })
-    }, 180)
-  }, [])
-
   async function handleRegister() {
     setError('')
+    const normalizedEmail = email.trim()
 
-    if (!validateEmail(email)) {
+    if (!validateEmail(normalizedEmail)) {
       console.warn('[RegisterScreen] Registration blocked because email is invalid', {
-        email: maskEmail(email),
+        email: maskEmail(normalizedEmail),
       })
       setError('Unesi ispravan email.')
       return
@@ -69,12 +84,12 @@ export default function RegisterScreen() {
     }
 
     console.log('[RegisterScreen] Register pressed', {
-      email: maskEmail(email),
+      email: maskEmail(normalizedEmail),
       passwordLength: password.length,
     })
     setLoading(true)
     try {
-      await registerWithEmail(email, password)
+      await registerWithEmail(normalizedEmail, password)
       console.log('[RegisterScreen] Registration request resolved successfully')
     } catch (e: any) {
       console.error('[RegisterScreen] Registration failed', {
@@ -82,15 +97,7 @@ export default function RegisterScreen() {
         message: e?.message,
         nativeErrorCode: e?.nativeErrorCode,
       })
-      if (e.code === 'auth/email-already-in-use') {
-        setError('Ovaj email je vec registrovan.')
-      } else if (e.code === 'auth/network-request-failed') {
-        setError('Firebase nije dostupan. Proveri internet na emulatoru ili pokreni app ponovo.')
-      } else if (e.code === 'auth/invalid-email') {
-        setError('Neispravan email format.')
-      } else {
-        setError('Greska pri registraciji. Pokusaj ponovo.')
-      }
+      setError(getEmailRegisterError(e))
     } finally {
       setLoading(false)
     }
@@ -99,8 +106,8 @@ export default function RegisterScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-base-canvas"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
       style={{ flex: 1 }}
     >
       <BrandBackground />
@@ -109,18 +116,21 @@ export default function RegisterScreen() {
         ref={scrollRef}
         contentContainerStyle={{
           flexGrow: 1,
-          justifyContent: 'space-between',
+          justifyContent: 'center',
           paddingHorizontal: 20,
-          paddingTop: Math.max(insets.top + 28, 64),
-          paddingBottom: Math.max(insets.bottom + 32, 40),
+          paddingTop: Math.max(insets.top + 24, 48),
+          paddingBottom: Math.max(insets.bottom + 28, 36),
+          minHeight: height,
         }}
-        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 180 }}>
-          <BrandWordmark width={220} />
+        <View className="items-center" style={{ marginBottom: 28 }}>
+          <BrandWordmark width={176} />
+          <Text className="mt-4 text-center font-sans text-sm text-ink-dark/60">
+            {t('auth.registerDescription')}
+          </Text>
         </View>
 
         <GlassSurface style={{ paddingHorizontal: 20, paddingVertical: 20 }}>
@@ -136,7 +146,6 @@ export default function RegisterScreen() {
             returnKeyType="next"
             onSubmitEditing={() => passwordRef.current?.focus()}
             blurOnSubmit={false}
-            onFocus={scrollToForm}
           />
 
           <TextInput
@@ -149,7 +158,6 @@ export default function RegisterScreen() {
             onChangeText={setPassword}
             returnKeyType="done"
             onSubmitEditing={handleRegister}
-            onFocus={scrollToForm}
           />
 
           {error ? (

@@ -23,6 +23,7 @@ export type DiscoveryCardItem = {
   size?: string;
   price?: number;
   listingType?: 'sell' | 'trade' | 'both';
+  status?: string;
   userId?: Owner | string;
 };
 

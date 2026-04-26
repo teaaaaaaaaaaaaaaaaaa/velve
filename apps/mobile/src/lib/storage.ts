@@ -3,6 +3,7 @@ import { NativeModules, TurboModuleRegistry } from 'react-native'
 type StorageLike = {
   getItem: (key: string) => Promise<string | null>
   setItem: (key: string, value: string) => Promise<void>
+  removeItem: (key: string) => Promise<void>
 }
 
 const memoryStorage = new Map<string, string>()
@@ -33,6 +34,9 @@ function createFallbackStorage(): StorageLike {
     async setItem(key, value) {
       memoryStorage.set(key, value)
     },
+    async removeItem(key) {
+      memoryStorage.delete(key)
+    },
   }
 }
 
@@ -61,7 +65,8 @@ function resolveStorage(): StorageLike {
     if (
       asyncStorage &&
       typeof asyncStorage.getItem === 'function' &&
-      typeof asyncStorage.setItem === 'function'
+      typeof asyncStorage.setItem === 'function' &&
+      typeof asyncStorage.removeItem === 'function'
     ) {
       cachedStorage = asyncStorage as StorageLike
       return cachedStorage

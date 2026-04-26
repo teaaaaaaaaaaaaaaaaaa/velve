@@ -23,6 +23,7 @@ import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { RemoteImage } from '@/components/RemoteImage'
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
+import { getApiErrorMessage } from '@/lib/apiErrors'
 import { getPrimaryItemImage } from '@/lib/itemImages'
 
 type ClosetCounts = {
@@ -106,6 +107,27 @@ function formatJoinedDate(
   )
 }
 
+function ProfileQuickAction({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap
+  label: string
+  onPress: () => void
+}) {
+  return (
+    <TouchableOpacity className="flex-1 items-center" activeOpacity={0.86} onPress={onPress}>
+      <View className="h-14 w-14 items-center justify-center rounded-full bg-surface-soft">
+        <Ionicons name={icon} size={22} color={colors.accentDeep} />
+      </View>
+      <Text className="mt-2 text-center font-sans text-xs font-semibold text-ink-dark">
+        {label}
+      </Text>
+    </TouchableOpacity>
+  )
+}
+
 export default function ProfileScreen() {
   const router = useRouter()
   const { t, formatDate } = useI18n()
@@ -130,7 +152,6 @@ export default function ProfileScreen() {
       profile.location?.city
         ? `${profile.location.city}${profile.location.region ? `, ${profile.location.region}` : ''}`
         : null,
-      profile.favoriteBrands?.[0] ? `Brand: ${profile.favoriteBrands[0]}` : null,
       profile.emailVerified ? 'Email verifikovan' : null,
     ].filter(Boolean) as string[]
   }, [profile])
@@ -160,8 +181,7 @@ export default function ProfileScreen() {
       setLoading(true)
       await loadProfile()
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'Profil trenutno nije moguce ucitati.'
+      const message = getApiErrorMessage(error, 'Profil trenutno nije moguce ucitati.')
       Alert.alert('Greska', message)
     } finally {
       setLoading(false)
@@ -186,8 +206,8 @@ export default function ProfileScreen() {
           setWishlistItems(response.data.data || [])
         }
       }
-    } catch {
-      // Keep the section quiet and retry on next refresh.
+    } catch (error) {
+      console.warn('[Profile] Tab content unavailable', getApiErrorMessage(error, ''))
     } finally {
       setTabLoading(false)
     }
@@ -237,8 +257,8 @@ export default function ProfileScreen() {
         if (response.data.ok) {
           setEditPhotoURL(response.data.data.url as string)
         }
-      } catch {
-        Alert.alert('Greska', 'Avatar trenutno nije moguce uploadovati.')
+      } catch (error) {
+        Alert.alert('Greska', getApiErrorMessage(error, 'Avatar trenutno nije moguce uploadovati.'))
       } finally {
         setUploading(false)
       }
@@ -265,8 +285,8 @@ export default function ProfileScreen() {
         hydrateEditState(nextProfile)
         setModalVisible(false)
       }
-    } catch {
-      Alert.alert('Greska', 'Profil nije sacuvan.')
+    } catch (error) {
+      Alert.alert('Greska', getApiErrorMessage(error, 'Profil nije sacuvan.'))
     } finally {
       setUploading(false)
     }
@@ -278,7 +298,7 @@ export default function ProfileScreen() {
 
   if (!profile) {
     return (
-      <View className="flex-1 bg-base-canvas px-4 pt-24">
+      <View className="flex-1 bg-surface-panel px-4 pt-24">
         <EditorialEmptyState
           icon="person-outline"
           title={t('profile.emptyTitle')}
@@ -293,7 +313,7 @@ export default function ProfileScreen() {
   return (
     <>
       <ScrollView
-        className="flex-1 bg-base-canvas"
+        className="flex-1 bg-surface-panel"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={{ paddingBottom: 120 }}
       >
@@ -302,7 +322,6 @@ export default function ProfileScreen() {
           <View className="mb-5 flex-row items-center justify-between">
             <View className="flex-1 pr-4">
               <BrandWordmark width={118} />
-              <Text className="font-display text-4xl text-ink-dark">{t('profile.title')}</Text>
             </View>
             <TouchableOpacity
               className="h-11 w-11 items-center justify-center rounded-full bg-surface-tint"
@@ -347,7 +366,6 @@ export default function ProfileScreen() {
 
               <View className="ml-4 flex-1">
                 <Text className="font-display text-4xl text-ink-dark">{profile.displayName}</Text>
-                <Text className="mt-1 font-sans text-sm text-ink-dark/55">{profile.email}</Text>
                 <Text className="mt-2 font-sans text-sm text-brand-accent-deep">
                   {formatJoinedDate(
                     profile.joinedAt,
@@ -386,6 +404,12 @@ export default function ProfileScreen() {
                 <Text className="font-display text-3xl text-ink-dark">{profile.closetCounts.live}</Text>
                 <Text className="font-sans text-xs text-ink-dark/50">{t('profile.active')}</Text>
               </View>
+              <View className="items-center">
+                <Text className="font-display text-3xl text-ink-dark">
+                  {profile.successfulSwaps || profile.completedTrades || 0}
+                </Text>
+                <Text className="font-sans text-xs text-ink-dark/50">Razmene</Text>
+              </View>
             </View>
 
             <View className="mt-4 flex-row flex-wrap gap-2">
@@ -415,34 +439,45 @@ export default function ProfileScreen() {
               ) : null}
             </View>
 
-            <View className="mt-5 flex-row gap-3">
-              <TouchableOpacity
-                className="flex-1 items-center rounded-full bg-brand-accent-deep px-4 py-3"
+            <View className="mt-6 flex-row rounded-[28px] bg-base-canvas px-3 py-4">
+              <ProfileQuickAction
+                icon="create-outline"
+                label="Edit"
                 onPress={() => setModalVisible(true)}
-              >
-                <Text className="font-sans text-sm font-semibold text-base-canvas">
-                  {t('profile.edit')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                className="flex-1 items-center rounded-full border border-ink-dark/10 bg-base-canvas px-4 py-3"
+              />
+              <ProfileQuickAction
+                icon="shirt-outline"
+                label="Closet"
                 onPress={() => router.push('/(tabs)/closet')}
-              >
-                <Text className="font-sans text-sm font-semibold text-ink-dark">
-                  {t('profile.closet')}
-                </Text>
-              </TouchableOpacity>
+              />
+              <ProfileQuickAction
+                icon="bookmark-outline"
+                label="Saved"
+                onPress={() => {
+                  setActiveTab('saved')
+                  loadTabContent('saved')
+                }}
+              />
+              <ProfileQuickAction
+                icon="settings-outline"
+                label="Settings"
+                onPress={() => router.push('/settings')}
+              />
             </View>
 
-            <View className="mt-3 flex-row justify-end">
-              <TouchableOpacity
-                className="rounded-full bg-base-canvas px-4 py-2.5"
-                onPress={() => router.push('/trade-archive')}
-              >
-                <Text className="font-sans text-xs font-semibold text-ink-dark/70">
-                  Arhiva tradeova
+            <View className="mt-4 flex-row gap-3">
+              <View className="flex-1 rounded-[22px] bg-base-canvas px-4 py-4">
+                <Text className="font-sans text-[11px] uppercase text-ink-dark/45">Profil</Text>
+                <Text className="mt-1 font-sans text-lg font-bold text-ink-dark">
+                  {profile.profileCompleteness || 0}%
                 </Text>
-              </TouchableOpacity>
+              </View>
+              <View className="flex-1 rounded-[22px] bg-base-canvas px-4 py-4">
+                <Text className="font-sans text-[11px] uppercase text-ink-dark/45">Ormar</Text>
+                <Text className="mt-1 font-sans text-lg font-bold text-ink-dark">
+                  {profile.closetCounts.live} live / {profile.closetCounts.drafts} drafts
+                </Text>
+              </View>
             </View>
           </View>
 

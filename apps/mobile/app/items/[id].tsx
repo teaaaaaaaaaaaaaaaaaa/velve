@@ -1,5 +1,6 @@
 ﻿import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -78,6 +79,50 @@ const LISTING_LABELS: Record<'trade' | 'sell' | 'both', string> = {
   both: 'Oba',
 };
 const SCREEN_HEIGHT = Dimensions.get('window').height;
+
+function DetailInfoPill({
+  icon,
+  label,
+  value,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View className="min-w-[46%] flex-1 rounded-[24px] bg-base-canvas px-4 py-4">
+      <View className="mb-3 h-9 w-9 items-center justify-center rounded-full bg-surface-soft">
+        <Ionicons name={icon} size={17} color={colors.accentDeep} />
+      </View>
+      <Text className="font-sans text-[11px] uppercase text-ink-dark/45">{label}</Text>
+      <Text className="mt-1 font-sans text-base font-bold text-ink-dark" numberOfLines={1}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function DetailPanel({
+  icon,
+  title,
+  children,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <View className="mt-4 rounded-[26px] bg-base-canvas px-4 py-4">
+      <View className="mb-3 flex-row items-center">
+        <View className="mr-2 h-8 w-8 items-center justify-center rounded-full bg-surface-soft">
+          <Ionicons name={icon} size={16} color={colors.accentDeep} />
+        </View>
+        <Text className="font-sans text-xs font-bold uppercase text-ink-dark/55">{title}</Text>
+      </View>
+      {children}
+    </View>
+  );
+}
 
 export default function ItemDetailsScreen() {
   const { id, viewOnly, openTrade } = useLocalSearchParams<{
@@ -462,7 +507,7 @@ export default function ItemDetailsScreen() {
   const sellerLocation = owner?.location?.city
     ? `${owner.location.city}${owner.location.region ? `, ${owner.location.region}` : ''}`
     : null;
-  const heroCardBottomOffset = 126;
+  const heroCardBottomOffset = 58;
 
   const renderTradeModal = () => (
     <Modal
@@ -758,46 +803,46 @@ export default function ItemDetailsScreen() {
   );
 
   return (
-    <View className="flex-1 bg-base-canvas">
+    <View className="flex-1 bg-surface-panel">
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
-        snapToOffsets={[0, SCREEN_HEIGHT - 150]}
+        snapToOffsets={[0, SCREEN_HEIGHT - 86]}
         decelerationRate="fast"
       >
-        <View style={{ height: SCREEN_HEIGHT - 90 }} className="bg-brand-accent-deep">
+        <View style={{ height: SCREEN_HEIGHT - 8 }} className="bg-surface-panel">
           {heroImage ? (
             <RemoteImage
               uri={heroImage}
               className="h-full w-full"
               contentFit="contain"
+              imageStyle={{ backgroundColor: colors.panel }}
               fallback={
-                <View className="h-full w-full items-center justify-center bg-brand-accent-deep">
-                  <Ionicons name="shirt-outline" size={56} color="#F6F8ED" />
+                <View className="h-full w-full items-center justify-center bg-surface-panel">
+                  <Ionicons name="shirt-outline" size={56} color={colors.accentDeep} />
                 </View>
               }
             />
           ) : (
-            <View className="h-full items-center justify-center bg-brand-accent-deep">
-              <Ionicons name="shirt-outline" size={56} color="#F6F8ED" />
+            <View className="h-full items-center justify-center bg-surface-panel">
+              <Ionicons name="shirt-outline" size={56} color={colors.accentDeep} />
             </View>
           )}
-          <View className="absolute inset-0 bg-black/20" />
           <TouchableOpacity
             onPress={() => router.back()}
-            className="absolute left-4 h-11 w-11 items-center justify-center rounded-full bg-black/30"
+            className="absolute left-4 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
             style={{ top: insets.top + 10 }}
           >
-            <Ionicons name="arrow-back" size={22} color="white" />
+            <Ionicons name="arrow-back" size={22} color={colors.inkDark} />
           </TouchableOpacity>
           {!isOwn && !isViewOnly ? (
             <TouchableOpacity
               onPress={showActions}
-              className="absolute right-4 h-11 w-11 items-center justify-center rounded-full bg-black/30"
+              className="absolute right-4 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
               style={{ top: insets.top + 10 }}
             >
-              <Ionicons name="ellipsis-horizontal" size={22} color="white" />
+              <Ionicons name="ellipsis-horizontal" size={22} color={colors.inkDark} />
             </TouchableOpacity>
           ) : null}
           <ItemHeroOverlay
@@ -823,13 +868,14 @@ export default function ItemDetailsScreen() {
             showOwnerArrow={!isOwn}
           />
           {!isViewOnly ? (
-            <View className="absolute right-3 items-center gap-3" style={{ bottom: heroCardBottomOffset + 110 }}>
+            <View className="absolute right-3 items-center gap-3" style={{ bottom: heroCardBottomOffset + 118 }}>
               <GlassCountActionButton
                 icon={isLiked ? 'heart' : 'heart-outline'}
                 count={likesCount}
                 active={isLiked}
                 onPress={handleLike}
                 accessibilityLabel="Lajkuj predmet"
+                tone="dark"
               />
               {!isOwn && showProposalButton ? (
                 <GlassCountActionButton
@@ -837,6 +883,7 @@ export default function ItemDetailsScreen() {
                   count={tradeRequestsCount}
                   onPress={openTradeComposer}
                   accessibilityLabel="Posalji predlog"
+                  tone="dark"
                 />
               ) : null}
               {!isOwn ? (
@@ -846,6 +893,7 @@ export default function ItemDetailsScreen() {
                   active={isWishlisted}
                   onPress={handleWishlist}
                   accessibilityLabel="Sacuvaj predmet"
+                  tone="dark"
                 />
               ) : null}
               {!isOwn && hasDigitizedImage(item) ? (
@@ -853,6 +901,7 @@ export default function ItemDetailsScreen() {
                   icon="body-outline"
                   onPress={handleTryOn}
                   accessibilityLabel="Probaj na sebi"
+                  tone="dark"
                 />
               ) : null}
               {isOwn ? (
@@ -862,91 +911,90 @@ export default function ItemDetailsScreen() {
                       icon="sparkles-outline"
                       onPress={handleDigitize}
                       accessibilityLabel="Digitizuj predmet"
+                      tone="dark"
                     />
                   ) : null}
                   <GlassCountActionButton
                     icon="pencil-outline"
                     onPress={() => setShowEditModal(true)}
                     accessibilityLabel="Izmeni objavu"
+                    tone="dark"
                   />
                   <GlassCountActionButton
                     icon="trash-outline"
                     onPress={handleDelete}
                     accessibilityLabel="Obrisi objavu"
+                    tone="dark"
                   />
                 </>
               ) : null}
             </View>
           ) : null}
         </View>
-        <View className="-mt-10 rounded-t-[36px] bg-base-canvas px-5 pt-4">
+        <View className="-mt-2 rounded-t-[36px] bg-surface-panel px-5 pt-4">
           <View className="mb-5 items-center">
             <View className="h-1 w-10 rounded-full bg-ink-dark/20" />
           </View>
-          <View className="mb-4 flex-row items-center justify-between">
-            <View className="rounded-full bg-brand-accent-deep/8 px-3 py-2">
-              <Text className="font-sans text-xs font-semibold text-brand-accent-deep">
+
+          <View className="mb-5 flex-row items-center justify-between">
+            <View className="flex-row items-center rounded-full bg-surface-soft px-3 py-2">
+              <Ionicons name="sparkles-outline" size={14} color={colors.accentDeep} />
+              <Text className="ml-1.5 font-sans text-xs font-bold text-brand-accent-deep">
                 {LISTING_LABELS[item.listingType || 'trade']}
               </Text>
             </View>
             {showPrice ? (
-              <Text className="font-sans text-lg font-semibold text-brand-accent-deep">
-                {item.price} EUR
-              </Text>
+              <View className="rounded-full bg-brand-accent-deep px-4 py-2.5">
+                <Text className="font-sans text-base font-bold text-base-canvas">
+                  {item.price} EUR
+                </Text>
+              </View>
             ) : null}
           </View>
 
           <View className="mb-5 flex-row flex-wrap gap-3">
-            <View className="min-w-[46%] flex-1 rounded-[22px] bg-surface-panel px-4 py-4">
-              <Text className="font-sans text-[11px] uppercase text-ink-dark/45">Kategorija</Text>
-              <Text className="mt-1 font-sans text-sm font-semibold text-ink-dark">
-                {item.category || 'Nije uneto'}
-              </Text>
-            </View>
-            <View className="min-w-[46%] flex-1 rounded-[22px] bg-surface-panel px-4 py-4">
-              <Text className="font-sans text-[11px] uppercase text-ink-dark/45">Velicina</Text>
-              <Text className="mt-1 font-sans text-sm font-semibold text-ink-dark">
-                {item.size ? item.size.toUpperCase() : 'Nije uneto'}
-              </Text>
-            </View>
-            <View className="min-w-[46%] flex-1 rounded-[22px] bg-surface-panel px-4 py-4">
-              <Text className="font-sans text-[11px] uppercase text-ink-dark/45">Stanje</Text>
-              <Text className="mt-1 font-sans text-sm font-semibold text-ink-dark">
-                {CONDITION_LABELS[item.condition]}
-              </Text>
-            </View>
-            <View className="min-w-[46%] flex-1 rounded-[22px] bg-surface-panel px-4 py-4">
-              <Text className="font-sans text-[11px] uppercase text-ink-dark/45">Brend</Text>
-              <Text className="mt-1 font-sans text-sm font-semibold text-ink-dark">
-                {item.brand || 'Bez brenda'}
-              </Text>
-            </View>
+            <DetailInfoPill icon="albums-outline" label="Kategorija" value={item.category || 'Nije uneto'} />
+            <DetailInfoPill icon="resize-outline" label="Velicina" value={item.size ? item.size.toUpperCase() : 'Nije uneto'} />
+            <DetailInfoPill icon="diamond-outline" label="Stanje" value={CONDITION_LABELS[item.condition]} />
+            <DetailInfoPill icon="pricetag-outline" label="Brend" value={item.brand || 'Bez brenda'} />
           </View>
 
-          <Text className="font-sans text-[15px] leading-6 text-ink-dark">
-            {item.description ||
-              'Ovaj komad jos nema opis, ali slicni predlozi i seller signal ispod daju dodatni kontekst.'}
-          </Text>
+          <DetailPanel icon="document-text-outline" title="Opis">
+            <Text className="font-sans text-[15px] leading-6 text-ink-dark">
+              {item.description ||
+                'Ovaj komad jos nema opis, ali seller signal i slicni predlozi ispod daju dodatni kontekst.'}
+            </Text>
+          </DetailPanel>
           {showTradeFor ? (
-            <View className="mt-4 rounded-[22px] bg-surface-panel px-4 py-4">
-              <Text className="font-sans text-[11px] uppercase text-ink-dark/45">
-                Trazi za razmenu
-              </Text>
-              <Text className="mt-1 font-sans text-sm text-ink-dark">{item.tradeFor}</Text>
-            </View>
+            <DetailPanel icon="repeat-outline" title="Trazi za razmenu">
+              <Text className="font-sans text-sm leading-6 text-ink-dark">{item.tradeFor}</Text>
+            </DetailPanel>
           ) : null}
           {owner ? (
-            <View className="mt-4 rounded-[22px] bg-surface-panel px-4 py-4">
-              <Text className="font-sans text-[11px] uppercase text-ink-dark/45">
-                Seller signal
-              </Text>
-              <Text className="mt-1 font-sans text-sm text-ink-dark">
-                {sellerLocation ? `${sellerLocation} / ` : ''}
-                {owner.averageRating
-                  ? `${owner.averageRating.toFixed(1)} rating`
-                  : 'Bez ocena'} / {owner.completedTrades || 0} zavrsenih razmena
-              </Text>
-            </View>
+            <DetailPanel icon="person-circle-outline" title="Seller signal">
+              <View className="flex-row flex-wrap gap-2">
+                {sellerLocation ? (
+                  <View className="flex-row items-center rounded-full bg-brand-highlight px-3 py-2">
+                    <Ionicons name="location" size={13} color={colors.inkDark} />
+                    <Text className="ml-1.5 font-sans text-xs font-bold text-ink-dark">
+                      {sellerLocation}
+                    </Text>
+                  </View>
+                ) : null}
+                <View className="flex-row items-center rounded-full bg-surface-soft px-3 py-2">
+                  <Ionicons name="star-outline" size={13} color={colors.inkDark} />
+                  <Text className="ml-1.5 font-sans text-xs font-semibold text-ink-dark">
+                    {owner.averageRating ? `${owner.averageRating.toFixed(1)} rating` : 'Bez ocena'}
+                  </Text>
+                </View>
+                <View className="flex-row items-center rounded-full bg-surface-soft px-3 py-2">
+                  <Ionicons name="swap-horizontal" size={13} color={colors.inkDark} />
+                  <Text className="ml-1.5 font-sans text-xs font-semibold text-ink-dark">
+                    {owner.completedTrades || 0} razmena
+                  </Text>
+                </View>
+              </View>
+            </DetailPanel>
           ) : null}
           {!isViewOnly && (showProposalButton || isOwn) ? (
             <View className="mt-5 flex-row gap-3">

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   Alert,
   KeyboardAvoidingView,
@@ -7,6 +7,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native'
 import { useRouter } from 'expo-router'
@@ -25,9 +26,38 @@ function maskEmail(email: string) {
   return `${localPart.slice(0, 2)}***@${domain}`
 }
 
+function validateEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+}
+
+function getEmailLoginError(error: any) {
+  const code = error?.code || error?.nativeErrorCode || ''
+
+  if (
+    code === 'auth/user-not-found' ||
+    code === 'auth/wrong-password' ||
+    code === 'auth/invalid-credential' ||
+    code === 'auth/invalid-login-credentials'
+  ) {
+    return 'Pogresan email ili lozinka.'
+  }
+
+  if (code === 'auth/invalid-email') return 'Unesi ispravan email.'
+  if (code === 'auth/user-disabled') return 'Ovaj nalog je deaktiviran.'
+  if (code === 'auth/too-many-requests') {
+    return 'Previse pokusaja. Sacekaj malo pa probaj ponovo.'
+  }
+  if (code === 'auth/network-request-failed' || error?.message?.includes('Network')) {
+    return 'Nema stabilne internet konekcije. Proveri mrezu i pokusaj ponovo.'
+  }
+
+  return 'Nije moguce prijaviti se trenutno. Pokusaj ponovo.'
+}
+
 export default function LoginScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const { height } = useWindowDimensions()
   const {
     signInWithGoogle,
     signInWithEmail,
@@ -45,39 +75,28 @@ export default function LoginScreen() {
   const passwordRef = useRef<TextInput>(null)
   const scrollRef = useRef<ScrollView>(null)
 
-  const scrollToForm = useCallback(() => {
-    setTimeout(() => {
-      scrollRef.current?.scrollToEnd({ animated: true })
-    }, 180)
-  }, [])
-
-  useEffect(() => {
-    if (!showEmailLogin) return
-
-    console.log('[LoginScreen] Email login form opened')
-    const timeoutId = setTimeout(() => {
-      scrollRef.current?.scrollToEnd({ animated: true })
-    }, 120)
-
-    return () => clearTimeout(timeoutId)
-  }, [showEmailLogin])
-
   async function handleEmailLogin() {
     setError('')
+    const normalizedEmail = email.trim()
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       console.warn('[LoginScreen] Email login blocked because fields are empty')
       setError('Unesi email i lozinku.')
       return
     }
 
+    if (!validateEmail(normalizedEmail)) {
+      setError('Unesi ispravan email.')
+      return
+    }
+
     console.log('[LoginScreen] Email login pressed', {
-      email: maskEmail(email),
+      email: maskEmail(normalizedEmail),
       passwordLength: password.length,
     })
     setLoading(true)
     try {
-      await signInWithEmail(email, password)
+      await signInWithEmail(normalizedEmail, password)
       console.log('[LoginScreen] Email login request resolved successfully')
     } catch (e: any) {
       console.error('[LoginScreen] Email login failed', {
@@ -85,17 +104,7 @@ export default function LoginScreen() {
         message: e?.message,
         nativeErrorCode: e?.nativeErrorCode,
       })
-      if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
-        setError('Pogresan email ili lozinka.')
-      } else if (e.code === 'auth/network-request-failed') {
-        setError('Firebase nije dostupan. Proveri internet na emulatoru ili pokreni app ponovo.')
-      } else if (e.code === 'auth/wrong-password') {
-        setError('Pogresna lozinka.')
-      } else if (e.code === 'auth/too-many-requests') {
-        setError('Previse pokusaja. Pokusaj ponovo kasnije.')
-      } else {
-        setError('Greska pri prijavi. Pokusaj ponovo.')
-      }
+      setError(getEmailLoginError(e))
     } finally {
       setLoading(false)
     }
@@ -137,8 +146,8 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-base-canvas"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
       style={{ flex: 1 }}
     >
       <BrandBackground />
@@ -147,18 +156,21 @@ export default function LoginScreen() {
         ref={scrollRef}
         contentContainerStyle={{
           flexGrow: 1,
-          justifyContent: 'space-between',
+          justifyContent: 'center',
           paddingHorizontal: 20,
-          paddingTop: Math.max(insets.top + 28, 64),
-          paddingBottom: Math.max(insets.bottom + 32, 40),
+          paddingTop: Math.max(insets.top + 24, 48),
+          paddingBottom: Math.max(insets.bottom + 28, 36),
+          minHeight: height,
         }}
-        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 180 }}>
-          <BrandWordmark width={220} />
+        <View className="items-center" style={{ marginBottom: showEmailLogin ? 28 : 40 }}>
+          <BrandWordmark width={showEmailLogin ? 176 : 220} />
+          <Text className="mt-4 text-center font-sans text-sm text-ink-dark/60">
+            {t('auth.tagline')}
+          </Text>
         </View>
 
         <GlassSurface style={{ paddingHorizontal: 20, paddingVertical: 20 }}>
@@ -176,7 +188,6 @@ export default function LoginScreen() {
                 returnKeyType="next"
                 onSubmitEditing={() => passwordRef.current?.focus()}
                 blurOnSubmit={false}
-                onFocus={scrollToForm}
               />
 
               <TextInput
@@ -189,7 +200,6 @@ export default function LoginScreen() {
                 onChangeText={setPassword}
                 returnKeyType="done"
                 onSubmitEditing={handleEmailLogin}
-                onFocus={scrollToForm}
               />
 
               {error ? (
@@ -210,13 +220,10 @@ export default function LoginScreen() {
 
               <TouchableOpacity
                 className="mt-3 items-center rounded-pill border border-ink-dark/10 bg-base-canvas/70 px-4 py-4"
-                onPress={() => {
-                  setShowEmailLogin(false)
-                  setError('')
-                }}
+                onPress={() => router.push('/(auth)/register')}
               >
                 <Text className="font-sans text-base font-medium text-ink-dark">
-                  {t('common.close')}
+                  {t('auth.register')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -272,14 +279,16 @@ export default function LoginScreen() {
             </View>
           )}
 
-          <View className="mt-5 flex-row items-center justify-between">
-            <Text className="font-sans text-sm text-ink-dark/50">{t('auth.tagline')}</Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+          {!showEmailLogin ? (
+            <TouchableOpacity
+              className="mt-5 items-center"
+              onPress={() => router.push('/(auth)/register')}
+            >
               <Text className="font-sans text-sm font-semibold text-brand-accent-deep">
-                {showEmailLogin ? t('auth.noAccount') : t('auth.register')}
+                {t('auth.register')}
               </Text>
             </TouchableOpacity>
-          </View>
+          ) : null}
         </GlassSurface>
       </ScrollView>
     </KeyboardAvoidingView>

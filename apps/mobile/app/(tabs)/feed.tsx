@@ -25,6 +25,7 @@ import { ImmersiveFeedCard, ImmersiveFeedItem } from '@/components/ImmersiveFeed
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
 import { prefetchImageUri } from '@/lib/expoImage'
+import { getApiErrorMessage } from '@/lib/apiErrors'
 import { getPrimaryItemImage } from '@/lib/itemImages'
 import { normalizeImageUri } from '@/lib/images'
 
@@ -53,8 +54,13 @@ export default function FeedScreen() {
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const [isFirstTime, setIsFirstTime] = useState(true)
   const [actionItem, setActionItem] = useState<ImmersiveFeedItem | null>(null)
+  const [feedError, setFeedError] = useState('')
+  const feedInFlightKeysRef = useRef(new Set<string>())
+  const feedRequestVersionRef = useRef(0)
+  const feedModeRef = useRef(feedMode)
+  const firstTimeFeedRef = useRef(true)
+  feedModeRef.current = feedMode
 
   // --- Inline search state ---
   const [searchActive, setSearchActive] = useState(false)
@@ -135,6 +141,19 @@ export default function FeedScreen() {
       mode: 'replace' | 'append' = 'replace',
       excludeIds: string[] = []
     ) => {
+      const requestKey = `${feedMode}:${mode}:${pageNum}:${excludeIds.join('|')}`
+
+      if (feedInFlightKeysRef.current.has(requestKey)) {
+        if (mode === 'replace') setRefreshing(false)
+        return
+      }
+
+      feedInFlightKeysRef.current.add(requestKey)
+      const requestVersion =
+        mode === 'replace' ? ++feedRequestVersionRef.current : feedRequestVersionRef.current
+      const isCurrentRequest = () =>
+        feedModeRef.current === feedMode && requestVersion === feedRequestVersionRef.current
+
       try {
         if (pageNum === 0 && mode === 'replace') setIsLoading(true)
         else setIsLoadingMore(true)
@@ -145,7 +164,7 @@ export default function FeedScreen() {
           mode: feedMode,
         }
 
-        if (feedMode === 'for_you' && pageNum === 0 && isFirstTime) {
+        if (feedMode === 'for_you' && pageNum === 0 && firstTimeFeedRef.current) {
           params.firstTime = 'true'
         }
 
@@ -156,27 +175,36 @@ export default function FeedScreen() {
         const response = await client.get('/api/feed', { params })
 
         if (response.data.ok) {
+          if (!isCurrentRequest()) {
+            return
+          }
+
           const nextItems = dedupeItemsById(response.data.data as ImmersiveFeedItem[])
           setItems((prev) =>
             mode === 'append' ? dedupeItemsById([...prev, ...nextItems]) : nextItems
           )
           setHasMore(response.data.hasMore)
+          setFeedError('')
 
-          if (pageNum === 0 && isFirstTime) {
-            setIsFirstTime(false)
+          if (pageNum === 0 && firstTimeFeedRef.current) {
+            firstTimeFeedRef.current = false
           }
         }
-      } catch {
-        if (pageNum === 0) {
+      } catch (error) {
+        if (pageNum === 0 && isCurrentRequest()) {
           setItems([])
+          setFeedError(getApiErrorMessage(error, 'Feed trenutno ne moze da se ucita.'))
         }
       } finally {
-        setIsLoading(false)
-        setIsLoadingMore(false)
-        setRefreshing(false)
+        feedInFlightKeysRef.current.delete(requestKey)
+        if (isCurrentRequest()) {
+          setIsLoading(false)
+          setIsLoadingMore(false)
+          setRefreshing(false)
+        }
       }
     },
-    [feedMode, isFirstTime]
+    [feedMode]
   )
 
   useEffect(() => {
@@ -419,7 +447,7 @@ export default function FeedScreen() {
   }
 
   return (
-    <View className="flex-1 bg-white">
+    <View className="flex-1 bg-surface-panel">
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
       {searchActive ? (
@@ -427,7 +455,7 @@ export default function FeedScreen() {
         searchLoading && searchItems.length === 0 ? (
           <BrandedLoader showSpinner />
         ) : searchItems.length === 0 ? (
-          <View className="flex-1 bg-white px-5 pt-24">
+          <View className="flex-1 bg-surface-panel px-5 pt-24">
             <EditorialEmptyState
               icon="search-outline"
               title="Nema rezultata za ovaj upit"
@@ -450,7 +478,9 @@ export default function FeedScreen() {
             maxToRenderPerBatch={2}
             windowSize={3}
             updateCellsBatchingPeriod={40}
-            removeClippedSubviews
+            removeClippedSubviews={false}
+            snapToInterval={pageHeight}
+            snapToAlignment="start"
             viewabilityConfig={searchViewabilityConfig.current}
             onEndReached={onSearchLoadMore}
             onEndReachedThreshold={0.55}
@@ -481,8 +511,18 @@ export default function FeedScreen() {
             }
           />
         )
+      ) : feedError ? (
+        <View className="flex-1 justify-center bg-surface-panel px-4 pt-20">
+          <EditorialEmptyState
+            icon="cloud-offline-outline"
+            title="Feed nije ucitan"
+            description={feedError}
+            actionLabel="Pokusaj ponovo"
+            onAction={() => fetchFeed(0)}
+          />
+        </View>
       ) : items.length === 0 ? (
-        <View className="flex-1 justify-center bg-base-canvas px-4 pt-20">
+        <View className="flex-1 justify-center bg-surface-panel px-4 pt-20">
           <EditorialEmptyState
             icon={feedMode === 'following' ? 'people-outline' : 'sparkles-outline'}
             title={
@@ -517,7 +557,9 @@ export default function FeedScreen() {
           maxToRenderPerBatch={2}
           windowSize={3}
           updateCellsBatchingPeriod={40}
-          removeClippedSubviews
+          removeClippedSubviews={false}
+          snapToInterval={pageHeight}
+          snapToAlignment="start"
           onViewableItemsChanged={onViewableItemsChanged.current}
           viewabilityConfig={viewabilityConfig.current}
           onEndReached={handleLoadMore}

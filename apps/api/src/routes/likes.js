@@ -5,6 +5,7 @@ const { requireAuth } = require('../middleware/auth')
 const Like = require('../models/Like')
 const Item = require('../models/Item')
 const { enrichItems } = require('../lib/enrichItems')
+const { sendPushToUser } = require('../lib/pushNotifications')
 
 // GET /api/likes — lajkovani itemi trenutnog korisnika
 router.get('/', requireAuth, async (req, res) => {
@@ -42,14 +43,20 @@ router.post('/:id/like', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid item ID' })
     }
 
-    const item = await Item.findById(req.params.id).lean()
+    const item = await Item.findOne({ _id: req.params.id, isDeleted: false }).lean()
     if (!item) {
       return res.status(404).json({ error: 'Item not found' })
+    }
+
+    if (item.status !== 'available') {
+      return res.status(400).json({ error: 'Item is not currently available' })
     }
 
     if (String(item.userId) === String(req.dbUser._id)) {
       return res.status(400).json({ error: 'Cannot like your own item' })
     }
+
+    const existingLike = await Like.exists({ userId: req.dbUser._id, itemId: req.params.id })
 
     await Like.findOneAndUpdate(
       { userId: req.dbUser._id, itemId: req.params.id },
@@ -58,6 +65,18 @@ router.post('/:id/like', requireAuth, async (req, res) => {
     )
 
     const enriched = await enrichItems(item, req.dbUser._id)
+
+    if (!existingLike) {
+      sendPushToUser(item.userId, {
+        title: 'Novi lajk',
+        body: `${req.dbUser.displayName || 'Korisnik'} je lajkovao/la "${item.title}"`,
+        data: {
+          type: 'item_like',
+          itemId: String(item._id),
+          userId: String(req.dbUser._id),
+        },
+      })
+    }
 
     res.json({
       ok: true,

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { memo } from 'react'
-import { StyleSheet, TouchableOpacity, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
 
 import { colors } from '@/design/tokens'
 import { RemoteImage } from '@/components/RemoteImage'
@@ -66,13 +66,12 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
   const router = useRouter()
   const imageUri = getPrimaryItemImage(item)
   const floatingTabBarHeight = 92
-  const contentBottomOffset = floatingTabBarHeight + Math.max(bottomInset, 12) + 12
+  const contentBottomOffset = floatingTabBarHeight + 2
 
   return (
-    <View style={{ height }} className="w-full bg-white">
-      <TouchableOpacity
+    <View style={{ height }} className="w-full bg-surface-panel">
+      <Pressable
         style={StyleSheet.absoluteFillObject}
-        activeOpacity={1}
         onPress={() => router.push(`/items/${item._id}`)}
       >
         {imageUri ? (
@@ -80,7 +79,7 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
             uri={imageUri}
             contentFit="contain"
             style={styles.containedImage}
-            imageStyle={{ backgroundColor: '#FFFFFF' }}
+            imageStyle={{ backgroundColor: colors.panel }}
             fallback={
               <View style={[StyleSheet.absoluteFillObject, styles.imageFallback]}>
                 <Ionicons name="shirt-outline" size={48} color={colors.accentDeep} />
@@ -92,7 +91,7 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
             <Ionicons name="shirt-outline" size={48} color={colors.accentDeep} />
           </View>
         )}
-      </TouchableOpacity>
+      </Pressable>
 
       <ItemHeroOverlay
         title={item.title}
@@ -158,12 +157,12 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
 const styles = StyleSheet.create({
   containedImage: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.panel,
   },
   imageFallback: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.panel,
     paddingHorizontal: 24,
   },
 })

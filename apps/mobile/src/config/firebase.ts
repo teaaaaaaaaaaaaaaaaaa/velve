@@ -7,6 +7,8 @@
 
 import Constants from 'expo-constants'
 
+import { getStorage } from '@/lib/storage'
+
 type AuthProviderInfo = {
   providerId?: string | null
 }
@@ -86,8 +88,12 @@ if (isExpoGo) {
       : firebaseAppModule.initializeApp(firebaseWebConfig)
 
   try {
+    const reactNativePersistence =
+      (firebaseAuthModule as any).getReactNativePersistence?.(getStorage()) ??
+      firebaseAuthModule.inMemoryPersistence
+
     auth = firebaseAuthModule.initializeAuth(firebaseApp as any, {
-      persistence: firebaseAuthModule.inMemoryPersistence,
+      persistence: reactNativePersistence,
     }) as typeof auth
   } catch {
     auth = firebaseAuthModule.getAuth(firebaseApp as any) as typeof auth
@@ -103,7 +109,7 @@ if (isExpoGo) {
   createGoogleCredentialInternal = (idToken) =>
     firebaseAuthModule.GoogleAuthProvider.credential(idToken)
 
-  console.log('[Firebase] Initialized Firebase web auth fallback for Expo Go')
+  console.log('[Firebase] Initialized Firebase web auth fallback for Expo Go with persistent storage')
   if (firebaseWebConfigError) {
     console.warn(`[Firebase] WARNING: ${firebaseWebConfigError}`)
   }

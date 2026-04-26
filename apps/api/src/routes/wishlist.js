@@ -6,6 +6,7 @@ const Wishlist = require('../models/Wishlist')
 const Item = require('../models/Item')
 const { enrichItems } = require('../lib/enrichItems')
 const { withPrimaryImage } = require('../lib/itemPresentation')
+const { sendPushToUser } = require('../lib/pushNotifications')
 
 // POST /api/wishlist/:itemId — Add item to wishlist (idempotent)
 router.post('/:itemId', requireAuth, async (req, res) => {
@@ -20,17 +21,38 @@ router.post('/:itemId', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Item not found' })
     }
 
+    if (item.status !== 'available') {
+      return res.status(400).json({ error: 'Item is not currently available' })
+    }
+
     // Cannot wishlist your own items
     if (item.userId.equals(req.dbUser._id)) {
       return res.status(400).json({ error: 'Cannot wishlist your own item' })
     }
 
     // Upsert - creates if doesn't exist, does nothing if already exists
+    const existingWishlist = await Wishlist.exists({
+      userId: req.dbUser._id,
+      itemId: req.params.itemId,
+    })
+
     const wishlist = await Wishlist.findOneAndUpdate(
       { userId: req.dbUser._id, itemId: req.params.itemId },
       { userId: req.dbUser._id, itemId: req.params.itemId },
       { upsert: true, new: true }
     )
+
+    if (!existingWishlist) {
+      sendPushToUser(item.userId, {
+        title: 'Komad je sacuvan',
+        body: `${req.dbUser.displayName || 'Korisnik'} je sacuvao/la "${item.title}"`,
+        data: {
+          type: 'item_wishlist',
+          itemId: String(item._id),
+          userId: String(req.dbUser._id),
+        },
+      })
+    }
 
     res.json({ ok: true, data: wishlist })
   } catch (err) {
@@ -81,7 +103,7 @@ router.get('/', requireAuth, async (req, res) => {
       .lean()
 
     const validItems = wishlistItems
-      .filter((entry) => entry.itemId && !entry.itemId.isDeleted)
+      .filter((entry) => entry.itemId && !entry.itemId.isDeleted && entry.itemId.status === 'available')
       .map((entry) => entry.itemId)
 
     const hasMore = validItems.length > limit

@@ -8,6 +8,7 @@ import { BrandedLoader } from '@/components/BrandedLoader'
 import { DiscoveryCardItem, DiscoveryItemCard } from '@/components/DiscoveryItemCard'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { RemoteImage } from '@/components/RemoteImage'
+import { getApiErrorMessage } from '@/lib/apiErrors'
 
 type PublicUser = {
   _id: string
@@ -28,23 +29,6 @@ type PublicUser = {
   profileCompleteness?: number
 }
 
-function TrustPill({
-  label,
-  value,
-}: {
-  label: string
-  value: string
-}) {
-  return (
-    <View className="mb-3 w-[48%] rounded-[22px] bg-base-canvas px-4 py-4">
-      <Text className="font-sans text-[11px] uppercase tracking-[1.1px] text-ink-dark/45">
-        {label}
-      </Text>
-      <Text className="mt-1 font-display text-2xl text-ink-dark">{value}</Text>
-    </View>
-  )
-}
-
 export default function PublicProfileScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -54,6 +38,7 @@ export default function PublicProfileScreen() {
   const [isFollowing, setIsFollowing] = useState(false)
   const [followersCount, setFollowersCount] = useState(0)
   const [followLoading, setFollowLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   const loadProfile = async () => {
     try {
@@ -73,9 +58,16 @@ export default function PublicProfileScreen() {
       if (itemsResponse.data.ok) {
         setItems(itemsResponse.data.data as DiscoveryCardItem[])
       }
-    } catch {
+      setErrorMessage('')
+    } catch (error) {
       setUser(null)
       setItems([])
+      setErrorMessage(
+        getApiErrorMessage(
+          error,
+          'Moguce je da je korisnik blokiran, uklonjen ili da je veza kratko pukla.'
+        )
+      )
     } finally {
       setLoading(false)
     }
@@ -177,9 +169,9 @@ export default function PublicProfileScreen() {
         <EditorialEmptyState
           icon="person-outline"
           title="Profil trenutno nije dostupan"
-          description="Moguce je da je korisnik blokiran, uklonjen ili da je veza kratko pukla."
-          actionLabel="Nazad na feed"
-          onAction={() => router.replace('/(tabs)/feed')}
+          description={errorMessage || 'Moguce je da je korisnik blokiran ili uklonjen.'}
+          actionLabel="Pokusaj ponovo"
+          onAction={loadProfile}
         />
       </View>
     )
@@ -269,6 +261,12 @@ export default function PublicProfileScreen() {
               <Text className="font-display text-2xl text-ink-dark">{user.followingCount || 0}</Text>
               <Text className="font-sans text-xs text-ink-dark/50">Prati</Text>
             </View>
+            <View className="flex-1 items-center">
+              <Text className="font-display text-2xl text-ink-dark">
+                {user.successfulSwaps || user.completedTrades || 0}
+              </Text>
+              <Text className="font-sans text-xs text-ink-dark/50">Razmene</Text>
+            </View>
           </View>
 
           <View className="mt-5 flex-row items-center gap-3">
@@ -291,36 +289,7 @@ export default function PublicProfileScreen() {
         </View>
 
         <View className="mt-8">
-          <Text className="font-display text-3xl text-ink-dark">Trust signali</Text>
-          <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/60">
-            Javno vidljivi pokazatelji koji cine profil pouzdanijim za trade odluke.
-          </Text>
-
-          <View className="mt-4 flex-row flex-wrap justify-between">
-            <TrustPill
-              label="Ocena"
-              value={user.averageRating ? user.averageRating.toFixed(1) : 'Novi profil'}
-            />
-            <TrustPill
-              label="Swaps"
-              value={String(user.successfulSwaps || user.completedTrades || 0)}
-            />
-            <TrustPill
-              label="Response rate"
-              value={user.responseRate == null ? 'N/A' : `${user.responseRate}%`}
-            />
-            <TrustPill
-              label="Profil"
-              value={`${user.profileCompleteness || 0}%`}
-            />
-          </View>
-        </View>
-
-        <View className="mt-8">
           <Text className="font-display text-3xl text-ink-dark">Objave</Text>
-          <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/60">
-            Aktivni komadi ovog profila koji su trenutno dostupni za discovery, trade ili kupovinu.
-          </Text>
 
           {items.length === 0 ? (
             <View className="mt-4">

@@ -54,7 +54,7 @@ router.get('/', requireAuth, async (req, res) => {
       })
         .sort({ createdAt: -1 })
         .limit(fetchLimit)
-        .populate('userId', 'displayName photoURL')
+        .populate('userId', 'displayName photoURL averageRating completedTrades location')
         .lean()
     } else {
       const items = await Item.find({
@@ -65,13 +65,13 @@ router.get('/', requireAuth, async (req, res) => {
       })
         .sort({ createdAt: -1 })
         .limit(fetchLimit)
-        .populate('userId', 'displayName photoURL')
+        .populate('userId', 'displayName photoURL averageRating completedTrades location')
         .lean()
 
       ranked = await rankFeedItems(items, req.dbUser, signals)
 
       // First-time user special treatment
-      if (isFirstTime) {
+      if (isFirstTime && ranked.length > limit) {
         // Filter: only show items with decent engagement or strong preference match
         ranked = ranked.filter(item => {
           return (item.normalizedEngagementScore || 0) >= 0.25 || item.preferenceScore >= 0.3

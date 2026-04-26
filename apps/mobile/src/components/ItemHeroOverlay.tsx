@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons'
-import { Text, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
 import { RemoteImage } from '@/components/RemoteImage'
-import { colors } from '@/design/tokens'
+import { colors, shadows } from '@/design/tokens'
 
 type Owner = {
   _id: string
@@ -40,13 +40,40 @@ const CONDITION_LABELS: Record<NonNullable<Props['condition']>, string> = {
   fair: 'OK stanje',
 }
 
-function formatPublishedDate(dateValue?: string) {
+function formatPublishedAge(dateValue?: string) {
   if (!dateValue) return ''
 
-  return new Date(dateValue).toLocaleDateString('sr-Latn', {
-    day: 'numeric',
-    month: 'short',
-  })
+  const createdAt = new Date(dateValue).getTime()
+  if (!Number.isFinite(createdAt)) return ''
+
+  const elapsedMs = Math.max(Date.now() - createdAt, 0)
+  const minutes = Math.floor(elapsedMs / (1000 * 60))
+  if (minutes < 1) return 'sad'
+  if (minutes < 60) return `${minutes}m`
+
+  const hours = Math.floor(minutes / 60)
+  if (hours < 48) return `${hours}h`
+
+  const days = Math.floor(hours / 24)
+  if (days < 30) return days === 1 ? '1 dan' : `${days} dana`
+
+  const months = Math.floor(days / 30)
+  if (months < 12) return months === 1 ? '1 mesec' : `${months} mes.`
+
+  const years = Math.floor(months / 12)
+  return years === 1 ? '1 god.' : `${years} god.`
+}
+
+function formatPriceLabel(price?: number, listingType?: Props['listingType']) {
+  if (price != null) {
+    return `${price.toLocaleString('sr-Latn', {
+      maximumFractionDigits: Number.isInteger(price) ? 0 : 2,
+    })} EUR`
+  }
+
+  if (listingType === 'sell') return 'Ponudi cenu'
+  if (listingType === 'both') return 'Prodaja ili razmena'
+  return 'Za razmenu'
 }
 
 function buildLocationLabel(owner?: Owner | null) {
@@ -80,18 +107,8 @@ export function ItemHeroOverlay({
     condition ? CONDITION_LABELS[condition] : null,
   ].filter(Boolean)
   const locationLabel = buildLocationLabel(owner)
-  const publishedLabel = formatPublishedDate(createdAt)
-  const ownerSummary = owner?.averageRating
-    ? `${owner.averageRating.toFixed(1)} rating / ${owner.completedTrades || 0} razmena`
-    : `Novi profil / ${owner?.completedTrades || 0} razmena`
-  const priceLabel =
-    price != null
-      ? `${price} EUR`
-      : listingType === 'sell'
-        ? 'Ponudi cenu'
-        : listingType === 'both'
-          ? 'Prodaja ili razmena'
-          : 'Za razmenu'
+  const publishedLabel = formatPublishedAge(createdAt)
+  const priceLabel = formatPriceLabel(price, listingType)
 
   return (
     <>
@@ -100,18 +117,38 @@ export function ItemHeroOverlay({
         style={{ top: topInset + 66, right: reservedRightSpace }}
         pointerEvents="none"
       >
+        {locationLabel ? (
+          <View className="mb-3 self-start flex-row items-center rounded-full bg-brand-highlight px-3 py-1.5">
+            <Ionicons name="location" size={13} color={colors.inkDark} />
+            <Text
+              className="ml-1.5 font-sans text-[12px] font-bold text-ink-dark"
+              numberOfLines={1}
+            >
+              {locationLabel}
+            </Text>
+          </View>
+        ) : null}
+
         <Text
-          className="font-display text-[34px] leading-[34px] text-base-canvas"
+          className="font-display text-[32px] leading-[32px] text-ink-dark"
           numberOfLines={2}
+          style={styles.titleText}
         >
           {title}
         </Text>
 
         {chips.length > 0 ? (
-          <View className="mt-4 flex-row flex-wrap gap-2">
+          <View className="mt-3 flex-row gap-2" style={styles.chipsRow}>
             {chips.map((chip, index) => (
-              <View key={`${chip}-${index}`} className="rounded-full bg-white/15 px-3 py-2">
-                <Text className="font-sans text-[12px] font-semibold text-base-canvas">
+              <View
+                key={`${chip}-${index}`}
+                className="shrink rounded-full bg-surface-soft px-3 py-1.5"
+                style={styles.chip}
+              >
+                <Text
+                  className="font-sans text-[12px] font-semibold text-ink-dark"
+                  numberOfLines={1}
+                >
                   {chip}
                 </Text>
               </View>
@@ -121,14 +158,14 @@ export function ItemHeroOverlay({
       </View>
 
       <View
-        className="absolute left-3 right-3 flex-row items-center rounded-[24px] bg-base-canvas px-3 py-3"
-        style={{ bottom: bottomOffset }}
+        className="absolute left-3 right-3 flex-row items-center rounded-[28px] bg-surface-panel px-3 py-2.5"
+        style={[{ bottom: bottomOffset }, styles.marketBar]}
       >
         <TouchableOpacity
           disabled={!onOwnerPress}
           activeOpacity={onOwnerPress ? 0.88 : 1}
           onPress={onOwnerPress}
-          className="flex-1 flex-row items-center pr-3"
+          className="min-w-0 flex-1 flex-row items-center pr-2"
         >
           {owner?.photoURL ? (
             <RemoteImage
@@ -150,59 +187,53 @@ export function ItemHeroOverlay({
             </View>
           )}
 
-          <View className="ml-3 flex-1">
-            <View className="flex-row items-center">
-              <Text
-                className="flex-1 font-sans text-sm font-semibold text-ink-dark"
-                numberOfLines={1}
-              >
-                @{owner?.displayName || 'velve'}
-              </Text>
-              {showOwnerArrow ? (
-                <Ionicons name="arrow-forward" size={16} color={colors.inkDark} />
-              ) : null}
-            </View>
-
-            <Text className="mt-0.5 font-sans text-[11px] text-ink-dark/50" numberOfLines={1}>
-              {ownerSummary}
-            </Text>
-
-            {locationLabel ? (
-              <View className="mt-1 flex-row items-center">
-                <Ionicons name="location-outline" size={12} color={colors.mutedTextStrong} />
-                <Text
-                  className="ml-1 font-sans text-[11px] font-medium text-ink-dark/60"
-                  numberOfLines={1}
-                >
-                  {locationLabel}
-                </Text>
-              </View>
-            ) : null}
-          </View>
+          <Text
+            className="ml-3 min-w-0 flex-1 font-sans text-base font-bold text-ink-dark"
+            numberOfLines={1}
+          >
+            @{owner?.displayName || 'velve'}
+          </Text>
         </TouchableOpacity>
 
-        <View className="items-end">
-          <Text className="font-sans text-base font-semibold text-brand-accent-deep">
-            {priceLabel}
-          </Text>
+        <View className="ml-1 flex-row items-center justify-end gap-2" style={styles.marketMeta}>
           {publishedLabel ? (
-            <Text className="mt-1 font-sans text-[11px] text-ink-dark/52">
-              Objavljeno {publishedLabel}
+            <Text className="font-sans text-[12px] font-bold text-ink-dark/58" numberOfLines={1}>
+              {publishedLabel}
             </Text>
           ) : null}
+          <View className="flex-row items-center rounded-full bg-brand-accent-deep px-3 py-2">
+            <Ionicons name="cash-outline" size={14} color={colors.baseCanvas} />
+            <Text
+              className="ml-1 font-sans text-[13px] font-bold text-base-canvas"
+              numberOfLines={1}
+            >
+              {priceLabel}
+            </Text>
+          </View>
         </View>
 
-        {actionIcon && onActionPress ? (
-          <TouchableOpacity
-            className="ml-3 h-11 w-11 items-center justify-center rounded-full bg-brand-accent-deep"
-            activeOpacity={0.86}
-            accessibilityLabel={actionAccessibilityLabel}
-            onPress={onActionPress}
-          >
-            <Ionicons name={actionIcon} size={18} color={colors.baseCanvas} />
-          </TouchableOpacity>
-        ) : null}
       </View>
     </>
   )
 }
+
+const styles = StyleSheet.create({
+  marketBar: {
+    ...shadows.soft,
+  },
+  titleText: {
+    textShadowColor: 'rgba(246,248,237,0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 10,
+  },
+  chipsRow: {
+    overflow: 'hidden',
+  },
+  chip: {
+    maxWidth: 96,
+  },
+  marketMeta: {
+    maxWidth: 178,
+    minWidth: 118,
+  },
+})

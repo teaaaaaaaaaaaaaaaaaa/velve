@@ -1,4 +1,4 @@
-import { ActivityIndicator, View } from 'react-native'
+import { ActivityIndicator, Text, View } from 'react-native'
 
 import { BrandWordmark } from '@/components/BrandWordmark'
 import { colors } from '@/design/tokens'
@@ -9,19 +9,20 @@ type LoaderProps = {
   showSpinner?: boolean
 }
 
-export function BrandedLoader({ dark = false, showSpinner = false }: LoaderProps) {
+export function BrandedLoader({ label, dark = false, showSpinner = false }: LoaderProps) {
   return (
     <View
-      className={`flex-1 items-center justify-center ${
-        dark ? 'bg-brand-accent-deep' : 'bg-base-canvas'
-      }`}
+      className="flex-1 items-center justify-center bg-surface-panel px-8"
     >
-      <BrandWordmark width={168} tone={dark ? 'light' : 'deep'} />
+      <BrandWordmark width={168} tone={dark ? 'deep' : 'deep'} />
+      <Text className="mt-5 text-center font-sans text-sm text-ink-dark/58">
+        {label || 'Peglamo piksele i trazimo najbolji komad...'}
+      </Text>
       {showSpinner ? (
         <ActivityIndicator
           size="large"
-          color={dark ? colors.baseCanvas : colors.accentDeep}
-          style={{ marginTop: 32 }}
+          color={colors.accentDeep}
+          style={{ marginTop: 24 }}
         />
       ) : null}
     </View>
@@ -29,7 +30,7 @@ export function BrandedLoader({ dark = false, showSpinner = false }: LoaderProps
 }
 
 export function FeedSkeleton() {
-  return <BrandedLoader dark />
+  return <BrandedLoader showSpinner />
 }
 
 export function ProfileSkeleton() {
