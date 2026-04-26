@@ -27,8 +27,11 @@ async function sendPushToUser(userId, { title, body, data = {} }) {
       },
     ]
 
-    // Send and get tickets
-    const tickets = await expo.sendPushNotificationsAsync(messages)
+    const chunks = expo.chunkPushNotifications(messages)
+    const tickets = []
+    for (const chunk of chunks) {
+      tickets.push(...await expo.sendPushNotificationsAsync(chunk))
+    }
 
     // Check ticket status for errors
     for (const ticket of tickets) {

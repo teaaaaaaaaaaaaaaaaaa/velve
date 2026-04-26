@@ -58,6 +58,7 @@ type StatusData = {
 
 type MessageRecord = {
   _id: string
+  clientId?: string
   chatId: string
   senderId: { _id: string; displayName: string; photoURL?: string } | string
   text: string
@@ -66,6 +67,7 @@ type MessageRecord = {
   buyData?: BuyData
   statusData?: StatusData
   createdAt: string
+  deliveryStatus?: 'pending' | 'sent' | 'failed'
 }
 
 type TradeState = {
@@ -123,6 +125,10 @@ function formatDate(dateStr: string) {
 function isSameDay(a?: string, b?: string) {
   if (!a || !b) return false
   return new Date(a).toDateString() === new Date(b).toDateString()
+}
+
+function createClientMessageId() {
+  return `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
 
 const ProposalItemCard = memo(function ProposalItemCard({
@@ -334,6 +340,7 @@ export default function ChatScreen() {
       const data = response.data.data as ChatPayload
       setMessages(data.messages || [])
       setTradeRequest(data.tradeRequestId || null)
+      client.post(`/api/chat/${chatId}/read`).catch(() => undefined)
 
       if (data.participants && dbUser) {
         const participant =
@@ -388,17 +395,36 @@ export default function ChatScreen() {
 
       socket.on('connect', () => {
         socket?.emit('join_chat', chatId)
+        socket?.emit('mark_read', chatId)
       })
 
       socket.on('new_message', (payload: { chatId: string; message: MessageRecord }) => {
         if (payload.chatId !== chatId) return
 
         setMessages((prev) => {
+          if (payload.message.clientId) {
+            const hasPendingMatch = prev.some(
+              (message) => message.clientId === payload.message.clientId
+            )
+            if (hasPendingMatch) {
+              return prev.map((message) =>
+                message.clientId === payload.message.clientId
+                  ? { ...payload.message, deliveryStatus: 'sent' }
+                  : message
+              )
+            }
+          }
           if (prev.some((message) => message._id === payload.message._id)) {
             return prev
           }
-          return [...prev, payload.message]
+          return [...prev, { ...payload.message, deliveryStatus: 'sent' }]
         })
+
+        socket?.emit('mark_read', chatId)
+      })
+
+      socket.on('messages_read', (payload: { chatId: string; userId: string; readAt: string }) => {
+        if (payload.chatId !== chatId) return
       })
 
       socket.on('user_typing', (payload: { chatId: string; displayName: string }) => {
@@ -431,30 +457,75 @@ export default function ChatScreen() {
     const text = inputText.trim()
     if (!text || sending) return
 
+    const clientId = createClientMessageId()
+    const optimisticMessage: MessageRecord = {
+      _id: clientId,
+      clientId,
+      chatId,
+      senderId: {
+        _id: dbUser?._id || '',
+        displayName: dbUser?.displayName || 'Ti',
+        photoURL: dbUser?.photoURL,
+      },
+      text,
+      type: 'text',
+      createdAt: new Date().toISOString(),
+      deliveryStatus: 'pending',
+    }
+
     setInputText('')
+    setMessages((prev) => [...prev, optimisticMessage])
     setSending(true)
 
     try {
       if (socketRef.current?.connected) {
-        socketRef.current.emit('send_message', { chatId, text })
+        socketRef.current.emit(
+          'send_message',
+          { chatId, text, clientId },
+          (ack: { ok: boolean; data?: MessageRecord; error?: string }) => {
+            if (ack.ok && ack.data) {
+              setMessages((prev) =>
+                prev.map((message) =>
+                  message.clientId === clientId
+                    ? { ...ack.data!, deliveryStatus: 'sent' }
+                    : message
+                )
+              )
+              return
+            }
+
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.clientId === clientId ? { ...message, deliveryStatus: 'failed' } : message
+              )
+            )
+            setInputText(text)
+          }
+        )
       } else {
         const response = await client.post(`/api/chat/${chatId}/message`, { text })
         if (response.data.ok) {
           const nextMessage = response.data.data as MessageRecord
           setMessages((prev) => {
-            if (prev.some((message) => message._id === nextMessage._id)) {
-              return prev
-            }
-            return [...prev, nextMessage]
+            return prev.map((message) =>
+              message.clientId === clientId
+                ? { ...nextMessage, deliveryStatus: 'sent' }
+                : message
+            )
           })
         }
       }
     } catch {
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.clientId === clientId ? { ...message, deliveryStatus: 'failed' } : message
+        )
+      )
       setInputText(text)
     } finally {
       setSending(false)
     }
-  }, [chatId, inputText, sending])
+  }, [chatId, dbUser?._id, dbUser?.displayName, dbUser?.photoURL, inputText, sending])
 
   const handleTyping = useCallback(() => {
     if (socketRef.current?.connected) {
@@ -573,8 +644,16 @@ export default function ChatScreen() {
                   {item.text}
                 </Text>
               </View>
-              <Text className="mt-1 px-1 font-sans text-[10px] text-ink-dark/30">
-                {formatTime(item.createdAt)}
+              <Text
+                className={`mt-1 px-1 font-sans text-[10px] ${
+                  item.deliveryStatus === 'failed' ? 'text-red-600' : 'text-ink-dark/30'
+                }`}
+              >
+                {item.deliveryStatus === 'pending'
+                  ? 'Slanje...'
+                  : item.deliveryStatus === 'failed'
+                    ? 'Nije poslato'
+                    : formatTime(item.createdAt)}
               </Text>
             </View>
           )}

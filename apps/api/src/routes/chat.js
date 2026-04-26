@@ -6,7 +6,8 @@ const Chat = require('../models/Chat')
 const Message = require('../models/Message')
 const Item = require('../models/Item')
 const { getPrimaryImage } = require('../lib/itemPresentation')
-const { sendPushToUser } = require('../lib/pushNotifications')
+const { createChatMessage, markChatRead } = require('../lib/chatMessages')
+const { messageLimiter } = require('../middleware/rateLimit')
 
 async function enrichTradeImages(messages = []) {
   const itemIds = new Set()
@@ -57,8 +58,11 @@ async function enrichTradeImages(messages = []) {
 // GET /api/chat — lista chat soba korisnika
 router.get('/', requireAuth, async (req, res) => {
   try {
-    const chats = await Chat.find({ participants: req.dbUser._id })
-      .sort({ updatedAt: -1 })
+    const chats = await Chat.find({
+      participants: req.dbUser._id,
+      deletedFor: { $ne: req.dbUser._id },
+    })
+      .sort({ lastMessageAt: -1, updatedAt: -1 })
       .populate('participants', 'displayName photoURL email')
       .populate('tradeRequestId', 'status type offeredPrice')
       .lean()
@@ -71,7 +75,14 @@ router.get('/', requireAuth, async (req, res) => {
           .populate('senderId', 'displayName')
           .lean()
 
-        const messageCount = await Message.countDocuments({ chatId: chat._id })
+        const [messageCount, unreadCount] = await Promise.all([
+          Message.countDocuments({ chatId: chat._id }),
+          Message.countDocuments({
+            chatId: chat._id,
+            senderId: { $ne: req.dbUser._id },
+            'readBy.userId': { $ne: req.dbUser._id },
+          }),
+        ])
 
         return {
           _id: chat._id,
@@ -79,6 +90,8 @@ router.get('/', requireAuth, async (req, res) => {
           tradeRequestId: chat.tradeRequestId,
           lastMessage,
           messageCount,
+          unreadCount,
+          deletedFor: chat.deletedFor || [],
           updatedAt: chat.updatedAt,
         }
       })
@@ -105,6 +118,7 @@ router.post('/direct/:userId', requireAuth, async (req, res) => {
     })
 
     if (existing) {
+      await Chat.findByIdAndUpdate(existing._id, { $pull: { deletedFor: req.dbUser._id } })
       return res.json({ ok: true, data: { chatId: existing._id } })
     }
 
@@ -157,22 +171,52 @@ router.get('/:id', requireAuth, async (req, res) => {
     messages.reverse()
     const enrichedMessages = await enrichTradeImages(messages)
 
-    res.json({ ok: true, data: { ...chat, messages: enrichedMessages } })
+    const unreadCount = await Message.countDocuments({
+      chatId: chat._id,
+      senderId: { $ne: req.dbUser._id },
+      'readBy.userId': { $ne: req.dbUser._id },
+    })
+
+    res.json({ ok: true, data: { ...chat, messages: enrichedMessages, unreadCount } })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
 // POST /api/chat/:id/message — slanje poruke (REST fallback, WebSocket je primarni)
-router.post('/:id/message', requireAuth, async (req, res) => {
+router.post('/:id/message', requireAuth, messageLimiter, async (req, res) => {
+  try {
+    const message = await createChatMessage({
+      chatId: req.params.id,
+      sender: req.dbUser,
+      text: req.body.text,
+      io: req.app.get('io'),
+    })
+    res.json({ ok: true, data: message })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message })
+  }
+})
+
+// POST /api/chat/:id/read - mark every inbound message in the chat as read
+router.post('/:id/read', requireAuth, async (req, res) => {
+  try {
+    const result = await markChatRead({
+      chatId: req.params.id,
+      userId: req.dbUser._id,
+      io: req.app.get('io'),
+    })
+    res.json({ ok: true, data: result })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message })
+  }
+})
+
+// DELETE /api/chat/:id - soft-delete only the current user's side of a chat
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ error: 'Invalid chat ID' })
-    }
-
-    const { text } = req.body
-    if (!text || !text.trim()) {
-      return res.status(400).json({ error: 'Message text is required' })
     }
 
     const chat = await Chat.findById(req.params.id)
@@ -183,39 +227,14 @@ router.post('/:id/message', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Not a participant of this chat' })
     }
 
-    // Create Message document
-    const message = await Message.create({
-      chatId: req.params.id,
-      senderId: req.dbUser._id,
-      text: text.trim().slice(0, 1000),
-    })
+    await Chat.findByIdAndUpdate(req.params.id, { $addToSet: { deletedFor: req.dbUser._id } })
 
-    // Update chat's lastMessageAt
-    await Chat.findByIdAndUpdate(req.params.id, { lastMessageAt: message.createdAt })
-
-    // Populate sender info for response
-    await message.populate('senderId', 'displayName photoURL')
-
-    // Emit via socket.io if available
     const io = req.app.get('io')
     if (io) {
-      io.to(`chat:${req.params.id}`).emit('new_message', {
-        chatId: req.params.id,
-        message,
-      })
+      io.to(`user:${req.dbUser._id}`).emit('chat_deleted', { chatId: req.params.id })
     }
 
-    // Push notification to other participant
-    const otherUserId = chat.participants.find((p) => !p.equals(req.dbUser._id))
-    if (otherUserId) {
-      sendPushToUser(otherUserId, {
-        title: req.dbUser.displayName || 'New message',
-        body: text.trim().slice(0, 100),
-        data: { type: 'chat_message', chatId: chat._id.toString() },
-      })
-    }
-
-    res.json({ ok: true, data: message })
+    res.json({ ok: true, message: 'Chat deleted' })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

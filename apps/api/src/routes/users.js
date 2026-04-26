@@ -1,5 +1,6 @@
 const express = require('express')
 const mongoose = require('mongoose')
+const { Expo } = require('expo-server-sdk')
 const router = express.Router()
 const { requireAuth, maybeAuth } = require('../middleware/auth')
 const User = require('../models/User')
@@ -400,6 +401,9 @@ router.put('/me/push-token', requireAuth, async (req, res) => {
     const { token } = req.body
     if (!token) {
       return res.status(400).json({ error: 'token is required' })
+    }
+    if (!Expo.isExpoPushToken(token)) {
+      return res.status(400).json({ error: 'Invalid Expo push token' })
     }
 
     await User.findByIdAndUpdate(req.dbUser._id, { expoPushToken: token })

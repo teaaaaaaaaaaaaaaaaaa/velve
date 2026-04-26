@@ -27,4 +27,15 @@ const uploadLimiter = rateLimit({
   message: { error: 'Too many uploads, please try again later.' },
 })
 
-module.exports = { apiLimiter, authLimiter, uploadLimiter }
+// Chat messages should be limited per authenticated user, not per IP. Multiple
+// real users can sit behind the same carrier/NAT address on mobile networks.
+const messageLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => String(req.dbUser?._id || req.user?.uid || 'anonymous-chat-user'),
+  message: { error: 'Too many messages, please slow down.' },
+})
+
+module.exports = { apiLimiter, authLimiter, uploadLimiter, messageLimiter }

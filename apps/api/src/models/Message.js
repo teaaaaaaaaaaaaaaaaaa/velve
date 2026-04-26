@@ -26,10 +26,17 @@ const messageSchema = new mongoose.Schema({
     status: String,
     label: String,
   },
+  readBy: [
+    {
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      readAt: { type: Date, default: Date.now },
+    },
+  ],
   createdAt: { type: Date, default: Date.now },
 })
 
 // Index for fetching chat messages sorted by time
 messageSchema.index({ chatId: 1, createdAt: -1 })
+messageSchema.index({ chatId: 1, senderId: 1, 'readBy.userId': 1 })
 
 module.exports = mongoose.model('Message', messageSchema)

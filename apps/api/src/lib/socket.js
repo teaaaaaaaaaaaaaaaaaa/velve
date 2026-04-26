@@ -3,8 +3,26 @@ const mongoose = require('mongoose')
 const admin = require('firebase-admin')
 const User = require('../models/User')
 const Chat = require('../models/Chat')
-const Message = require('../models/Message')
-const { sendPushToUser } = require('./pushNotifications')
+const { createChatMessage, markChatRead } = require('./chatMessages')
+
+const messageBuckets = new Map()
+
+function allowMessage(userId) {
+  const now = Date.now()
+  const windowMs = 60 * 1000
+  const maxMessages = 30
+  const bucket = messageBuckets.get(userId) || { count: 0, resetAt: now + windowMs }
+
+  if (bucket.resetAt <= now) {
+    bucket.count = 0
+    bucket.resetAt = now + windowMs
+  }
+
+  bucket.count += 1
+  messageBuckets.set(userId, bucket)
+
+  return bucket.count <= maxMessages
+}
 
 function initSocket(httpServer) {
   const io = new Server(httpServer, {
@@ -13,12 +31,13 @@ function initSocket(httpServer) {
         'exp://localhost:8081',
         'http://localhost:8081',
         'https://velve.app',
+        'https://velveapp.com',
+        'https://www.velveapp.com',
       ],
       credentials: true,
     },
   })
 
-  // Auth middleware: verify Firebase token on connection
   io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token
     if (!token) {
@@ -40,103 +59,82 @@ function initSocket(httpServer) {
   })
 
   io.on('connection', (socket) => {
-    // Auto-join user's personal room for direct events
     socket.join(`user:${socket.userId}`)
 
-    // Join a chat room
-    socket.on('join_chat', async (chatId) => {
+    socket.on('join_chat', async (chatId, ack) => {
       try {
-        // Validate ObjectId
         if (!mongoose.Types.ObjectId.isValid(chatId)) {
+          if (typeof ack === 'function') ack({ ok: false, error: 'Invalid chat ID' })
           return
         }
 
         const chat = await Chat.findById(chatId).lean()
-        if (!chat) return
+        if (!chat) {
+          if (typeof ack === 'function') ack({ ok: false, error: 'Chat not found' })
+          return
+        }
 
         const isParticipant = chat.participants.some((p) => p.toString() === socket.userId)
-        if (!isParticipant) return
+        if (!isParticipant) {
+          if (typeof ack === 'function') ack({ ok: false, error: 'Not a participant of this chat' })
+          return
+        }
 
         socket.join(`chat:${chatId}`)
+        if (typeof ack === 'function') ack({ ok: true })
       } catch (err) {
         console.error('join_chat error:', err.message)
+        if (typeof ack === 'function') ack({ ok: false, error: err.message })
       }
     })
 
-    // Leave a chat room
     socket.on('leave_chat', (chatId) => {
       socket.leave(`chat:${chatId}`)
     })
 
-    // Send a message in a chat
-    socket.on('send_message', async ({ chatId, text }) => {
+    socket.on('send_message', async ({ chatId, text, clientId }, ack) => {
       try {
-        if (!text?.trim()) return
+        if (!allowMessage(socket.userId)) {
+          if (typeof ack === 'function') {
+            ack({ ok: false, error: 'Too many messages, please slow down.', clientId })
+          }
+          return
+        }
 
-        const chat = await Chat.findById(chatId)
-        if (!chat) return
-
-        const isParticipant = chat.participants.some((p) => p.toString() === socket.userId)
-        if (!isParticipant) return
-
-        // Create Message document
-        const message = await Message.create({
+        const message = await createChatMessage({
           chatId,
-          senderId: socket.dbUser._id,
-          text: text.trim().slice(0, 1000),
+          sender: socket.dbUser,
+          text,
+          io,
+          clientId,
         })
 
-        // Update chat's lastMessageAt
-        await Chat.findByIdAndUpdate(chatId, { lastMessageAt: message.createdAt })
-
-        const messagePayload = {
-          _id: message._id,
-          chatId: message.chatId,
-          senderId: { _id: socket.dbUser._id, displayName: socket.dbUser.displayName, photoURL: socket.dbUser.photoURL },
-          text: message.text,
-          createdAt: message.createdAt,
-        }
-
-        // Broadcast to all in the chat room
-        io.to(`chat:${chatId}`).emit('new_message', { chatId, message: messagePayload })
-
-        // Emit badge event direktno svakom učesniku (za badge u tab baru)
-        for (const participantId of chat.participants) {
-          if (participantId.toString() !== socket.userId) {
-            io.to(`user:${participantId.toString()}`).emit('badge_new_message', { chatId })
-          }
-        }
-
-        // Push notification to other participant (if not in the room)
-        const otherUserId = chat.participants.find((p) => p.toString() !== socket.userId)
-        if (otherUserId) {
-          const otherSocketIds = await io.in(`chat:${chatId}`).fetchSockets()
-          const otherOnline = otherSocketIds.some((s) => s.userId === otherUserId.toString())
-
-          if (!otherOnline) {
-            sendPushToUser(otherUserId, {
-              title: socket.dbUser.displayName || 'New message',
-              body: text.trim().slice(0, 100),
-              data: { type: 'chat_message', chatId },
-            })
-          }
+        if (typeof ack === 'function') {
+          ack({ ok: true, data: message, clientId })
         }
       } catch (err) {
         console.error('send_message error:', err.message)
+        if (typeof ack === 'function') {
+          ack({ ok: false, error: err.message, clientId })
+        }
       }
     })
 
-    // Typing indicator
+    socket.on('mark_read', async (chatId, ack) => {
+      try {
+        const result = await markChatRead({ chatId, userId: socket.dbUser._id, io })
+        if (typeof ack === 'function') ack({ ok: true, data: result })
+      } catch (err) {
+        if (typeof ack === 'function') ack({ ok: false, error: err.message })
+      }
+    })
+
     socket.on('typing', (chatId) => {
       socket.to(`chat:${chatId}`).emit('user_typing', {
         chatId,
         userId: socket.userId,
         displayName: socket.dbUser.displayName,
       })
-    })
-
-    socket.on('disconnect', () => {
-      // cleanup handled automatically by socket.io
     })
   })
 

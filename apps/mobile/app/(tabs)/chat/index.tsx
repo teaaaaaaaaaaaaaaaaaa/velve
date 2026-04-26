@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router'
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   RefreshControl,
   ScrollView,
@@ -18,6 +19,7 @@ import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { RemoteImage } from '@/components/RemoteImage'
 import { colors } from '@/design/tokens'
 import { useAuth } from '@/hooks/useAuth'
+import { useSocket } from '@/hooks/useSocket'
 import { useI18n } from '@/i18n'
 
 type Participant = {
@@ -45,6 +47,7 @@ type ChatRoom = {
   tradeRequestId?: TradeMeta | null
   lastMessage: LastMessage | null
   messageCount: number
+  unreadCount?: number
   updatedAt: string
 }
 
@@ -114,16 +117,19 @@ const ChatRow = memo(function ChatRow({
   other,
   tradeLabel,
   onPress,
+  onDelete,
 }: {
   chat: ChatRoom
   other: Participant | undefined
   tradeLabel: string | null
   onPress: () => void
+  onDelete: () => void
 }) {
   return (
     <TouchableOpacity
       activeOpacity={0.88}
       onPress={onPress}
+      onLongPress={onDelete}
       className="mb-1 flex-row items-center px-4 py-3"
     >
       <View className="mr-3">
@@ -162,7 +168,13 @@ const ChatRow = memo(function ChatRow({
           <Text className="flex-1 font-sans text-sm text-ink-dark/55" numberOfLines={1}>
             {chat.lastMessage?.text || 'Zapocni razgovor...'}
           </Text>
-          {tradeLabel ? (
+          {chat.unreadCount ? (
+            <View className="min-w-5 items-center rounded-full bg-brand-accent-deep px-1.5 py-0.5">
+              <Text className="font-sans text-[10px] font-semibold text-base-canvas">
+                {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
+              </Text>
+            </View>
+          ) : tradeLabel ? (
             <View className="rounded-full bg-brand-accent-light/25 px-2 py-0.5">
               <Text className="font-sans text-[10px] font-semibold text-brand-accent-deep">
                 {tradeLabel}
@@ -340,6 +352,7 @@ const TradeRow = memo(function TradeRow({
 export default function ChatListScreen() {
   const router = useRouter()
   const { dbUser } = useAuth()
+  const { socket } = useSocket()
   const { t } = useI18n()
 
   const [activeTab, setActiveTab] = useState<'messages' | 'trades'>('messages')
@@ -381,6 +394,27 @@ export default function ChatListScreen() {
       .catch(() => undefined)
       .finally(() => setLoading(false))
   }, [loadAll])
+
+  useEffect(() => {
+    if (!socket) return
+
+    const refreshChats = () => {
+      fetchChats().catch(() => undefined)
+    }
+    const removeDeletedChat = ({ chatId }: { chatId: string }) => {
+      setChats((prev) => prev.filter((chat) => chat._id !== chatId))
+    }
+
+    socket.on('chat_updated', refreshChats)
+    socket.on('badge_new_message', refreshChats)
+    socket.on('chat_deleted', removeDeletedChat)
+
+    return () => {
+      socket.off('chat_updated', refreshChats)
+      socket.off('badge_new_message', refreshChats)
+      socket.off('chat_deleted', removeDeletedChat)
+    }
+  }, [fetchChats, socket])
 
   const onRefresh = useCallback(async () => {
     try {
@@ -437,6 +471,19 @@ export default function ChatListScreen() {
             other={other}
             tradeLabel={tradeLabel}
             onPress={() => router.push(`/(tabs)/chat/${chat._id}`)}
+            onDelete={() => {
+              Alert.alert('Obrisi razgovor?', 'Razgovor se brise samo kod tebe.', [
+                { text: 'Odustani', style: 'cancel' },
+                {
+                  text: 'Obrisi',
+                  style: 'destructive',
+                  onPress: async () => {
+                    setChats((prev) => prev.filter((entry) => entry._id !== chat._id))
+                    await client.delete(`/api/chat/${chat._id}`).catch(() => fetchChats())
+                  },
+                },
+              ])
+            }}
           />
           {index < chats.length - 1 ? <View className="mx-4 h-px bg-ink-dark/6" /> : null}
         </View>
