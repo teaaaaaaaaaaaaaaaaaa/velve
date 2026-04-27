@@ -7,6 +7,7 @@ const Item = require('../models/Item')
 const { enrichItems } = require('../lib/enrichItems')
 const { withPrimaryImage } = require('../lib/itemPresentation')
 const { sendPushToUser } = require('../lib/pushNotifications')
+const { createNotification } = require('../lib/notifications')
 
 // POST /api/wishlist/:itemId — Add item to wishlist (idempotent)
 router.post('/:itemId', requireAuth, async (req, res) => {
@@ -43,6 +44,16 @@ router.post('/:itemId', requireAuth, async (req, res) => {
     )
 
     if (!existingWishlist) {
+      createNotification({
+        userId: item.userId,
+        actorUserId: req.dbUser._id,
+        type: 'item_wishlist',
+        title: 'Komad je sacuvan',
+        body: `${req.dbUser.displayName || 'Korisnik'} je sacuvao/la "${item.title}"`,
+        itemId: item._id,
+        data: { itemId: String(item._id), userId: String(req.dbUser._id) },
+      })
+
       sendPushToUser(item.userId, {
         title: 'Komad je sacuvan',
         body: `${req.dbUser.displayName || 'Korisnik'} je sacuvao/la "${item.title}"`,

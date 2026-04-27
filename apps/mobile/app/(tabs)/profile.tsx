@@ -324,6 +324,12 @@ export default function ProfileScreen() {
               <BrandWordmark width={118} />
             </View>
             <TouchableOpacity
+              className="mr-3 h-11 w-11 items-center justify-center rounded-full bg-surface-tint"
+              onPress={() => router.push('/notifications')}
+            >
+              <Ionicons name="notifications-outline" size={20} color={colors.accentDeep} />
+            </TouchableOpacity>
+            <TouchableOpacity
               className="h-11 w-11 items-center justify-center rounded-full bg-surface-tint"
               onPress={() => router.push('/settings')}
             >
@@ -392,14 +398,24 @@ export default function ProfileScreen() {
             ) : null}
 
             <View className="mt-5 flex-row items-center justify-between">
-              <View className="items-center">
+              <TouchableOpacity
+                className="items-center"
+                onPress={() =>
+                  router.push({ pathname: '/connections', params: { userId: profile._id, tab: 'followers' } })
+                }
+              >
                 <Text className="font-display text-3xl text-ink-dark">{profile.followersCount}</Text>
                 <Text className="font-sans text-xs text-ink-dark/50">{t('profile.followers')}</Text>
-              </View>
-              <View className="items-center">
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="items-center"
+                onPress={() =>
+                  router.push({ pathname: '/connections', params: { userId: profile._id, tab: 'following' } })
+                }
+              >
                 <Text className="font-display text-3xl text-ink-dark">{profile.followingCount}</Text>
                 <Text className="font-sans text-xs text-ink-dark/50">{t('profile.following')}</Text>
-              </View>
+              </TouchableOpacity>
               <View className="items-center">
                 <Text className="font-display text-3xl text-ink-dark">{profile.closetCounts.live}</Text>
                 <Text className="font-sans text-xs text-ink-dark/50">{t('profile.active')}</Text>

@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Platform,
   Text,
@@ -538,6 +539,51 @@ export default function ChatScreen() {
     [canRespondToTrade, fetchChat, submittingDecision, tradeRequest?._id]
   )
 
+  const handleRetry = useCallback(
+    async (failedMessage: MessageRecord) => {
+      const text = failedMessage.text
+      if (!text) return
+
+      const clientId = createClientMessageId()
+      setMessages((prev) =>
+        prev.map((m) =>
+          m._id === failedMessage._id ? { ...m, _id: clientId, clientId, deliveryStatus: 'pending' } : m
+        )
+      )
+
+      try {
+        let nextMessage: MessageRecord | null = null
+        if (socketRef.current?.connected) {
+          nextMessage = await new Promise<MessageRecord>((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('timeout')), 10000)
+            socketRef.current?.emit(
+              'send_message',
+              { chatId, text, clientId },
+              (ack: { ok: boolean; data?: MessageRecord; error?: string }) => {
+                clearTimeout(timeout)
+                if (ack.ok && ack.data) { resolve(ack.data); return }
+                reject(new Error(ack.error || 'failed'))
+              }
+            )
+          })
+        } else {
+          const response = await client.post(`/api/chat/${chatId}/message`, { text, clientId })
+          if (response.data.ok) nextMessage = response.data.data as MessageRecord
+        }
+        if (nextMessage) {
+          setMessages((prev) =>
+            prev.map((m) => (m.clientId === clientId ? { ...nextMessage!, deliveryStatus: 'sent' } : m))
+          )
+        }
+      } catch {
+        setMessages((prev) =>
+          prev.map((m) => (m.clientId === clientId ? { ...m, deliveryStatus: 'failed' } : m))
+        )
+      }
+    },
+    [chatId]
+  )
+
   const renderMessage = useCallback(
     ({ item, index }: { item: MessageRecord; index: number }) => {
       const isMine = getSenderId(item) === dbUser?._id
@@ -569,8 +615,18 @@ export default function ChatScreen() {
               onOpenRequestedItem={() => router.push(`/items/${item.tradeData!.requestedItemId}`)}
               showDecisionActions={showDecisionActions}
               submittingDecision={submittingDecision}
-              onAccept={() => handleTradeDecision('accepted')}
-              onReject={() => handleTradeDecision('rejected')}
+              onAccept={() =>
+                Alert.alert('Prihvati predlog', 'Jesi li siguran/na da prihvataš ovu razmenu?', [
+                  { text: 'Da, prihvatam', onPress: () => handleTradeDecision('accepted') },
+                  { text: 'Odustani', style: 'cancel' },
+                ])
+              }
+              onReject={() =>
+                Alert.alert('Odbij predlog', 'Jesi li siguran/na da odbijаš ovaj predlog?', [
+                  { text: 'Odbij', style: 'destructive', onPress: () => handleTradeDecision('rejected') },
+                  { text: 'Odustani', style: 'cancel' },
+                ])
+              }
             />
           ) : item.type === 'buy' && item.buyData ? (
             <ProposalMessageCard
@@ -580,13 +636,35 @@ export default function ChatScreen() {
               onOpenRequestedItem={() => router.push(`/items/${item.buyData!.requestedItemId}`)}
               showDecisionActions={showDecisionActions}
               submittingDecision={submittingDecision}
-              onAccept={() => handleTradeDecision('accepted')}
-              onReject={() => handleTradeDecision('rejected')}
+              onAccept={() =>
+                Alert.alert('Prihvati ponudu', 'Jesi li siguran/na da prihvataš ovu ponudu?', [
+                  { text: 'Da, prihvatam', onPress: () => handleTradeDecision('accepted') },
+                  { text: 'Odustani', style: 'cancel' },
+                ])
+              }
+              onReject={() =>
+                Alert.alert('Odbij ponudu', 'Jesi li siguran/na da odbijаš ovu ponudu?', [
+                  { text: 'Odbij', style: 'destructive', onPress: () => handleTradeDecision('rejected') },
+                  { text: 'Odustani', style: 'cancel' },
+                ])
+              }
             />
           ) : item.type === 'trade_update' && item.statusData ? (
             <TradeStatusTicket statusData={item.statusData} />
           ) : (
             <View className={`mb-1 px-4 ${isMine ? 'items-end' : 'items-start'}`}>
+              <TouchableOpacity
+                activeOpacity={item.deliveryStatus === 'failed' ? 0.7 : 1}
+                onLongPress={
+                  item.deliveryStatus === 'failed'
+                    ? () =>
+                        Alert.alert('Poruka nije poslata', 'Šta želiš da uradiš?', [
+                          { text: 'Pokušaj ponovo', onPress: () => handleRetry(item) },
+                          { text: 'Otkaži', style: 'cancel' },
+                        ])
+                    : undefined
+                }
+              >
               <View
                 className={`max-w-[82%] rounded-[22px] px-4 py-3 ${
                   isMine ? 'bg-brand-accent-deep' : 'bg-surface-panel'
@@ -625,9 +703,10 @@ export default function ChatScreen() {
                 {item.deliveryStatus === 'pending'
                   ? 'Slanje...'
                   : item.deliveryStatus === 'failed'
-                    ? 'Nije poslato'
+                    ? 'Nije poslato — drži za opcije'
                     : formatTime(item.createdAt)}
               </Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -638,6 +717,7 @@ export default function ChatScreen() {
       canRespondToTrade,
       dbUser?._id,
       getSenderId,
+      handleRetry,
       handleTradeDecision,
       otherUser,
       router,

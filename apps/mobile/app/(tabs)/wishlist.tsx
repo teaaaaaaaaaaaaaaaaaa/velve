@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   View,
   Text,
   RefreshControl,
   Alert,
   FlatList,
+  ScrollView,
   TouchableOpacity,
 } from 'react-native'
 import { useRouter } from 'expo-router'
@@ -21,7 +22,12 @@ import { getApiErrorMessage } from '@/lib/apiErrors'
 
 type WishlistItem = DiscoveryCardItem & {
   isWishlisted?: boolean
+  price?: number
+  category?: string
+  size?: string
 }
+
+type WishlistSort = 'recent' | 'price_low' | 'price_high'
 
 export default function WishlistScreen() {
   const router = useRouter()
@@ -30,6 +36,9 @@ export default function WishlistScreen() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('Sve')
+  const [sizeFilter, setSizeFilter] = useState('Sve')
+  const [sortMode, setSortMode] = useState<WishlistSort>('recent')
 
   const copy = {
     sr: {
@@ -73,9 +82,33 @@ export default function WishlistScreen() {
     },
   } as const
 
+  const categories = useMemo(() => {
+    const unique = [...new Set(items.map((item) => item.category).filter(Boolean) as string[])]
+    return ['Sve', ...unique.slice(0, 8)]
+  }, [items])
+
+  const sizes = useMemo(() => {
+    const unique = [...new Set(items.map((item) => item.size).filter(Boolean) as string[])]
+    return ['Sve', ...unique.slice(0, 8)]
+  }, [items])
+
+  const visibleItems = useMemo(() => {
+    const filtered = items.filter((item) => {
+      const matchesCategory = categoryFilter === 'Sve' || item.category === categoryFilter
+      const matchesSize = sizeFilter === 'Sve' || item.size === sizeFilter
+      return matchesCategory && matchesSize
+    })
+
+    return [...filtered].sort((a, b) => {
+      if (sortMode === 'price_low') return (a.price ?? Number.MAX_SAFE_INTEGER) - (b.price ?? Number.MAX_SAFE_INTEGER)
+      if (sortMode === 'price_high') return (b.price ?? -1) - (a.price ?? -1)
+      return 0
+    })
+  }, [categoryFilter, items, sizeFilter, sortMode])
+
   const fetchWishlist = async () => {
     try {
-      const response = await client.get('/api/wishlist')
+      const response = await client.get('/api/wishlist', { params: { limit: 50 } })
       if (response.data.ok) {
         setItems(
           (response.data.data as WishlistItem[]).filter(
@@ -150,8 +183,78 @@ export default function WishlistScreen() {
           />
         </View>
       ) : (
+        <>
+        <View className="px-5 pb-3">
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-2">
+            <View className="flex-row gap-2 pr-5">
+              {categories.map((category) => (
+                <TouchableOpacity
+                  key={category}
+                  onPress={() => setCategoryFilter(category)}
+                  className={`rounded-full px-4 py-2.5 ${
+                    categoryFilter === category ? 'bg-brand-accent-deep' : 'bg-surface-panel'
+                  }`}
+                >
+                  <Text
+                    className={`font-sans text-sm ${
+                      categoryFilter === category ? 'text-base-canvas' : 'text-ink-dark/65'
+                    }`}
+                  >
+                    {category}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View className="flex-row gap-2 pr-5">
+              {sizes.map((size) => (
+                <TouchableOpacity
+                  key={size}
+                  onPress={() => setSizeFilter(size)}
+                  className={`rounded-full px-4 py-2.5 ${
+                    sizeFilter === size ? 'bg-brand-accent-light/40' : 'bg-surface-panel'
+                  }`}
+                >
+                  <Text className="font-sans text-sm text-ink-dark">{size}</Text>
+                </TouchableOpacity>
+              ))}
+              {([
+                ['recent', 'Nedavno'],
+                ['price_low', 'Cena od najnize'],
+                ['price_high', 'Cena od najvise'],
+              ] as const).map(([value, label]) => (
+                <TouchableOpacity
+                  key={value}
+                  onPress={() => setSortMode(value)}
+                  className={`rounded-full px-4 py-2.5 ${
+                    sortMode === value ? 'bg-brand-highlight/50' : 'bg-surface-panel'
+                  }`}
+                >
+                  <Text className="font-sans text-sm text-ink-dark">{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+
+        {visibleItems.length === 0 ? (
+          <View className="px-4 pt-4">
+            <EditorialEmptyState
+              icon="filter-outline"
+              title="Nema komada za ove filtere"
+              description="Promeni kategoriju, velicinu ili sortiranje da opet vidis sacuvane komade."
+              actionLabel="Ocisti filtere"
+              onAction={() => {
+                setCategoryFilter('Sve')
+                setSizeFilter('Sve')
+                setSortMode('recent')
+              }}
+            />
+          </View>
+        ) : (
         <FlatList
-          data={items}
+          data={visibleItems}
           keyExtractor={(item) => item._id}
           numColumns={2}
           columnWrapperStyle={{ gap: 12, paddingHorizontal: 16 }}
@@ -174,6 +277,8 @@ export default function WishlistScreen() {
             </View>
           )}
         />
+        )}
+        </>
       )}
     </View>
   )

@@ -28,6 +28,7 @@ const verificationRouter = require('./routes/verification')
 const wishlistRouter = require('./routes/wishlist')
 const vtoRouter = require('./routes/vto')
 const searchRouter = require('./routes/search')
+const notificationsRouter = require('./routes/notifications')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -160,6 +161,7 @@ app.use('/api/verification', verificationRouter)
 app.use('/api/wishlist', wishlistRouter)
 app.use('/api/vto', vtoRouter)
 app.use('/api/search', searchRouter)
+app.use('/api/notifications', notificationsRouter)
 
 // Sentry error handler (must be before other error middleware)
 app.use(Sentry.Handlers.errorHandler())

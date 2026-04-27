@@ -1,7 +1,7 @@
 ﻿import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -166,6 +166,12 @@ export default function ItemDetailsScreen() {
   const [markingSold, setMarkingSold] = useState(false);
   const [digitizing, setDigitizing] = useState(false);
   const [checkingBodyScan, setCheckingBodyScan] = useState(false);
+
+  const editInitialRef = useRef<{
+    title: string; description: string; category: string; brand: string;
+    size: string; condition: Item['condition']; listingType: 'trade' | 'sell' | 'both';
+    price: string; tradeFor: string;
+  } | null>(null);
 
   const owner = item && typeof item.userId === 'object' ? item.userId : null;
   const isOwn =
@@ -347,6 +353,34 @@ export default function ItemDetailsScreen() {
       Alert.alert('Greska', 'Nije moguce pokrenuti Virtual Try-On.');
     } finally {
       setCheckingBodyScan(false);
+    }
+  };
+
+  const openEditModal = () => {
+    editInitialRef.current = {
+      title: editTitle, description: editDescription, category: editCategory,
+      brand: editBrand, size: editSize, condition: editCondition,
+      listingType: editListingType, price: editPrice, tradeFor: editTradeFor,
+    };
+    setShowEditModal(true);
+  };
+
+  const handleCloseEditModal = () => {
+    const initial = editInitialRef.current;
+    const isDirty = initial && (
+      editTitle !== initial.title || editDescription !== initial.description ||
+      editCategory !== initial.category || editBrand !== initial.brand ||
+      editSize !== initial.size || editCondition !== initial.condition ||
+      editListingType !== initial.listingType || editPrice !== initial.price ||
+      editTradeFor !== initial.tradeFor
+    );
+    if (isDirty) {
+      Alert.alert('Nesnimljene izmene', 'Imaš nesnimljene izmene. Zatvori bez čuvanja?', [
+        { text: 'Nastavi editovanje', style: 'cancel' },
+        { text: 'Zatvori', style: 'destructive', onPress: () => setShowEditModal(false) },
+      ]);
+    } else {
+      setShowEditModal(false);
     }
   };
 
@@ -570,7 +604,7 @@ export default function ItemDetailsScreen() {
                   actionLabel="Dodaj objavu"
                   onAction={() => {
                     setShowTradeModal(false);
-                    router.push('/(tabs)/upload');
+                    router.push('/upload-flow');
                   }}
                 />
               ) : null}
@@ -673,11 +707,11 @@ export default function ItemDetailsScreen() {
       visible={showEditModal}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={() => setShowEditModal(false)}
+      onRequestClose={handleCloseEditModal}
     >
       <View className="flex-1 bg-base-canvas">
         <View className="flex-row items-center justify-between border-b border-ink-dark/4 px-6 pb-4 pt-10">
-          <TouchableOpacity onPress={() => setShowEditModal(false)}>
+          <TouchableOpacity onPress={handleCloseEditModal}>
             <Ionicons name="close" size={26} color="#2B2A2B" />
           </TouchableOpacity>
           <Text className="font-display text-xl text-ink-dark">Izmeni objavu</Text>
@@ -907,7 +941,7 @@ export default function ItemDetailsScreen() {
                   ) : null}
                   <GlassCountActionButton
                     icon="pencil-outline"
-                    onPress={() => setShowEditModal(true)}
+                    onPress={openEditModal}
                     accessibilityLabel="Izmeni objavu"
                     tone="dark"
                   />

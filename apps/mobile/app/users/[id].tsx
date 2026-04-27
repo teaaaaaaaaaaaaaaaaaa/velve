@@ -253,14 +253,20 @@ export default function PublicProfileScreen() {
               <Text className="font-display text-2xl text-ink-dark">{user.itemsCount || items.length}</Text>
               <Text className="font-sans text-xs text-ink-dark/50">Objave</Text>
             </View>
-            <View className="flex-1 items-center">
+            <TouchableOpacity
+              className="flex-1 items-center"
+              onPress={() => router.push({ pathname: '/connections', params: { userId: user._id, tab: 'followers' } })}
+            >
               <Text className="font-display text-2xl text-ink-dark">{followersCount}</Text>
               <Text className="font-sans text-xs text-ink-dark/50">Pratioci</Text>
-            </View>
-            <View className="flex-1 items-center">
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="flex-1 items-center"
+              onPress={() => router.push({ pathname: '/connections', params: { userId: user._id, tab: 'following' } })}
+            >
               <Text className="font-display text-2xl text-ink-dark">{user.followingCount || 0}</Text>
               <Text className="font-sans text-xs text-ink-dark/50">Prati</Text>
-            </View>
+            </TouchableOpacity>
             <View className="flex-1 items-center">
               <Text className="font-display text-2xl text-ink-dark">
                 {user.successfulSwaps || user.completedTrades || 0}

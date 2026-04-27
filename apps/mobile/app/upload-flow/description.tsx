@@ -35,7 +35,7 @@ const AI_STEPS = [
   'Pisemo opis na srpskom...',
 ]
 
-function AiLoadingOverlay() {
+function AiLoadingOverlay({ onCancel }: { onCancel: () => void }) {
   const [stepIndex, setStepIndex] = useState(0)
   const fade = useRef(new Animated.Value(1)).current
   const pulse = useRef(new Animated.Value(1)).current
@@ -94,6 +94,10 @@ function AiLoadingOverlay() {
       </Animated.View>
 
       <BrandWordmark width={100} style={{ marginTop: 32, opacity: 0.25 }} />
+
+      <TouchableOpacity onPress={onCancel} className="mt-8 px-8 py-3">
+        <Text className="font-sans text-sm text-ink-dark/45">Otkaži</Text>
+      </TouchableOpacity>
     </View>
   )
 }
@@ -118,6 +122,7 @@ export default function DescriptionScreen() {
   const [generated, setGenerated] = useState(false)
   const [saving, setSaving] = useState(false)
   const [imageUrl, setImageUrl] = useState('')
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   // Fetch item to get image URL for AI
   useEffect(() => {
@@ -132,7 +137,14 @@ export default function DescriptionScreen() {
       .catch(() => {})
   }, [params.itemId])
 
+  const handleCancelGeneration = useCallback(() => {
+    abortControllerRef.current?.abort()
+    setGenerating(false)
+  }, [])
+
   const generateAiDescription = useCallback(async () => {
+    const controller = new AbortController()
+    abortControllerRef.current = controller
     setGenerating(true)
     try {
       const response = await client.post(
@@ -145,13 +157,14 @@ export default function DescriptionScreen() {
           image_url: imageUrl,
           language: 'sr',
         },
-        { timeout: 60000 }
+        { timeout: 60000, signal: controller.signal }
       )
 
       const payload = response.data?.data
       if (payload?.description) setDescription(payload.description)
       setGenerated(true)
-    } catch {
+    } catch (error: any) {
+      if (controller.signal.aborted) return
       Alert.alert('AI nije dostupan', 'Opis trenutno ne moze da se generise. Popuni rucno.')
     } finally {
       setGenerating(false)
@@ -207,7 +220,7 @@ export default function DescriptionScreen() {
     <KeyboardAwareScreen className="bg-base-canvas">
       <BrandBackground />
 
-      {generating ? <AiLoadingOverlay /> : null}
+      {generating ? <AiLoadingOverlay onCancel={handleCancelGeneration} /> : null}
 
       <ScrollView
         className="flex-1"
