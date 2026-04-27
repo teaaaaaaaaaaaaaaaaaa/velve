@@ -6,7 +6,6 @@ import {
   RefreshControl,
   StatusBar,
   Text,
-  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -17,6 +16,7 @@ import client from '@/api/client'
 import { BrandedLoader } from '@/components/BrandedLoader'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { ImmersiveFeedCard, ImmersiveFeedItem } from '@/components/ImmersiveFeedCard'
+import { VelveTextInput } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
 
@@ -244,11 +244,10 @@ export default function SearchScreen() {
 
           <View className="flex-1 flex-row items-center rounded-full bg-ink-dark/6 px-4 py-3">
             <Ionicons name="search" size={18} color={colors.inkDark} style={{ opacity: 0.5 }} />
-            <TextInput
+            <VelveTextInput
               value={query}
               onChangeText={setQuery}
               placeholder="Pretrazi komade, brend ili kategoriju..."
-              placeholderTextColor="rgba(43,42,43,0.42)"
               className="ml-3 flex-1 font-sans text-sm text-ink-dark"
               autoFocus
             />

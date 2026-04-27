@@ -6,11 +6,8 @@ import {
   Alert,
   Animated,
   Easing,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
@@ -19,6 +16,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import client from '@/api/client'
 import { BrandBackground } from '@/components/BrandBackground'
 import { BrandWordmark } from '@/components/BrandWordmark'
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen'
+import { VelveTextInput } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 import { getPrimaryItemImage } from '@/lib/itemImages'
 
@@ -205,10 +204,7 @@ export default function DescriptionScreen() {
   )
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-base-canvas"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAwareScreen className="bg-base-canvas">
       <BrandBackground />
 
       {generating ? <AiLoadingOverlay /> : null}
@@ -299,11 +295,10 @@ export default function DescriptionScreen() {
           {/* Title */}
           <View>
             <Text className="mb-2 font-sans text-sm font-semibold text-ink-dark">Naslov</Text>
-            <TextInput
+            <VelveTextInput
               value={title}
               onChangeText={setTitle}
               placeholder="Ti smisli naslov svog komada"
-              placeholderTextColor={colors.mutedText}
               className="rounded-[20px] border border-ink-dark/8 bg-surface-panel px-5 py-4 font-sans text-sm text-ink-dark"
             />
           </View>
@@ -311,11 +306,10 @@ export default function DescriptionScreen() {
           {/* Description */}
           <View className="mt-4">
             <Text className="mb-2 font-sans text-sm font-semibold text-ink-dark">Opis</Text>
-            <TextInput
+            <VelveTextInput
               value={description}
               onChangeText={setDescription}
               placeholder="Opisi komad prirodno: boja, kroj, detalji, stanje..."
-              placeholderTextColor={colors.mutedText}
               multiline
               textAlignVertical="top"
               className="min-h-[140px] rounded-[20px] border border-ink-dark/8 bg-surface-panel px-5 py-4 font-sans text-sm leading-6 text-ink-dark"
@@ -392,6 +386,6 @@ export default function DescriptionScreen() {
           </Text>
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScreen>
   )
 }

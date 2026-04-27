@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   FlatList,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
@@ -13,6 +12,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import client from '@/api/client'
 import { BrandedLoader } from '@/components/BrandedLoader'
 import { RemoteImage } from '@/components/RemoteImage'
+import { VelveTextInput } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 import { getPrimaryItemImage, hasDigitizedImage } from '@/lib/itemImages'
 
@@ -114,11 +114,10 @@ export default function VtoSelectScreen() {
           </TouchableOpacity>
         </View>
 
-        <TextInput
+        <VelveTextInput
           value={query}
           onChangeText={setQuery}
           placeholder="Pretraga"
-          placeholderTextColor="#2B2A2B66"
           className="rounded-[24px] bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
         />
 

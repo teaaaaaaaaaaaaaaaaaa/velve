@@ -4,11 +4,8 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
   Platform,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
@@ -18,7 +15,9 @@ import { io, Socket } from 'socket.io-client'
 import client from '@/api/client'
 import { BrandBackground } from '@/components/BrandBackground'
 import { ChatSkeleton } from '@/components/BrandedLoader'
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen'
 import { RemoteImage } from '@/components/RemoteImage'
+import { VelveTextInput } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 import { API_URL } from '@/config/api'
 import { auth as firebaseAuth, getAuthToken } from '@/config/firebase'
@@ -129,6 +128,23 @@ function isSameDay(a?: string, b?: string) {
 
 function createClientMessageId() {
   return `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+}
+
+function mergeIncomingMessage(prev: MessageRecord[], incoming: MessageRecord): MessageRecord[] {
+  if (incoming.clientId) {
+    const hasClientMatch = prev.some((message) => message.clientId === incoming.clientId)
+    if (hasClientMatch) {
+      return prev.map((message) =>
+        message.clientId === incoming.clientId ? { ...incoming, deliveryStatus: 'sent' } : message
+      )
+    }
+  }
+
+  if (prev.some((message) => message._id === incoming._id)) {
+    return prev
+  }
+
+  return [...prev, { ...incoming, deliveryStatus: 'sent' }]
 }
 
 const ProposalItemCard = memo(function ProposalItemCard({
@@ -325,7 +341,6 @@ export default function ChatScreen() {
   const [otherUser, setOtherUser] = useState<Participant | null>(null)
   const [typingUser, setTypingUser] = useState<string | null>(null)
   const [tradeRequest, setTradeRequest] = useState<TradeState | null>(null)
-  const [keyboardHeight, setKeyboardHeight] = useState(0)
   const [composerHeight, setComposerHeight] = useState(86)
 
   const socketRef = useRef<Socket | null>(null)
@@ -357,27 +372,6 @@ export default function ChatScreen() {
   }, [fetchChat])
 
   useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
-
-    const showSub = Keyboard.addListener(showEvent, (event) => {
-      if (Platform.OS === 'android') {
-        setKeyboardHeight(Math.max(0, event.endCoordinates.height - insets.bottom))
-      }
-    })
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      if (Platform.OS === 'android') {
-        setKeyboardHeight(0)
-      }
-    })
-
-    return () => {
-      showSub.remove()
-      hideSub.remove()
-    }
-  }, [insets.bottom])
-
-  useEffect(() => {
     let socket: Socket | null = null
 
     async function connectSocket() {
@@ -401,24 +395,7 @@ export default function ChatScreen() {
       socket.on('new_message', (payload: { chatId: string; message: MessageRecord }) => {
         if (payload.chatId !== chatId) return
 
-        setMessages((prev) => {
-          if (payload.message.clientId) {
-            const hasPendingMatch = prev.some(
-              (message) => message.clientId === payload.message.clientId
-            )
-            if (hasPendingMatch) {
-              return prev.map((message) =>
-                message.clientId === payload.message.clientId
-                  ? { ...payload.message, deliveryStatus: 'sent' }
-                  : message
-              )
-            }
-          }
-          if (prev.some((message) => message._id === payload.message._id)) {
-            return prev
-          }
-          return [...prev, { ...payload.message, deliveryStatus: 'sent' }]
-        })
+        setMessages((prev) => mergeIncomingMessage(prev, payload.message))
 
         socket?.emit('mark_read', chatId)
       })
@@ -478,42 +455,38 @@ export default function ChatScreen() {
     setSending(true)
 
     try {
-      if (socketRef.current?.connected) {
-        socketRef.current.emit(
-          'send_message',
-          { chatId, text, clientId },
-          (ack: { ok: boolean; data?: MessageRecord; error?: string }) => {
-            if (ack.ok && ack.data) {
-              setMessages((prev) =>
-                prev.map((message) =>
-                  message.clientId === clientId
-                    ? { ...ack.data!, deliveryStatus: 'sent' }
-                    : message
-                )
-              )
-              return
-            }
+      let nextMessage: MessageRecord | null = null
 
-            setMessages((prev) =>
-              prev.map((message) =>
-                message.clientId === clientId ? { ...message, deliveryStatus: 'failed' } : message
-              )
-            )
-            setInputText(text)
-          }
-        )
+      if (socketRef.current?.connected) {
+        nextMessage = await new Promise<MessageRecord>((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Message acknowledgement timed out')), 10000)
+
+          socketRef.current?.emit(
+            'send_message',
+            { chatId, text, clientId },
+            (ack: { ok: boolean; data?: MessageRecord; error?: string }) => {
+              clearTimeout(timeout)
+              if (ack.ok && ack.data) {
+                resolve(ack.data)
+                return
+              }
+              reject(new Error(ack.error || 'Message send failed'))
+            }
+          )
+        })
       } else {
-        const response = await client.post(`/api/chat/${chatId}/message`, { text })
+        const response = await client.post(`/api/chat/${chatId}/message`, { text, clientId })
         if (response.data.ok) {
-          const nextMessage = response.data.data as MessageRecord
-          setMessages((prev) => {
-            return prev.map((message) =>
-              message.clientId === clientId
-                ? { ...nextMessage, deliveryStatus: 'sent' }
-                : message
-            )
-          })
+          nextMessage = response.data.data as MessageRecord
         }
+      }
+
+      if (nextMessage) {
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.clientId === clientId ? { ...nextMessage, deliveryStatus: 'sent' } : message
+          )
+        )
       }
     } catch {
       setMessages((prev) =>
@@ -677,11 +650,7 @@ export default function ChatScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-base-canvas"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
-    >
+    <KeyboardAwareScreen className="bg-base-canvas" offset={insets.top}>
       <BrandBackground />
 
       <View
@@ -774,7 +743,7 @@ export default function ChatScreen() {
             setComposerHeight(event.nativeEvent.layout.height)
           }}
           style={{
-            bottom: Platform.OS === 'android' ? keyboardHeight : 0,
+            bottom: 0,
             paddingBottom: Math.max(insets.bottom, 12),
           }}
         >
@@ -788,14 +757,13 @@ export default function ChatScreen() {
               elevation: 8,
             }}
           >
-            <TextInput
+            <VelveTextInput
               value={inputText}
               onChangeText={(text) => {
                 setInputText(text)
                 handleTyping()
               }}
               placeholder={t('chat.placeholder')}
-              placeholderTextColor={colors.mutedText}
               multiline
               maxLength={1000}
               textAlignVertical="top"
@@ -818,6 +786,6 @@ export default function ChatScreen() {
           </View>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScreen>
   )
 }

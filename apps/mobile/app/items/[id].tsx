@@ -9,7 +9,6 @@ import {
   Modal,
   ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -22,6 +21,7 @@ import { EditorialEmptyState } from '@/components/EditorialEmptyState';
 import { GlassCountActionButton } from '@/components/GlassCountActionButton';
 import { ItemHeroOverlay } from '@/components/ItemHeroOverlay';
 import { RemoteImage } from '@/components/RemoteImage';
+import { VelveTextInput } from '@/components/VelveTextInput';
 import { colors } from '@/design/tokens';
 import { useAuth } from '@/hooks/useAuth';
 import { getPrimaryItemImage, hasDigitizedImage } from '@/lib/itemImages';
@@ -627,23 +627,21 @@ export default function ItemDetailsScreen() {
               <Text className="mb-2 font-sans text-sm text-ink-dark/65">
                 Unesi cenu koju bi ponudio/la za ovaj komad.
               </Text>
-              <TextInput
+              <VelveTextInput
                 value={offeredPrice}
                 onChangeText={setOfferedPrice}
                 keyboardType="numeric"
                 placeholder="npr. 24"
-                placeholderTextColor="#2B2A2B66"
                 className="rounded-[24px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
               />
             </>
           )}
 
           <Text className="mb-2 mt-5 font-sans text-sm text-ink-dark/65">Poruka (opciono)</Text>
-          <TextInput
+          <VelveTextInput
             value={tradeMessage}
             onChangeText={setTradeMessage}
             placeholder="Hocu da razmenim ovaj komad za..."
-            placeholderTextColor="#2B2A2B66"
             multiline
             className="min-h-[110px] rounded-[24px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
           />
@@ -691,48 +689,43 @@ export default function ItemDetailsScreen() {
         </View>
         <ScrollView className="flex-1 px-6 pt-5">
           <Text className="mb-2 font-sans text-xs uppercase text-ink-dark/45">Naslov</Text>
-          <TextInput
+          <VelveTextInput
             value={editTitle}
             onChangeText={setEditTitle}
             placeholder="Naslov..."
-            placeholderTextColor="#2B2A2B66"
             className="rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
           />
           <Text className="mb-2 mt-4 font-sans text-xs uppercase text-ink-dark/45">Kategorija</Text>
-          <TextInput
+          <VelveTextInput
             value={editCategory}
             onChangeText={setEditCategory}
             placeholder="Kategorija..."
-            placeholderTextColor="#2B2A2B66"
             className="rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
           />
           <Text className="mb-2 mt-4 font-sans text-xs uppercase text-ink-dark/45">Opis</Text>
-          <TextInput
+          <VelveTextInput
             value={editDescription}
             onChangeText={setEditDescription}
             placeholder="Opis..."
-            placeholderTextColor="#2B2A2B66"
             multiline
             className="min-h-[110px] rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
           />
           <View className="mt-4 flex-row gap-3">
             <View className="flex-1">
               <Text className="mb-2 font-sans text-xs uppercase text-ink-dark/45">Brand</Text>
-              <TextInput
+              <VelveTextInput
                 value={editBrand}
                 onChangeText={setEditBrand}
                 placeholder="Brand..."
-                placeholderTextColor="#2B2A2B66"
                 className="rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
               />
             </View>
             <View className="flex-1">
               <Text className="mb-2 font-sans text-xs uppercase text-ink-dark/45">Velicina</Text>
-              <TextInput
+              <VelveTextInput
                 value={editSize}
                 onChangeText={setEditSize}
                 placeholder="Velicina..."
-                placeholderTextColor="#2B2A2B66"
                 className="rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
               />
             </View>
@@ -756,12 +749,11 @@ export default function ItemDetailsScreen() {
           {editListingType === 'sell' || editListingType === 'both' ? (
             <>
               <Text className="mb-2 mt-4 font-sans text-xs uppercase text-ink-dark/45">Cena</Text>
-              <TextInput
+              <VelveTextInput
                 value={editPrice}
                 onChangeText={setEditPrice}
                 keyboardType="numeric"
                 placeholder="npr. 24"
-                placeholderTextColor="#2B2A2B66"
                 className="rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
               />
             </>
@@ -771,11 +763,10 @@ export default function ItemDetailsScreen() {
               <Text className="mb-2 mt-4 font-sans text-xs uppercase text-ink-dark/45">
                 Sta trazis za razmenu
               </Text>
-              <TextInput
+              <VelveTextInput
                 value={editTradeFor}
                 onChangeText={setEditTradeFor}
                 placeholder="npr. oversized jakna"
-                placeholderTextColor="#2B2A2B66"
                 multiline
                 className="min-h-[100px] rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
               />

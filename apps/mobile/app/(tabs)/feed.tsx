@@ -9,7 +9,6 @@ import {
   RefreshControl,
   StatusBar,
   Text,
-  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -22,6 +21,7 @@ import { BrandedLoader, FeedSkeleton } from '@/components/BrandedLoader'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { BrandWordmark } from '@/components/BrandWordmark'
 import { ImmersiveFeedCard, ImmersiveFeedItem } from '@/components/ImmersiveFeedCard'
+import { VelveTextInput, type VelveTextInputRef } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
 import { prefetchImageUri } from '@/lib/expoImage'
@@ -70,7 +70,7 @@ export default function FeedScreen() {
   const [searchLoadingMore, setSearchLoadingMore] = useState(false)
   const [searchNextCursor, setSearchNextCursor] = useState<string | null>(null)
   const [searchHasMore, setSearchHasMore] = useState(false)
-  const searchInputRef = useRef<TextInput>(null)
+  const searchInputRef = useRef<VelveTextInputRef>(null)
 
   const openSearch = useCallback(() => {
     setSearchActive(true)
@@ -600,12 +600,11 @@ export default function FeedScreen() {
               <View className="mr-1">
                 <Ionicons name="search" size={18} color={colors.inkDark} style={{ opacity: 0.5 }} />
               </View>
-              <TextInput
+              <VelveTextInput
                 ref={searchInputRef}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 placeholder="Pretrazi komade, brend..."
-                placeholderTextColor="rgba(43,42,43,0.42)"
                 className="flex-1 py-2 font-sans text-sm text-ink-dark"
                 returnKeyType="search"
               />
