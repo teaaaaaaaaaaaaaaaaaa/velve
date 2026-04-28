@@ -24,6 +24,15 @@ const DRAFT_ITEM_STATUSES = ['draft']
 const ARCHIVE_ITEM_STATUSES = ['archived', 'sold', 'swapped', 'traded']
 const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:8000'
 const BODY_SCAN_ANALYSIS_TIMEOUT_MS = 45000
+const DEFAULT_NOTIFICATION_PREFERENCES = {
+  allPush: true,
+  likes: true,
+  follows: true,
+  trades: true,
+  messages: true,
+  ratings: true,
+  marketing: false,
+}
 
 function buildOnboardingUpdates(body = {}) {
   const { stylePreferences, favoriteBrands, categories, sizes, location } = body
@@ -212,6 +221,18 @@ async function buildUserProfilePayload(userDoc, viewerId = null) {
     isFollowing: Boolean(isFollowing),
     isSelf,
   }
+}
+
+function normalizeNotificationPreferences(preferences = {}) {
+  const normalized = { ...DEFAULT_NOTIFICATION_PREFERENCES }
+
+  for (const key of Object.keys(DEFAULT_NOTIFICATION_PREFERENCES)) {
+    if (preferences[key] !== undefined) {
+      normalized[key] = Boolean(preferences[key])
+    }
+  }
+
+  return normalized
 }
 
 async function buildConnectionPayload({ userId, mode, viewerId }) {
@@ -468,6 +489,54 @@ router.put('/me/push-token', requireAuth, async (req, res) => {
 
     await User.findByIdAndUpdate(req.dbUser._id, { expoPushToken: token })
     res.json({ ok: true, message: 'Push token saved' })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.get('/me/notification-preferences', requireAuth, async (req, res) => {
+  try {
+    res.json({
+      ok: true,
+      data: normalizeNotificationPreferences(req.dbUser.notificationPreferences || {}),
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.put('/me/notification-preferences', requireAuth, async (req, res) => {
+  try {
+    const preferences = normalizeNotificationPreferences({
+      ...(req.dbUser.notificationPreferences || {}),
+      ...(req.body || {}),
+    })
+
+    await User.findByIdAndUpdate(req.dbUser._id, { notificationPreferences: preferences })
+    res.json({ ok: true, data: preferences })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.get('/me/blocked-users', requireAuth, async (req, res) => {
+  try {
+    const blocks = await BlockedUser.find({ userId: req.dbUser._id })
+      .sort({ createdAt: -1 })
+      .populate('blockedUserId', 'displayName photoURL bio averageRating completedTrades location')
+      .lean()
+
+    res.json({
+      ok: true,
+      data: blocks
+        .filter((entry) => entry.blockedUserId)
+        .map((entry) => ({
+          _id: entry._id,
+          createdAt: entry.createdAt,
+          reason: entry.reason || '',
+          user: entry.blockedUserId,
+        })),
+    })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

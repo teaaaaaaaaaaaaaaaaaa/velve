@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 
 import client from '@/api/client'
 import { BrandBackground } from '@/components/BrandBackground'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { RemoteImage } from '@/components/RemoteImage'
 import { colors } from '@/design/tokens'
+import { useAuth } from '@/hooks/useAuth'
 import { getApiErrorMessage } from '@/lib/apiErrors'
 
 type ConnectionTab = 'followers' | 'following'
@@ -26,6 +27,7 @@ type ConnectionUser = {
 
 export default function ConnectionsScreen() {
   const router = useRouter()
+  const { dbUser } = useAuth()
   const params = useLocalSearchParams<{ userId?: string; tab?: ConnectionTab }>()
   const userId = params.userId
   const [activeTab, setActiveTab] = useState<ConnectionTab>(params.tab === 'following' ? 'following' : 'followers')
@@ -37,6 +39,7 @@ export default function ConnectionsScreen() {
 
   const title = activeTab === 'followers' ? 'Pratioci' : 'Pratis'
   const emptyText = activeTab === 'followers' ? 'Ne prati vas niko.' : 'Ne pratite nikoga.'
+  const isOwnConnections = Boolean(userId && dbUser?._id && String(userId) === String(dbUser._id))
 
   const endpoint = useMemo(() => {
     if (!userId) return ''
@@ -91,6 +94,32 @@ export default function ConnectionsScreen() {
       setBusyId(null)
     }
   }, [busyId])
+
+  const removeFollower = useCallback(
+    (connection: ConnectionUser) => {
+      if (busyId) return
+
+      Alert.alert('Ukloni pratioca', `${connection.displayName || 'Korisnik'} vise nece pratiti tvoj profil.`, [
+        { text: 'Odustani', style: 'cancel' },
+        {
+          text: 'Ukloni',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setBusyId(connection._id)
+              setUsers((prev) => prev.filter((entry) => entry._id !== connection._id))
+              await client.delete(`/api/users/${connection._id}/follower`)
+            } catch {
+              await loadConnections()
+            } finally {
+              setBusyId(null)
+            }
+          },
+        },
+      ])
+    },
+    [busyId, loadConnections]
+  )
 
   if (loading) {
     return (
@@ -189,18 +218,34 @@ export default function ConnectionsScreen() {
                   </View>
                   {!connection.isSelf ? (
                     <TouchableOpacity
-                      onPress={() => toggleFollow(connection)}
+                      onPress={() =>
+                        isOwnConnections && activeTab === 'followers'
+                          ? removeFollower(connection)
+                          : toggleFollow(connection)
+                      }
                       disabled={busyId === connection._id}
                       className={`rounded-full px-4 py-2.5 ${
-                        connection.isFollowing ? 'bg-base-canvas' : 'bg-brand-accent-deep'
+                        isOwnConnections && activeTab === 'followers'
+                          ? 'bg-base-canvas'
+                          : connection.isFollowing
+                            ? 'bg-base-canvas'
+                            : 'bg-brand-accent-deep'
                       }`}
                     >
                       <Text
                         className={`font-sans text-xs font-semibold ${
-                          connection.isFollowing ? 'text-ink-dark' : 'text-base-canvas'
+                          isOwnConnections && activeTab === 'followers'
+                            ? 'text-ink-dark'
+                            : connection.isFollowing
+                              ? 'text-ink-dark'
+                              : 'text-base-canvas'
                         }`}
                       >
-                        {connection.isFollowing ? 'Pratis' : 'Zaprati'}
+                        {isOwnConnections && activeTab === 'followers'
+                          ? 'Ukloni'
+                          : connection.isFollowing
+                            ? 'Pratis'
+                            : 'Zaprati'}
                       </Text>
                     </TouchableOpacity>
                   ) : null}

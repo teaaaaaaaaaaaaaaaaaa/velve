@@ -3,6 +3,7 @@ import { Tabs, usePathname, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { io, Socket } from 'socket.io-client'
 import { View } from 'react-native'
+import client from '@/api/client'
 import { useAuth } from '@/hooks/useAuth'
 import { auth as firebaseAuth, getAuthToken } from '@/config/firebase'
 import { API_URL } from '@/config/api'
@@ -15,6 +16,7 @@ export default function TabsLayout() {
   const pathname = usePathname()
   const router = useRouter()
   const [unreadCount, setUnreadCount] = useState(0)
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0)
   const socketRef = useRef<Socket | null>(null)
   // Hide only inside a specific conversation (e.g. /chat/<id>). The chat list
   // (/chat), closet, and trades keep the floating nav visible.
@@ -26,6 +28,34 @@ export default function TabsLayout() {
       setUnreadCount(0)
     }
   }, [pathname])
+
+  useEffect(() => {
+    if (!dbUser?._id) {
+      setNotificationUnreadCount(0)
+      return
+    }
+
+    let active = true
+
+    async function loadNotificationBadge() {
+      try {
+        const response = await client.get('/api/notifications/unread-count')
+        if (active && response.data.ok) {
+          setNotificationUnreadCount(response.data.unreadCount || response.data.data?.unreadCount || 0)
+        }
+      } catch {
+        // Badge should never block tab navigation.
+      }
+    }
+
+    loadNotificationBadge()
+    const interval = setInterval(loadNotificationBadge, 60000)
+
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [dbUser?._id, pathname])
 
   // Socket.io konekcija — samo za badge, bez pollinga
   useEffect(() => {
@@ -51,6 +81,7 @@ export default function TabsLayout() {
         if (!pathname.includes('chat')) {
           setUnreadCount((prev) => prev + 1)
         }
+        setNotificationUnreadCount((prev) => prev + 1)
       })
 
       socketRef.current = socket
@@ -72,6 +103,7 @@ export default function TabsLayout() {
       if (!pathname.includes('chat')) {
         setUnreadCount((prev) => prev + 1)
       }
+      setNotificationUnreadCount((prev) => prev + 1)
     })
   }, [pathname])
 
@@ -154,6 +186,12 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: t('tabs.profile'),
+          tabBarBadge: notificationUnreadCount > 0 ? notificationUnreadCount : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: colors.highlight,
+            color: colors.inkDark,
+            fontSize: 10,
+          },
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),

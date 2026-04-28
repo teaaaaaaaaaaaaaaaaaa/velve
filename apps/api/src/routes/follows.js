@@ -105,6 +105,20 @@ router.get('/:id/followers', requireAuth, async (req, res) => {
   }
 })
 
+// DELETE /api/users/:id/follower - remove a user from your followers list
+router.delete('/:id/follower', requireAuth, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid user ID' })
+    }
+
+    await Follow.findOneAndDelete({ followerId: req.params.id, followingId: req.dbUser._id })
+    res.json({ ok: true, message: 'Follower removed' })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // GET /api/users/:id/following
 router.get('/:id/following', requireAuth, async (req, res) => {
   try {

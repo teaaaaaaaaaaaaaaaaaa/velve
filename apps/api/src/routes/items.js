@@ -762,7 +762,7 @@ router.get('/:id', maybeAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid item ID' })
     }
 
-    const item = await Item.findOne({ _id: req.params.id, isDeleted: false })
+    const item = await Item.findById(req.params.id)
       .populate('userId', 'displayName photoURL averageRating completedTrades location')
       .lean()
 
@@ -776,10 +776,7 @@ router.get('/:id', maybeAuth, async (req, res) => {
         ? item.userId._id.toString()
         : String(item.userId)
 
-    if (viewerId !== ownerId && item.status !== 'available') {
-      return res.status(404).json({ error: 'Item not found' })
-    }
-
+    let shouldRecordView = false
     if (viewerId) {
       const [blockedUserIds, hiddenItemIds] = await Promise.all([
         getBlockedUserIds(req.dbUser._id),
@@ -794,9 +791,24 @@ router.get('/:id', maybeAuth, async (req, res) => {
         return res.status(404).json({ error: 'Item not found' })
       }
 
-      if (viewerId !== ownerId) {
-        await recordItemView(req.dbUser._id, item._id)
-      }
+      shouldRecordView = viewerId !== ownerId
+    }
+
+    if (viewerId !== ownerId && (item.isDeleted || item.status !== 'available')) {
+      return res.status(410).json({
+        error: 'Item is no longer available',
+        data: {
+          _id: item._id,
+          title: item.title,
+          status: item.isDeleted ? 'archived' : item.status,
+          category: item.category,
+          primaryImage: getPrimaryImage(item),
+        },
+      })
+    }
+
+    if (shouldRecordView) {
+      await recordItemView(req.dbUser._id, item._id)
     }
 
     const enriched = await enrichItems(item, req.dbUser?._id || null)

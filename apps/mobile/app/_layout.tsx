@@ -48,6 +48,7 @@ function AuthGate() {
     const inSettings = segments[0] === 'settings'
     const inNotifications = segments[0] === 'notifications'
     const inConnections = segments[0] === 'connections'
+    const inBlockedUsers = segments[0] === 'blocked-users'
     const inRateTrade = segments[0] === 'rate-trade'
     const inUploadFlow = segments[0] === 'upload-flow'
     const inVto = segments[0] === 'vto'
@@ -60,7 +61,7 @@ function AuthGate() {
     } else if (currentUser && inAuthGroup) {
       console.log('[AuthGate] Redirecting signed-in user from auth group to /')
       router.replace('/')
-    } else if (currentUser && !inOnboarding && !inTabs && !inItems && !inUsers && !inSearch && !inSettings && !inNotifications && !inConnections && !inRateTrade && !inUploadFlow && !inVto && !inTradeArchive && !isIndex) {
+    } else if (currentUser && !inOnboarding && !inTabs && !inItems && !inUsers && !inSearch && !inSettings && !inNotifications && !inConnections && !inBlockedUsers && !inRateTrade && !inUploadFlow && !inVto && !inTradeArchive && !isIndex) {
       console.log('[AuthGate] Redirecting signed-in user to home because route is outside allowed groups')
       router.replace('/')
     }
@@ -82,6 +83,7 @@ function AuthGate() {
         <Stack.Screen name="settings" />
         <Stack.Screen name="notifications" />
         <Stack.Screen name="connections" />
+        <Stack.Screen name="blocked-users" />
         <Stack.Screen name="rate-trade" />
         <Stack.Screen name="upload-flow" />
         <Stack.Screen name="vto" />

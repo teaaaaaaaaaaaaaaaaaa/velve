@@ -695,6 +695,7 @@ router.put('/:id/complete', requireAuth, async (req, res) => {
     trade.completedAt = new Date()
     trade.completedBy = isSender ? 'sender' : 'receiver'
     await trade.save()
+    await Promise.all([updateUserRating(trade.senderId), updateUserRating(trade.receiverId)])
 
     const requestedItemStatus = trade.offeredItemId ? 'swapped' : 'sold'
     const requestedItemUpdate = Item.findByIdAndUpdate(trade.requestedItemId, {

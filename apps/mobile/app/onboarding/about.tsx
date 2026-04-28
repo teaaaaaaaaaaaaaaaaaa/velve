@@ -53,7 +53,7 @@ const SERBIAN_CITIES = [
 
 const COPY = {
   sr: {
-    step: 'Korak 5 od 5',
+    step: 'Korak 5 od 6',
     mood: 'final fit',
     title: 'Zavrsi profil detaljima koji cine trade smislenim.',
     description:
@@ -73,7 +73,7 @@ const COPY = {
     errorFallback: 'Doslo je do greske. Pokusaj ponovo.',
   },
   en: {
-    step: 'Step 5 of 5',
+    step: 'Step 5 of 6',
     mood: 'final fit',
     title: 'Finish the profile with details that make trading feel real.',
     description:
@@ -93,7 +93,7 @@ const COPY = {
     errorFallback: 'Something went wrong. Please try again.',
   },
   ru: {
-    step: 'Шаг 5 из 5',
+    step: 'Шаг 5 из 6',
     mood: 'final fit',
     title: 'Заверши профиль деталями, которые делают trade реальным.',
     description:
@@ -270,7 +270,7 @@ export default function AboutScreen() {
     try {
       setLoading(true)
       await submitOnboarding()
-      router.push('/onboarding/scan')
+      router.push('/onboarding/photo')
     } catch (error: any) {
       Alert.alert(copy.errorTitle, error.response?.data?.error || copy.errorFallback)
     } finally {

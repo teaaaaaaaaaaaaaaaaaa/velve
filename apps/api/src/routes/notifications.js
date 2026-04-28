@@ -26,6 +26,20 @@ router.get('/', requireAuth, async (req, res) => {
   }
 })
 
+// GET /api/notifications/unread-count - lightweight tab badge payload
+router.get('/unread-count', requireAuth, async (req, res) => {
+  try {
+    const unreadCount = await Notification.countDocuments({
+      userId: req.dbUser._id,
+      readAt: null,
+    })
+
+    res.json({ ok: true, data: { unreadCount }, unreadCount })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // PUT /api/notifications/read - mark all read
 router.put('/read', requireAuth, async (req, res) => {
   try {

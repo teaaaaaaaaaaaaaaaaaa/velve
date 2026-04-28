@@ -14,6 +14,7 @@ export default function OnboardingLayout() {
       <Stack.Screen name="categories" />
       <Stack.Screen name="brands" />
       <Stack.Screen name="about" />
+      <Stack.Screen name="photo" />
       <Stack.Screen name="scan" />
     </Stack>
   )

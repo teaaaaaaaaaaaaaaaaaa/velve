@@ -12,8 +12,26 @@ const expo = new Expo()
  */
 async function sendPushToUser(userId, { title, body, data = {} }) {
   try {
-    const user = await User.findById(userId).select('expoPushToken').lean()
+    const user = await User.findById(userId).select('expoPushToken notificationPreferences').lean()
     if (!user?.expoPushToken || !Expo.isExpoPushToken(user.expoPushToken)) {
+      return
+    }
+
+    const preferences = user.notificationPreferences || {}
+    const type = String(data.type || '')
+    const preferenceKey = type.includes('chat')
+      ? 'messages'
+      : type.includes('like') || type.includes('wishlist')
+        ? 'likes'
+        : type.includes('follow')
+          ? 'follows'
+          : type.includes('rating')
+            ? 'ratings'
+            : type.includes('trade')
+              ? 'trades'
+              : 'marketing'
+
+    if (preferences.allPush === false || preferences[preferenceKey] === false) {
       return
     }
 

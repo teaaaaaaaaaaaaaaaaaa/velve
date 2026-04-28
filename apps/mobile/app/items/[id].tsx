@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import client from '@/api/client';
+import { BrandBackground } from '@/components/BrandBackground';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { DiscoveryCardItem, DiscoveryItemCard } from '@/components/DiscoveryItemCard';
 import { EditorialEmptyState } from '@/components/EditorialEmptyState';
@@ -65,6 +66,13 @@ type UserItem = {
   imageClean?: string | null;
   primaryImage?: string | null;
   brand: string;
+};
+type UnavailableItem = {
+  _id?: string;
+  title?: string;
+  status?: string;
+  category?: string;
+  primaryImage?: string | null;
 };
 
 const CONDITION_LABELS: Record<string, string> = {
@@ -136,6 +144,7 @@ export default function ItemDetailsScreen() {
   const isViewOnly = viewOnly === 'true';
 
   const [item, setItem] = useState<Item | null>(null);
+  const [unavailableItem, setUnavailableItem] = useState<UnavailableItem | null>(null);
   const [similarItems, setSimilarItems] = useState<DiscoveryCardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingSimilar, setLoadingSimilar] = useState(false);
@@ -147,6 +156,7 @@ export default function ItemDetailsScreen() {
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [currentUserItems, setCurrentUserItems] = useState<UserItem[]>([]);
   const [proposalMode, setProposalMode] = useState<'trade' | 'buy'>('trade');
+  const [showProposalReview, setShowProposalReview] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [tradeMessage, setTradeMessage] = useState('');
   const [offeredPrice, setOfferedPrice] = useState('');
@@ -225,19 +235,6 @@ export default function ItemDetailsScreen() {
         client.get(`/api/items/${id}/similar`, { params: { limit: 8 } }),
       ]);
 
-      if (itemResult.status !== 'fulfilled') throw itemResult.reason;
-
-      if (itemResult.value.data.ok) {
-        const data = itemResult.value.data.data as Item;
-        setItem(data);
-        setIsLiked(!!data.isLiked);
-        setLikesCount(data.likesCount || 0);
-        setIsWishlisted(!!data.isWishlisted);
-        setWishlistCount(data.wishlistCount || 0);
-        setTradeRequestsCount(data.tradeRequestsCount || 0);
-        hydrateEditState(data);
-      }
-
       if (similarResult.status === 'fulfilled' && similarResult.value.data.ok) {
         setSimilarItems(similarResult.value.data.data);
       } else {
@@ -247,6 +244,28 @@ export default function ItemDetailsScreen() {
             : similarResult.value.data?.error || 'Unknown similar-items error';
         console.warn('[ItemDetails] Similar items unavailable for item', id, similarReason);
         setSimilarItems([]);
+      }
+
+      if (itemResult.status !== 'fulfilled') {
+        const status = itemResult.reason?.response?.status;
+        if (status === 410) {
+          setUnavailableItem(itemResult.reason?.response?.data?.data || { _id: id });
+          setItem(null);
+          return;
+        }
+        throw itemResult.reason;
+      }
+
+      if (itemResult.value.data.ok) {
+        const data = itemResult.value.data.data as Item;
+        setUnavailableItem(null);
+        setItem(data);
+        setIsLiked(!!data.isLiked);
+        setLikesCount(data.likesCount || 0);
+        setIsWishlisted(!!data.isWishlisted);
+        setWishlistCount(data.wishlistCount || 0);
+        setTradeRequestsCount(data.tradeRequestsCount || 0);
+        hydrateEditState(data);
       }
     } catch {
       Alert.alert('Greska', 'Nije moguce ucitati detalje predmeta.');
@@ -414,13 +433,8 @@ export default function ItemDetailsScreen() {
   };
 
   const handleSubmitProposal = async () => {
-    if (proposalMode === 'trade' && !selectedItemId) {
-      return Alert.alert('Greska', 'Izaberi svoj komad koji nudis.');
-    }
-
-    if (proposalMode === 'buy' && !offeredPrice.trim()) {
-      return Alert.alert('Greska', 'Unesi cenu koju nudis.');
-    }
+    const validationError = getProposalValidationError();
+    if (validationError) return Alert.alert('Greska', validationError);
 
     try {
       setSubmittingTrade(true);
@@ -439,6 +453,7 @@ export default function ItemDetailsScreen() {
         setTradeMessage('');
         setSelectedItemId(null);
         setOfferedPrice('');
+        setShowProposalReview(false);
 
         Alert.alert('Uspeh', 'Predlog je poslat.', [
           {
@@ -452,6 +467,32 @@ export default function ItemDetailsScreen() {
     } finally {
       setSubmittingTrade(false);
     }
+  };
+
+  const getProposalValidationError = () => {
+    if (proposalMode === 'trade' && !selectedItemId) {
+      return 'Izaberi svoj komad koji nudis.';
+    }
+
+    if (proposalMode === 'buy' && !offeredPrice.trim()) {
+      return 'Unesi cenu koju nudis.';
+    }
+
+    if (proposalMode === 'buy' && (!Number.isFinite(Number(offeredPrice)) || Number(offeredPrice) <= 0)) {
+      return 'Cena mora biti broj veci od 0.';
+    }
+
+    return null;
+  };
+
+  const openProposalReview = () => {
+    const validationError = getProposalValidationError();
+    if (validationError) {
+      Alert.alert('Greska', validationError);
+      return;
+    }
+
+    setShowProposalReview(true);
   };
 
   const handleHide = async () => {
@@ -502,6 +543,7 @@ export default function ItemDetailsScreen() {
     setTradeMessage('');
     setSelectedItemId(null);
     setOfferedPrice(item?.price != null ? String(item.price) : '');
+    setShowProposalReview(false);
     setShowTradeModal(true);
     if (item?.listingType !== 'sell') {
       fetchUserItems();
@@ -518,6 +560,82 @@ export default function ItemDetailsScreen() {
   }, [loading, openTrade, item]);
 
   if (loading || !item) {
+    if (!loading && unavailableItem) {
+      return (
+        <View className="flex-1 bg-base-canvas">
+          <Stack.Screen options={{ headerShown: false }} />
+          <BrandBackground />
+          <ScrollView contentContainerStyle={{ paddingBottom: 120 }} className="flex-1">
+            <View className="px-5 pb-8 pt-14">
+              <TouchableOpacity
+                onPress={() => router.back()}
+                className="mb-7 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
+              >
+                <Ionicons name="arrow-back" size={20} color={colors.inkDark} />
+              </TouchableOpacity>
+
+              <View className="items-center rounded-[30px] bg-surface-panel px-5 py-8">
+                <View className="h-20 w-20 items-center justify-center rounded-full bg-brand-accent-light/25">
+                  <Ionicons name="bag-remove-outline" size={34} color={colors.accentDeep} />
+                </View>
+                <Text className="mt-5 text-center font-display text-4xl text-ink-dark">
+                  Ovaj artikal vise nije dostupan
+                </Text>
+                <Text className="mt-3 text-center font-sans text-sm leading-6 text-ink-dark/62">
+                  {unavailableItem.title
+                    ? `${unavailableItem.title} je prodat, arhiviran ili vise nije aktivan.`
+                    : 'Artikal je prodat, arhiviran ili vise nije aktivan.'}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.replace('/(tabs)/feed')}
+                  className="mt-6 rounded-full bg-brand-accent-deep px-5 py-3.5"
+                >
+                  <Text className="font-sans text-sm font-semibold text-base-canvas">
+                    Nazad na feed
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View className="mt-8">
+                <Text className="font-display text-3xl text-ink-dark">Slicni dostupni komadi</Text>
+                {loadingSimilar ? (
+                  <View className="items-center py-8">
+                    <ActivityIndicator size="small" color={colors.accentDeep} />
+                  </View>
+                ) : similarItems.length === 0 ? (
+                  <View className="items-center py-8">
+                    <Text className="font-sans text-sm text-ink-dark/50">
+                      Trenutno nema slicnih dostupnih komada.
+                    </Text>
+                  </View>
+                ) : (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{
+                      gap: 12,
+                      paddingTop: 16,
+                      paddingBottom: 8,
+                      paddingRight: 12,
+                    }}
+                  >
+                    {similarItems.map((similar) => (
+                      <View key={similar._id} style={{ width: 176 }}>
+                        <DiscoveryItemCard
+                          item={similar}
+                          onPress={() => router.push(`/items/${similar._id}`)}
+                        />
+                      </View>
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      );
+    }
+
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
@@ -536,6 +654,9 @@ export default function ItemDetailsScreen() {
     ? `${owner.location.city}${owner.location.region ? `, ${owner.location.region}` : ''}`
     : null;
   const heroCardBottomOffset = 58;
+  const selectedOfferItem = currentUserItems.find((entry) => entry._id === selectedItemId) || null;
+  const requestedImage = getPrimaryItemImage(item);
+  const offeredImage = selectedOfferItem ? getPrimaryItemImage(selectedOfferItem) : undefined;
 
   const renderTradeModal = () => (
     <Modal
@@ -553,6 +674,91 @@ export default function ItemDetailsScreen() {
           <View className="w-6" />
         </View>
         <ScrollView className="flex-1 px-6 pt-5">
+          {showProposalReview ? (
+            <>
+              <Text className="mb-4 font-sans text-sm text-ink-dark/65">
+                Proveri predlog pre slanja. Ovo ce otvoriti chat sa vlasnikom ako predlog prodje.
+              </Text>
+
+              <View className="rounded-[26px] bg-surface-panel px-4 py-4">
+                <Text className="font-sans text-xs uppercase text-ink-dark/45">
+                  Trazis
+                </Text>
+                <View className="mt-3 flex-row items-center">
+                  {requestedImage ? (
+                    <RemoteImage uri={requestedImage} className="h-16 w-16 rounded-2xl" />
+                  ) : (
+                    <View className="h-16 w-16 items-center justify-center rounded-2xl bg-brand-accent-light/20">
+                      <Ionicons name="shirt-outline" size={24} color={colors.accentDeep} />
+                    </View>
+                  )}
+                  <View className="ml-3 flex-1">
+                    <Text className="font-sans text-base font-semibold text-ink-dark">
+                      {item.title}
+                    </Text>
+                    <Text className="mt-1 font-sans text-xs text-ink-dark/55">
+                      Od {owner?.displayName || 'korisnika'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View className="mt-3 rounded-[26px] bg-surface-panel px-4 py-4">
+                <Text className="font-sans text-xs uppercase text-ink-dark/45">
+                  Saljes
+                </Text>
+                {proposalMode === 'trade' && selectedOfferItem ? (
+                  <View className="mt-3 flex-row items-center">
+                    {offeredImage ? (
+                      <RemoteImage uri={offeredImage} className="h-16 w-16 rounded-2xl" />
+                    ) : (
+                      <View className="h-16 w-16 items-center justify-center rounded-2xl bg-brand-accent-light/20">
+                        <Ionicons name="shirt-outline" size={24} color={colors.accentDeep} />
+                      </View>
+                    )}
+                    <View className="ml-3 flex-1">
+                      <Text className="font-sans text-base font-semibold text-ink-dark">
+                        {selectedOfferItem.title}
+                      </Text>
+                      <Text className="mt-1 font-sans text-xs text-ink-dark/55">
+                        {selectedOfferItem.brand || 'Bez brenda'}
+                      </Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View className="mt-3 flex-row items-center">
+                    <View className="h-16 w-16 items-center justify-center rounded-2xl bg-brand-accent-light/20">
+                      <Ionicons name="cash-outline" size={24} color={colors.accentDeep} />
+                    </View>
+                    <View className="ml-3 flex-1">
+                      <Text className="font-sans text-base font-semibold text-ink-dark">
+                        {Number(offeredPrice)} EUR
+                      </Text>
+                      <Text className="mt-1 font-sans text-xs text-ink-dark/55">
+                        Ponuda za kupovinu
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {tradeMessage.trim() ? (
+                <View className="mt-3 rounded-[26px] bg-surface-panel px-4 py-4">
+                  <Text className="font-sans text-xs uppercase text-ink-dark/45">Poruka</Text>
+                  <Text className="mt-2 font-sans text-sm leading-6 text-ink-dark/70">
+                    {tradeMessage.trim()}
+                  </Text>
+                </View>
+              ) : null}
+
+              <TouchableOpacity onPress={() => setShowProposalReview(false)} className="mt-5 self-center">
+                <Text className="font-sans text-sm font-semibold text-brand-accent-deep">
+                  Izmeni predlog
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
           {availableProposalModes.length > 1 ? (
             <View className="mb-5 flex-row rounded-[22px] bg-surface-panel p-1">
               {availableProposalModes.map((mode) => (
@@ -560,6 +766,7 @@ export default function ItemDetailsScreen() {
                   key={mode}
                   onPress={() => {
                     setProposalMode(mode);
+                    setShowProposalReview(false);
                     if (mode === 'trade' && currentUserItems.length === 0) {
                       fetchUserItems();
                     }
@@ -673,12 +880,14 @@ export default function ItemDetailsScreen() {
             multiline
             className="min-h-[110px] rounded-[24px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
           />
+            </>
+          )}
           <View className="h-24" />
         </ScrollView>
         {(proposalMode === 'buy' || currentUserItems.length > 0) ? (
           <View className="border-t border-ink-dark/4 px-6 py-4">
             <TouchableOpacity
-              onPress={handleSubmitProposal}
+              onPress={showProposalReview ? handleSubmitProposal : openProposalReview}
               disabled={(proposalMode === 'trade' && !selectedItemId) || (proposalMode === 'buy' && !offeredPrice.trim()) || submittingTrade}
               className="items-center rounded-full bg-brand-accent-deep px-4 py-4"
             >
@@ -686,7 +895,7 @@ export default function ItemDetailsScreen() {
                 <ActivityIndicator size="small" color={colors.baseCanvas} />
               ) : (
                 <Text className="font-sans text-sm font-semibold text-base-canvas">
-                  Posalji predlog
+                  {showProposalReview ? 'Potvrdi i posalji' : 'Pregledaj predlog'}
                 </Text>
               )}
             </TouchableOpacity>

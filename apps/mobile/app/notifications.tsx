@@ -105,7 +105,9 @@ export default function NotificationsScreen() {
       const actorId = notification.actorUserId?._id || notification.data?.userId || notification.data?.senderId
       const tradeId = notification.tradeId || notification.data?.tradeId
 
-      if (chatId) {
+      if (notification.type === 'trade_complete' && tradeId) {
+        router.push({ pathname: '/rate-trade', params: { tradeId } })
+      } else if (chatId) {
         router.push(`/(tabs)/chat/${chatId}`)
       } else if (itemId) {
         router.push(`/items/${itemId}`)
