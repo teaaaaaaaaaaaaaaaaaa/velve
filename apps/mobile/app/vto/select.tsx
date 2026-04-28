@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  Alert,
   FlatList,
   Text,
   TextInput,
@@ -15,6 +16,7 @@ import { BrandedLoader } from '@/components/BrandedLoader'
 import { RemoteImage } from '@/components/RemoteImage'
 import { colors } from '@/design/tokens'
 import { getPrimaryItemImage, hasDigitizedImage } from '@/lib/itemImages'
+import { resolveVtoGarmentCategory } from '@/lib/vtoCategory'
 
 type ClosetItem = {
   _id: string
@@ -27,14 +29,16 @@ type ClosetItem = {
   isDigitized?: boolean
 }
 
+const MAX_SELECTED_ITEMS = 4
+
 export default function VtoSelectScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<ClosetItem[]>([])
   const [query, setQuery] = useState('')
-  const [category, setCategory] = useState<'all' | 'tops' | 'bottoms'>('all')
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const [category, setCategory] = useState<'all' | 'tops' | 'bottoms' | 'one-pieces'>('all')
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([])
 
   useEffect(() => {
     client
@@ -51,49 +55,72 @@ export default function VtoSelectScreen() {
     return items.filter((item) => {
       const searchable = `${item.title} ${item.brand || ''} ${item.category || ''}`.toLowerCase()
       const matchesQuery = searchable.includes(query.trim().toLowerCase())
-      const normalizedCategory = String(item.category || '').toLowerCase()
-      const matchesCategory =
-        category === 'all' ||
-        (category === 'tops' && !normalizedCategory.includes('pantal') && !normalizedCategory.includes('bottom')) ||
-        (category === 'bottoms' && (normalizedCategory.includes('pantal') || normalizedCategory.includes('bottom')))
+      const normalizedCategory = resolveVtoGarmentCategory(item.category)
+      const matchesCategory = category === 'all' || normalizedCategory === category
 
       return matchesQuery && matchesCategory
     })
   }, [category, items, query])
 
+  const toggleSelection = useCallback((itemId: string) => {
+    setSelectedItemIds((prev) => {
+      if (prev.includes(itemId)) {
+        return prev.filter((entry) => entry !== itemId)
+      }
+
+      if (prev.length >= MAX_SELECTED_ITEMS) {
+        Alert.alert('Limit dostignut', 'Mozes da izaberes najvise 4 komada za outfit render.')
+        return prev
+      }
+
+      return [...prev, itemId]
+    })
+  }, [])
+
   const renderItem = useCallback(
-    ({ item }: { item: ClosetItem }) => (
-      <TouchableOpacity
-        style={{ width: '48%', marginBottom: 16 }}
-        onPress={() => setSelectedItemId(item._id)}
-        className={`overflow-hidden rounded-[26px] ${
-          selectedItemId === item._id ? 'bg-brand-accent-deep/10' : 'bg-surface-panel'
-        }`}
-      >
-        <RemoteImage
-          uri={getPrimaryItemImage(item) || undefined}
-          className="aspect-[0.82] w-full"
-        />
-        <View className="px-3 pb-4 pt-3">
-          <View className="flex-row items-start justify-between">
-            <Text className="flex-1 font-display text-lg text-ink-dark" numberOfLines={2}>
-              {item.title}
+    ({ item }: { item: ClosetItem }) => {
+      const selectedIndex = selectedItemIds.indexOf(item._id)
+      const isSelected = selectedIndex >= 0
+
+      return (
+        <TouchableOpacity
+          style={{ width: '48%', marginBottom: 16 }}
+          onPress={() => toggleSelection(item._id)}
+          className={`overflow-hidden rounded-[26px] ${
+            isSelected ? 'bg-brand-accent-deep/10' : 'bg-surface-panel'
+          }`}
+        >
+          <RemoteImage
+            uri={getPrimaryItemImage(item) || undefined}
+            className="aspect-[0.82] w-full"
+          />
+          <View className="px-3 pb-4 pt-3">
+            <View className="flex-row items-start justify-between">
+              <Text className="flex-1 font-display text-lg text-ink-dark" numberOfLines={2}>
+                {item.title}
+              </Text>
+              <View
+                className={`h-7 w-7 items-center justify-center rounded-full border ${
+                  isSelected
+                    ? 'border-brand-accent-deep bg-brand-accent-deep'
+                    : 'border-ink-dark/25 bg-transparent'
+                }`}
+              >
+                {isSelected ? (
+                  <Text className="font-sans text-xs font-semibold text-base-canvas">
+                    {selectedIndex + 1}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+            <Text className="mt-1 font-sans text-xs text-ink-dark/55">
+              {item.brand || 'Digital item'}
             </Text>
-            <View
-              className={`h-6 w-6 rounded-full border ${
-                selectedItemId === item._id
-                  ? 'border-brand-accent-deep bg-brand-accent-deep'
-                  : 'border-ink-dark/25 bg-transparent'
-              }`}
-            />
           </View>
-          <Text className="mt-1 font-sans text-xs text-ink-dark/55">
-            {item.brand || 'Digital item'}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    ),
-    [selectedItemId]
+        </TouchableOpacity>
+      )
+    },
+    [selectedItemIds, toggleSelection]
   )
 
   const listHeader = useMemo(
@@ -122,15 +149,16 @@ export default function VtoSelectScreen() {
           className="rounded-[24px] bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
         />
 
-        <View className="mt-4 flex-row gap-2">
+        <View className="mt-4 flex-row flex-wrap gap-2">
           {[
             { key: 'all', label: 'All' },
             { key: 'tops', label: 'Tops' },
             { key: 'bottoms', label: 'Bottoms' },
+            { key: 'one-pieces', label: 'One-Pieces' },
           ].map((entry) => (
             <TouchableOpacity
               key={entry.key}
-              onPress={() => setCategory(entry.key as 'all' | 'tops' | 'bottoms')}
+              onPress={() => setCategory(entry.key as 'all' | 'tops' | 'bottoms' | 'one-pieces')}
               className={`rounded-full px-4 py-2.5 ${
                 category === entry.key ? 'bg-brand-accent-deep' : 'bg-surface-panel'
               }`}
@@ -145,14 +173,21 @@ export default function VtoSelectScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        <Text className="mt-4 font-sans text-sm text-ink-dark/55">
+          Izabrano: {selectedItemIds.length}/{MAX_SELECTED_ITEMS}
+        </Text>
       </View>
     ),
-    [category, query, router]
+    [category, query, router, selectedItemIds.length]
   )
 
   if (loading) {
     return <BrandedLoader />
   }
+
+  const primaryLabel =
+    selectedItemIds.length > 1 ? 'Try On Outfit' : selectedItemIds.length === 1 ? 'Try On' : 'Izaberi komad'
 
   return (
     <SafeAreaView className="flex-1 bg-base-canvas" edges={['top', 'bottom']}>
@@ -194,21 +229,26 @@ export default function VtoSelectScreen() {
           }}
         >
           <TouchableOpacity
-            disabled={!selectedItemId}
+            disabled={selectedItemIds.length === 0}
             onPress={() =>
-              selectedItemId &&
-              router.push({ pathname: '/vto/render', params: { itemId: selectedItemId } })
+              router.push({
+                pathname: '/vto/render',
+                params:
+                  selectedItemIds.length === 1
+                    ? { itemId: selectedItemIds[0] }
+                    : { itemIds: JSON.stringify(selectedItemIds) },
+              })
             }
             className={`items-center rounded-full px-4 py-4 ${
-              selectedItemId ? 'bg-brand-accent-deep' : 'bg-brand-accent-deep/20'
+              selectedItemIds.length > 0 ? 'bg-brand-accent-deep' : 'bg-brand-accent-deep/20'
             }`}
           >
             <Text
               className={`font-sans text-base font-semibold ${
-                selectedItemId ? 'text-base-canvas' : 'text-ink-dark/45'
+                selectedItemIds.length > 0 ? 'text-base-canvas' : 'text-ink-dark/45'
               }`}
             >
-              Dalje
+              {primaryLabel}
             </Text>
           </TouchableOpacity>
         </View>

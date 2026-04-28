@@ -1,4 +1,5 @@
 import modal
+import uuid
 
 APP_NAME = "velve-fashn-vton"
 REPO_URL = "https://github.com/fashn-AI/fashn-vton-1.5.git"
@@ -19,11 +20,12 @@ image = (
 pipeline = None
 
 
-def fetch_pil_image(url: str):
+def fetch_pil_image(url: str, label: str, request_id: str):
     import io
     import requests
     from PIL import Image
 
+    print(f"[VTO][Modal][{request_id}] Fetching {label} image", {"url": url})
     response = requests.get(url, timeout=60)
     response.raise_for_status()
     return Image.open(io.BytesIO(response.content)).convert("RGB")
@@ -63,22 +65,37 @@ def try_on(payload: dict):
         garmentImageUrl: str
         garmentCategory: str = "tops"
         prompt: str = ""
+        requestId: str = ""
 
     req = TryOnRequest(**payload)
+    request_id = req.requestId.strip() or f"vto-modal-{uuid.uuid4().hex[:12]}"
     runner = ensure_pipeline()
-    person = fetch_pil_image(req.personImageUrl)
-    garment = fetch_pil_image(req.garmentImageUrl)
-    result = runner(
-        person_image=person,
-        garment_image=garment,
-        category=req.garmentCategory or "tops",
-    )
+    try:
+        print(
+            f"[VTO][Modal][{request_id}] Request received",
+            {"garmentCategory": req.garmentCategory or "tops"},
+        )
+        person = fetch_pil_image(req.personImageUrl, "person", request_id)
+        garment = fetch_pil_image(req.garmentImageUrl, "garment", request_id)
+        print(f"[VTO][Modal][{request_id}] Starting FASHN render")
+        result = runner(
+            person_image=person,
+            garment_image=garment,
+            category=req.garmentCategory or "tops",
+        )
 
-    output_buffer = io.BytesIO()
-    result.images[0].save(output_buffer, format="PNG")
-    image_bytes = output_buffer.getvalue()
+        output_buffer = io.BytesIO()
+        result.images[0].save(output_buffer, format="PNG")
+        image_bytes = output_buffer.getvalue()
+        print(
+            f"[VTO][Modal][{request_id}] Render complete",
+            {"imageBytes": len(image_bytes)},
+        )
 
-    return {
-        "imageBase64": base64.b64encode(image_bytes).decode("utf-8"),
-        "model": "fashn-vton-1.5",
-    }
+        return {
+            "imageBase64": base64.b64encode(image_bytes).decode("utf-8"),
+            "model": "fashn-vton-1.5",
+        }
+    except Exception as error:
+        print(f"[VTO][Modal][{request_id}] Render failed: {error}")
+        raise

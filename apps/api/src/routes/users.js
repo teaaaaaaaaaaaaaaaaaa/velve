@@ -12,7 +12,7 @@ const TradeRequest = require('../models/TradeRequest')
 const ItemView = require('../models/ItemView')
 const { enrichItems } = require('../lib/enrichItems')
 const { imageUpload } = require('../lib/uploadMiddleware')
-const { createBodyScanKey, uploadBuffer } = require('../lib/r2')
+const { createBodyScanKey, deleteObject, keyFromUrl, uploadBuffer } = require('../lib/r2')
 const {
   getDiscoverySignals,
   getBehavioralAffinity,
@@ -22,6 +22,8 @@ const {
 const LIVE_ITEM_STATUSES = ['available', 'pending_trade', 'unavailable']
 const DRAFT_ITEM_STATUSES = ['draft']
 const ARCHIVE_ITEM_STATUSES = ['archived', 'sold', 'swapped', 'traded']
+const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:8000'
+const BODY_SCAN_ANALYSIS_TIMEOUT_MS = 45000
 
 function buildOnboardingUpdates(body = {}) {
   const { stylePreferences, favoriteBrands, categories, sizes, location } = body
@@ -216,6 +218,38 @@ async function saveCurrentUser(req, res, updates) {
   const updated = await User.findByIdAndUpdate(req.dbUser._id, updates, { new: true })
   const payload = await buildUserProfilePayload(updated, req.dbUser._id)
   res.json({ ok: true, data: payload })
+}
+
+async function analyzeBodyScanFile(file) {
+  if (!file) {
+    throw new Error('Image file is required')
+  }
+
+  const formData = new FormData()
+  formData.append(
+    'file',
+    new Blob([file.buffer], { type: file.mimetype }),
+    file.originalname || 'body-scan.jpg'
+  )
+
+  const response = await fetch(`${AI_SERVER_URL}/analyze-body-scan`, {
+    method: 'POST',
+    body: formData,
+    signal: AbortSignal.timeout(BODY_SCAN_ANALYSIS_TIMEOUT_MS),
+  })
+
+  if (!response.ok) {
+    let message = 'Body scan validation failed'
+    try {
+      const errorBody = await response.json()
+      message = errorBody.detail || errorBody.error || message
+    } catch {
+      message = await response.text()
+    }
+    throw new Error(message)
+  }
+
+  return response.json()
 }
 
 async function buildRecentlyViewedItems(userId, limit = 8) {
@@ -434,6 +468,14 @@ router.post('/body-scan', requireAuth, imageUpload.single('image'), async (req, 
       return res.status(400).json({ error: 'image is required' })
     }
 
+    const analysis = await analyzeBodyScanFile(req.file)
+    if (!analysis?.ready) {
+      return res.status(400).json({
+        error: analysis?.message || 'Body scan nije prosao proveru. Pokusaj ponovo.',
+        data: analysis,
+      })
+    }
+
     const key = createBodyScanKey(req.dbUser._id)
     const uploadResult = await uploadBuffer({
       key,
@@ -452,8 +494,39 @@ router.post('/body-scan', requireAuth, imageUpload.single('image'), async (req, 
       data: {
         url: uploadResult.url,
         createdAt: bodyScanCreatedAt,
+        analysis,
       },
     })
+  } catch (err) {
+    res.status(500).json({
+      error: err.message || 'Body scan trenutno nije moguce sacuvati.',
+    })
+  }
+})
+
+router.delete('/body-scan', requireAuth, async (req, res) => {
+  try {
+    const existingUrl = req.dbUser.bodyScanUrl || ''
+
+    if (existingUrl) {
+      try {
+        await deleteObject(keyFromUrl(existingUrl))
+      } catch (error) {
+        console.warn('[Users/body-scan] Failed to delete body scan file from R2', {
+          userId: String(req.dbUser?._id || ''),
+          message: error.message,
+        })
+      }
+    }
+
+    await User.findByIdAndUpdate(req.dbUser._id, {
+      $unset: {
+        bodyScanUrl: 1,
+        bodyScanCreatedAt: 1,
+      },
+    })
+
+    res.json({ ok: true, message: 'Body scan deleted' })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

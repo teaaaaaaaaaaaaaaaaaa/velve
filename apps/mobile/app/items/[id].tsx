@@ -336,13 +336,7 @@ export default function ItemDetailsScreen() {
   const handleTryOn = async () => {
     try {
       setCheckingBodyScan(true);
-      const response = await client.get('/api/users/body-scan');
-      const hasBodyScan = response.data?.data?.exists;
-      if (hasBodyScan) {
-        router.push({ pathname: '/vto/render', params: { itemId: id } });
-      } else {
-        router.push('/vto/body-scan');
-      }
+      router.push({ pathname: '/vto/render', params: { itemId: id, mode: 'quick' } });
     } catch {
       Alert.alert('Greska', 'Nije moguce pokrenuti Virtual Try-On.');
     } finally {

@@ -49,6 +49,8 @@ type UserProfile = {
   successfulSwaps: number
   profileCompleteness: number
   closetCounts: ClosetCounts
+  bodyScanUrl?: string | null
+  bodyScanCreatedAt?: string | null
   favoriteBrands?: string[]
   location?: { city?: string; region?: string }
 }
@@ -310,6 +312,8 @@ export default function ProfileScreen() {
     )
   }
 
+  const hasBodyScan = Boolean(profile.bodyScanUrl)
+
   return (
     <>
       <ScrollView
@@ -478,6 +482,25 @@ export default function ProfileScreen() {
                   {profile.closetCounts.live} live / {profile.closetCounts.drafts} drafts
                 </Text>
               </View>
+            </View>
+
+            <View className="mt-4 rounded-[26px] bg-brand-accent-deep px-4 py-4">
+              <Text className="font-display text-[28px] text-base-canvas">
+                {hasBodyScan ? 'Virtual Try-On je spreman' : 'Dodaj Virtual Try-On'}
+              </Text>
+              <Text className="mt-2 font-sans text-sm leading-6 text-base-canvas/80">
+                {hasBodyScan
+                  ? 'Tvoj body scan je sacuvan i mozes odmah da otvoris VTO hub ili da nastavis sa novim renderima.'
+                  : 'Ako si preskocio body scan tokom prvog setup-a, ovde mozes kasnije da ga dodas i ukljucis Virtual Try-On.'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => router.push(hasBodyScan ? '/vto/hub' : '/vto/body-scan')}
+                className="mt-4 items-center rounded-full bg-base-canvas px-4 py-4"
+              >
+                <Text className="font-sans text-sm font-semibold text-brand-accent-deep">
+                  {hasBodyScan ? 'Otvori VTO hub' : 'Napravi body scan'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
 

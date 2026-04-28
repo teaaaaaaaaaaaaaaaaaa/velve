@@ -1,10 +1,32 @@
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Text, TouchableOpacity, View } from 'react-native'
 
 import { BrandBackground } from '@/components/BrandBackground'
 
+type BodyScanReadyRouteParams = {
+  returnTo?: string | string[]
+  itemId?: string | string[]
+  itemIds?: string | string[]
+  mode?: string | string[]
+}
+
+function normalizeParam(value?: string | string[]) {
+  if (Array.isArray(value)) {
+    return value[0]
+  }
+
+  return value
+}
+
 export default function BodyScanReadyScreen() {
   const router = useRouter()
+  const params = useLocalSearchParams<BodyScanReadyRouteParams>()
+
+  const returnTo = normalizeParam(params.returnTo)
+  const itemId = normalizeParam(params.itemId)
+  const itemIds = normalizeParam(params.itemIds)
+  const mode = normalizeParam(params.mode)
+  const canReturnToRender = returnTo === '/vto/render' && Boolean(itemId || itemIds)
 
   return (
     <View className="flex-1 bg-base-canvas">
@@ -22,11 +44,25 @@ export default function BodyScanReadyScreen() {
         </Text>
 
         <TouchableOpacity
-          onPress={() => router.replace('/vto/hub')}
+          onPress={() => {
+            if (canReturnToRender) {
+              router.replace({
+                pathname: '/vto/render',
+                params: {
+                  ...(itemId ? { itemId } : {}),
+                  ...(itemIds ? { itemIds } : {}),
+                  ...(mode ? { mode } : { mode: 'quick' }),
+                },
+              })
+              return
+            }
+
+            router.replace('/vto/hub')
+          }}
           className="mt-8 items-center rounded-full bg-brand-accent-deep px-5 py-4"
         >
           <Text className="font-sans text-base font-semibold text-base-canvas">
-            Uđi u Velve arhiv
+            {canReturnToRender ? 'Nastavi na Try-On' : 'Udji u Velve arhiv'}
           </Text>
         </TouchableOpacity>
       </View>

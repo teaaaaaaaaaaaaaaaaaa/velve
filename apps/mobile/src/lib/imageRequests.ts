@@ -40,7 +40,7 @@ export async function uploadBodyScanUri(uri: string) {
   const formData = createImageFormData(uri)
   const response = await client.post('/api/users/body-scan', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 60000,
+    timeout: 120000,
   })
   return response.data?.data
 }
