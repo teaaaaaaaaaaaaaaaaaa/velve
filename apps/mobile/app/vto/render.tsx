@@ -5,7 +5,6 @@ import {
   Alert,
   ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
@@ -13,6 +12,7 @@ import {
 import client from '@/api/client'
 import { BrandedLoader } from '@/components/BrandedLoader'
 import { RemoteImage } from '@/components/RemoteImage'
+import { VelveTextInput } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 import { getPrimaryItemImage } from '@/lib/itemImages'
 
@@ -307,11 +307,10 @@ export default function VtoRenderScreen() {
 
         <View className="mt-5 rounded-[28px] bg-surface-panel px-4 py-4">
           <Text className="font-display text-3xl text-ink-dark">Sacuvaj fit</Text>
-          <TextInput
+          <VelveTextInput
             value={outfitName}
             onChangeText={setOutfitName}
             placeholder={isMultiItem ? 'Velve Outfit' : 'Misty Night Out'}
-            placeholderTextColor="#2B2A2B66"
             className="mt-4 rounded-[22px] bg-base-canvas px-4 py-4 font-sans text-sm text-ink-dark"
           />
 

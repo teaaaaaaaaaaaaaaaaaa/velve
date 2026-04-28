@@ -3,10 +3,10 @@ import { Stack, useRouter } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   FlatList,
+  Modal,
   RefreshControl,
   StatusBar,
   Text,
-  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -17,8 +17,28 @@ import client from '@/api/client'
 import { BrandedLoader } from '@/components/BrandedLoader'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { ImmersiveFeedCard, ImmersiveFeedItem } from '@/components/ImmersiveFeedCard'
+import { VelveTextInput } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
+
+type SearchFilters = {
+  category: string
+  size: string
+  city: string
+  priceMin: string
+  priceMax: string
+}
+
+const EMPTY_FILTERS: SearchFilters = {
+  category: '',
+  size: '',
+  city: '',
+  priceMin: '',
+  priceMax: '',
+}
+
+const CATEGORY_FILTERS = ['Majice', 'Haljine', 'Pantalone', 'Jakne', 'Obuca', 'Dodaci']
+const SIZE_FILTERS = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
 
 export default function SearchScreen() {
   const router = useRouter()
@@ -33,6 +53,9 @@ export default function SearchScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
+  const [filters, setFilters] = useState<SearchFilters>(EMPTY_FILTERS)
+  const [draftFilters, setDraftFilters] = useState<SearchFilters>(EMPTY_FILTERS)
+  const [filterOpen, setFilterOpen] = useState(false)
 
   const pageHeight = Math.max(windowHeight, 1)
 
@@ -53,6 +76,11 @@ export default function SearchScreen() {
           params: {
             limit: 20,
             search: query.trim() || undefined,
+            category: filters.category || undefined,
+            size: filters.size || undefined,
+            city: filters.city.trim() || undefined,
+            priceMin: filters.priceMin.trim() || undefined,
+            priceMax: filters.priceMax.trim() || undefined,
             cursor: mode === 'append' ? nextCursor || undefined : undefined,
           },
         })
@@ -73,7 +101,7 @@ export default function SearchScreen() {
         setRefreshing(false)
       }
     },
-    [nextCursor, query]
+    [filters, nextCursor, query]
   )
 
   useEffect(() => {
@@ -176,6 +204,20 @@ export default function SearchScreen() {
   )
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 })
+  const activeFilterCount = Object.values(filters).filter((value) => value.trim()).length
+
+  const applyFilters = useCallback(() => {
+    setFilters(draftFilters)
+    setFilterOpen(false)
+    setNextCursor(null)
+  }, [draftFilters])
+
+  const clearFilters = useCallback(() => {
+    setDraftFilters(EMPTY_FILTERS)
+    setFilters(EMPTY_FILTERS)
+    setFilterOpen(false)
+    setNextCursor(null)
+  }, [])
 
   if (loading && items.length === 0) {
     return <BrandedLoader dark />
@@ -244,15 +286,29 @@ export default function SearchScreen() {
 
           <View className="flex-1 flex-row items-center rounded-full bg-ink-dark/6 px-4 py-3">
             <Ionicons name="search" size={18} color={colors.inkDark} style={{ opacity: 0.5 }} />
-            <TextInput
+            <VelveTextInput
               value={query}
               onChangeText={setQuery}
               placeholder="Pretrazi komade, brend ili kategoriju..."
-              placeholderTextColor="rgba(43,42,43,0.42)"
               className="ml-3 flex-1 font-sans text-sm text-ink-dark"
               autoFocus
             />
           </View>
+          <TouchableOpacity
+            onPress={() => {
+              setDraftFilters(filters)
+              setFilterOpen(true)
+            }}
+            className={`h-11 w-11 items-center justify-center rounded-full ${
+              activeFilterCount ? 'bg-brand-accent-deep' : 'bg-ink-dark/6'
+            }`}
+          >
+            <Ionicons
+              name="options-outline"
+              size={20}
+              color={activeFilterCount ? colors.baseCanvas : colors.inkDark}
+            />
+          </TouchableOpacity>
         </View>
 
         {!loading ? (
@@ -263,6 +319,116 @@ export default function SearchScreen() {
           </View>
         ) : null}
       </View>
+
+      <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
+        <View className="flex-1 justify-end bg-ink-dark/30">
+          <View className="rounded-t-[32px] bg-base-canvas px-5 pb-8 pt-5">
+            <View className="mb-5 flex-row items-center justify-between">
+              <Text className="font-display text-3xl text-ink-dark">Filteri</Text>
+              <TouchableOpacity
+                onPress={() => setFilterOpen(false)}
+                className="h-10 w-10 items-center justify-center rounded-full bg-surface-panel"
+              >
+                <Ionicons name="close" size={20} color={colors.inkDark} />
+              </TouchableOpacity>
+            </View>
+
+            <Text className="mb-2 font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/45">
+              Kategorija
+            </Text>
+            <View className="flex-row flex-wrap gap-2">
+              {CATEGORY_FILTERS.map((category) => (
+                <TouchableOpacity
+                  key={category}
+                  onPress={() =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      category: prev.category === category ? '' : category,
+                    }))
+                  }
+                  className={`rounded-full px-4 py-2.5 ${
+                    draftFilters.category === category ? 'bg-brand-accent-deep' : 'bg-surface-panel'
+                  }`}
+                >
+                  <Text
+                    className={`font-sans text-sm ${
+                      draftFilters.category === category ? 'text-base-canvas' : 'text-ink-dark'
+                    }`}
+                  >
+                    {category}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text className="mb-2 mt-5 font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/45">
+              Velicina
+            </Text>
+            <View className="flex-row flex-wrap gap-2">
+              {SIZE_FILTERS.map((size) => (
+                <TouchableOpacity
+                  key={size}
+                  onPress={() =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      size: prev.size === size ? '' : size,
+                    }))
+                  }
+                  className={`min-w-[48px] items-center rounded-full px-4 py-2.5 ${
+                    draftFilters.size === size ? 'bg-brand-accent-deep' : 'bg-surface-panel'
+                  }`}
+                >
+                  <Text
+                    className={`font-sans text-sm ${
+                      draftFilters.size === size ? 'text-base-canvas' : 'text-ink-dark'
+                    }`}
+                  >
+                    {size}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View className="mt-5 flex-row gap-3">
+              <VelveTextInput
+                value={draftFilters.city}
+                onChangeText={(city) => setDraftFilters((prev) => ({ ...prev, city }))}
+                placeholder="Grad"
+                className="flex-1 rounded-[20px] bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
+              />
+              <VelveTextInput
+                value={draftFilters.priceMin}
+                onChangeText={(priceMin) => setDraftFilters((prev) => ({ ...prev, priceMin }))}
+                placeholder="Cena od"
+                keyboardType="numeric"
+                className="flex-1 rounded-[20px] bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
+              />
+              <VelveTextInput
+                value={draftFilters.priceMax}
+                onChangeText={(priceMax) => setDraftFilters((prev) => ({ ...prev, priceMax }))}
+                placeholder="Do"
+                keyboardType="numeric"
+                className="flex-1 rounded-[20px] bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
+              />
+            </View>
+
+            <View className="mt-6 flex-row gap-3">
+              <TouchableOpacity
+                onPress={clearFilters}
+                className="flex-1 items-center rounded-full bg-surface-panel px-4 py-4"
+              >
+                <Text className="font-sans text-sm font-semibold text-ink-dark">Ocisti</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={applyFilters}
+                className="flex-1 items-center rounded-full bg-brand-accent-deep px-4 py-4"
+              >
+                <Text className="font-sans text-sm font-semibold text-base-canvas">Primeni</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }

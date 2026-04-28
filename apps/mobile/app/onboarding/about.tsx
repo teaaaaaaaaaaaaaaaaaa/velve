@@ -2,11 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   ScrollView,
   StatusBar,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
@@ -23,6 +21,8 @@ try {
 import client from '@/api/client'
 import { BrandBackground } from '@/components/BrandBackground'
 import { GlassSurface } from '@/components/GlassSurface'
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen'
+import { VelveTextInput } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
 
@@ -291,7 +291,7 @@ export default function AboutScreen() {
   }
 
   return (
-    <View className="flex-1 bg-base-canvas">
+    <KeyboardAwareScreen className="bg-base-canvas">
       <StatusBar barStyle="dark-content" />
       <BrandBackground />
 
@@ -367,11 +367,10 @@ export default function AboutScreen() {
           </Text>
           <View className="mt-3 flex-row items-center rounded-pill bg-base-canvas px-4 py-3">
             <Ionicons name="footsteps-outline" size={18} color={colors.accentDeep} />
-            <TextInput
+            <VelveTextInput
               value={shoeSize}
               onChangeText={(nextValue) => setShoeSize(nextValue.replace(/[^0-9]/g, ''))}
               placeholder={copy.shoePlaceholder}
-              placeholderTextColor="rgba(43,42,43,0.46)"
               className="ml-3 flex-1 font-sans text-sm text-ink-dark"
               keyboardType="numeric"
               maxLength={2}
@@ -521,6 +520,6 @@ export default function AboutScreen() {
           )}
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAwareScreen>
   )
 }

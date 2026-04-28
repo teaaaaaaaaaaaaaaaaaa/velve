@@ -6,6 +6,7 @@ const Like = require('../models/Like')
 const Item = require('../models/Item')
 const { enrichItems } = require('../lib/enrichItems')
 const { sendPushToUser } = require('../lib/pushNotifications')
+const { createNotification } = require('../lib/notifications')
 
 // GET /api/likes — lajkovani itemi trenutnog korisnika
 router.get('/', requireAuth, async (req, res) => {
@@ -67,6 +68,16 @@ router.post('/:id/like', requireAuth, async (req, res) => {
     const enriched = await enrichItems(item, req.dbUser._id)
 
     if (!existingLike) {
+      createNotification({
+        userId: item.userId,
+        actorUserId: req.dbUser._id,
+        type: 'item_like',
+        title: 'Novi lajk',
+        body: `${req.dbUser.displayName || 'Korisnik'} je lajkovao/la "${item.title}"`,
+        itemId: item._id,
+        data: { itemId: String(item._id), userId: String(req.dbUser._id) },
+      })
+
       sendPushToUser(item.userId, {
         title: 'Novi lajk',
         body: `${req.dbUser.displayName || 'Korisnik'} je lajkovao/la "${item.title}"`,

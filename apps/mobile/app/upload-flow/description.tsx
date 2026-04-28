@@ -6,11 +6,8 @@ import {
   Alert,
   Animated,
   Easing,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
@@ -19,6 +16,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import client from '@/api/client'
 import { BrandBackground } from '@/components/BrandBackground'
 import { BrandWordmark } from '@/components/BrandWordmark'
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen'
+import { VelveTextInput } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 import { getPrimaryItemImage } from '@/lib/itemImages'
 
@@ -36,7 +35,7 @@ const AI_STEPS = [
   'Pisemo opis na srpskom...',
 ]
 
-function AiLoadingOverlay() {
+function AiLoadingOverlay({ onCancel }: { onCancel: () => void }) {
   const [stepIndex, setStepIndex] = useState(0)
   const fade = useRef(new Animated.Value(1)).current
   const pulse = useRef(new Animated.Value(1)).current
@@ -95,6 +94,10 @@ function AiLoadingOverlay() {
       </Animated.View>
 
       <BrandWordmark width={100} style={{ marginTop: 32, opacity: 0.25 }} />
+
+      <TouchableOpacity onPress={onCancel} className="mt-8 px-8 py-3">
+        <Text className="font-sans text-sm text-ink-dark/45">Otkaži</Text>
+      </TouchableOpacity>
     </View>
   )
 }
@@ -119,6 +122,7 @@ export default function DescriptionScreen() {
   const [generated, setGenerated] = useState(false)
   const [saving, setSaving] = useState(false)
   const [imageUrl, setImageUrl] = useState('')
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   // Fetch item to get image URL for AI
   useEffect(() => {
@@ -133,7 +137,14 @@ export default function DescriptionScreen() {
       .catch(() => {})
   }, [params.itemId])
 
+  const handleCancelGeneration = useCallback(() => {
+    abortControllerRef.current?.abort()
+    setGenerating(false)
+  }, [])
+
   const generateAiDescription = useCallback(async () => {
+    const controller = new AbortController()
+    abortControllerRef.current = controller
     setGenerating(true)
     try {
       const response = await client.post(
@@ -146,13 +157,14 @@ export default function DescriptionScreen() {
           image_url: imageUrl,
           language: 'sr',
         },
-        { timeout: 60000 }
+        { timeout: 60000, signal: controller.signal }
       )
 
       const payload = response.data?.data
       if (payload?.description) setDescription(payload.description)
       setGenerated(true)
-    } catch {
+    } catch (error: any) {
+      if (controller.signal.aborted) return
       Alert.alert('AI nije dostupan', 'Opis trenutno ne moze da se generise. Popuni rucno.')
     } finally {
       setGenerating(false)
@@ -205,13 +217,10 @@ export default function DescriptionScreen() {
   )
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-base-canvas"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAwareScreen className="bg-base-canvas">
       <BrandBackground />
 
-      {generating ? <AiLoadingOverlay /> : null}
+      {generating ? <AiLoadingOverlay onCancel={handleCancelGeneration} /> : null}
 
       <ScrollView
         className="flex-1"
@@ -299,11 +308,10 @@ export default function DescriptionScreen() {
           {/* Title */}
           <View>
             <Text className="mb-2 font-sans text-sm font-semibold text-ink-dark">Naslov</Text>
-            <TextInput
+            <VelveTextInput
               value={title}
               onChangeText={setTitle}
               placeholder="Ti smisli naslov svog komada"
-              placeholderTextColor={colors.mutedText}
               className="rounded-[20px] border border-ink-dark/8 bg-surface-panel px-5 py-4 font-sans text-sm text-ink-dark"
             />
           </View>
@@ -311,11 +319,10 @@ export default function DescriptionScreen() {
           {/* Description */}
           <View className="mt-4">
             <Text className="mb-2 font-sans text-sm font-semibold text-ink-dark">Opis</Text>
-            <TextInput
+            <VelveTextInput
               value={description}
               onChangeText={setDescription}
               placeholder="Opisi komad prirodno: boja, kroj, detalji, stanje..."
-              placeholderTextColor={colors.mutedText}
               multiline
               textAlignVertical="top"
               className="min-h-[140px] rounded-[20px] border border-ink-dark/8 bg-surface-panel px-5 py-4 font-sans text-sm leading-6 text-ink-dark"
@@ -392,6 +399,6 @@ export default function DescriptionScreen() {
           </Text>
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScreen>
   )
 }

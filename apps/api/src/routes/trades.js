@@ -8,6 +8,7 @@ const Chat = require('../models/Chat')
 const Message = require('../models/Message')
 const { sendPushToUser } = require('../lib/pushNotifications')
 const { getPrimaryImage } = require('../lib/itemPresentation')
+const { createNotification } = require('../lib/notifications')
 
 const TRADE_EXPIRY_HOURS = Math.max(Number(process.env.TRADE_EXPIRY_HOURS) || 72, 1)
 const FINAL_ITEM_STATUSES = new Set(['sold', 'swapped', 'archived', 'traded'])
@@ -159,6 +160,17 @@ async function expirePendingTrades(baseQuery = {}) {
         tradeId: String(trade._id),
         chatId: chat?._id ? String(chat._id) : '',
       },
+    })
+
+    createNotification({
+      userId: trade.senderId,
+      actorUserId: trade.receiverId,
+      type: 'trade_expired',
+      title: 'Zahtev je istekao',
+      body: 'Trade zahtev nije dobio odgovor na vreme.',
+      tradeId: trade._id,
+      chatId: chat?._id,
+      data: { tradeId: String(trade._id), chatId: chat?._id ? String(chat._id) : '' },
     })
   }
 
@@ -459,6 +471,18 @@ router.post('/', requireAuth, async (req, res) => {
       },
     })
 
+    createNotification({
+      userId: receiverId,
+      actorUserId: req.dbUser._id,
+      type: 'trade_request',
+      title: isBuyRequest ? 'Novi zahtev za kupovinu' : 'Novi zahtev za razmenu',
+      body: pushBody,
+      itemId: requestedItem._id,
+      tradeId: trade._id,
+      chatId: chat._id,
+      data: { tradeId: String(trade._id), chatId: String(chat._id), itemId: String(requestedItem._id) },
+    })
+
     res.status(201).json({ ok: true, data: { trade, chatId: chat._id } })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -545,6 +569,20 @@ router.put('/:id', requireAuth, async (req, res) => {
       },
     })
 
+    createNotification({
+      userId: trade.senderId,
+      actorUserId: req.dbUser._id,
+      type: 'trade_update',
+      title: status === 'accepted' ? 'Trade prihvacen' : 'Trade odbijen',
+      body:
+        status === 'accepted'
+          ? `${req.dbUser.displayName || 'Korisnik'} je prihvatio tvoj zahtev`
+          : `${req.dbUser.displayName || 'Korisnik'} je odbio tvoj zahtev`,
+      tradeId: trade._id,
+      chatId: chat?._id,
+      data: { tradeId: String(trade._id), status, chatId: chat?._id ? String(chat._id) : '' },
+    })
+
     res.json({ ok: true, data: serializeTrade(trade.toObject(), req.dbUser._id) })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -597,6 +635,21 @@ router.post('/:id/cancel', requireAuth, async (req, res) => {
       data: {
         type: 'trade_cancelled',
         tradeId: trade._id.toString(),
+        status: 'cancelled',
+        chatId: chat?._id ? String(chat._id) : '',
+      },
+    })
+
+    createNotification({
+      userId: recipientId,
+      actorUserId: req.dbUser._id,
+      type: 'trade_cancelled',
+      title: 'Trade je otkazan',
+      body: `${actorName} je otkazao trade tok`,
+      tradeId: trade._id,
+      chatId: chat?._id,
+      data: {
+        tradeId: String(trade._id),
         status: 'cancelled',
         chatId: chat?._id ? String(chat._id) : '',
       },
@@ -682,6 +735,21 @@ router.put('/:id/complete', requireAuth, async (req, res) => {
       },
     })
 
+    createNotification({
+      userId: recipientId,
+      actorUserId: req.dbUser._id,
+      type: 'trade_complete',
+      title: 'Trade je zavrsen',
+      body: `${actorName} je oznacio trade kao zavrsen`,
+      tradeId: trade._id,
+      chatId: chat?._id,
+      data: {
+        tradeId: String(trade._id),
+        status: 'completed',
+        chatId: chat?._id ? String(chat._id) : '',
+      },
+    })
+
     res.json({ ok: true, data: serializeTrade(trade.toObject(), req.dbUser._id) })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -746,6 +814,16 @@ router.post('/:id/rate', requireAuth, async (req, res) => {
         type: 'trade_rating',
         tradeId: trade._id.toString(),
       },
+    })
+
+    createNotification({
+      userId: ratedUserId,
+      actorUserId: req.dbUser._id,
+      type: 'trade_rating',
+      title: 'Nova ocena',
+      body: `${req.dbUser.displayName || 'Korisnik'} je ostavio ocenu nakon trade-a`,
+      tradeId: trade._id,
+      data: { tradeId: String(trade._id) },
     })
 
     res.json({ ok: true, data: serializeTrade(trade.toObject(), req.dbUser._id) })

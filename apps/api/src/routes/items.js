@@ -49,7 +49,7 @@ function toObjectId(id) {
 // Fire-and-forget: generate CLIP embedding and push to FAISS index.
 // On failure the periodic retryMissingEmbeddings job will catch it.
 function generateEmbeddingAsync(itemId, imageUrl) {
-  ;(async () => {
+  (async () => {
     try {
       const embedding = await generateEmbedding(imageUrl)
       await Item.findByIdAndUpdate(itemId, { embedding })
@@ -503,6 +503,20 @@ router.get('/', maybeAuth, async (req, res) => {
 
     const listingTypeFilter = normalizeExactFilter(req.query.listingType, 20)
     if (listingTypeFilter) query.listingType = listingTypeFilter
+
+    const minPrice = req.query.priceMin !== undefined ? Number(req.query.priceMin) : null
+    const maxPrice = req.query.priceMax !== undefined ? Number(req.query.priceMax) : null
+    const priceQuery = {}
+    if (minPrice != null && Number.isFinite(minPrice) && minPrice >= 0) {
+      priceQuery.$gte = minPrice
+    }
+    if (maxPrice != null && Number.isFinite(maxPrice) && maxPrice >= 0) {
+      priceQuery.$lte = maxPrice
+    }
+    if (Object.keys(priceQuery).length > 0) {
+      query.price = priceQuery
+      query.listingType = query.listingType || { $in: ['sell', 'both'] }
+    }
 
     const idQuery = {}
     if (req.query.cursor) {

@@ -2,6 +2,7 @@ const mongoose = require('mongoose')
 const Chat = require('../models/Chat')
 const Message = require('../models/Message')
 const { sendPushToUser } = require('./pushNotifications')
+const { createNotification } = require('./notifications')
 
 function normalizeMessageText(text) {
   const trimmed = String(text || '').trim()
@@ -104,6 +105,20 @@ async function createChatMessage({
     }
 
     if (!recipientInRoom) {
+      createNotification({
+        userId: recipientId,
+        actorUserId: sender._id,
+        type: 'chat_message',
+        title: sender.displayName || 'Velve',
+        body: normalizedText.slice(0, 100),
+        chatId,
+        data: {
+          chatId: String(chatId),
+          messageId: String(message._id),
+          senderId: String(sender._id),
+        },
+      })
+
       sendPushToUser(recipientId, {
         title: sender.displayName || 'Velve',
         body: normalizedText.slice(0, 100),

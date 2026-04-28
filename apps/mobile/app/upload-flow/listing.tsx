@@ -2,17 +2,16 @@ import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import {
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { BrandBackground } from '@/components/BrandBackground'
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen'
+import { VelveTextInput } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 
 type ListingType = 'trade' | 'sell' | 'both'
@@ -63,10 +62,7 @@ export default function ListingScreen() {
     (!showPrice || price.trim() !== '')
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-base-canvas"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAwareScreen className="bg-base-canvas">
       <BrandBackground />
 
       <ScrollView
@@ -155,11 +151,10 @@ export default function ListingScreen() {
               </Text>
               <View className="flex-row items-center rounded-[20px] border border-ink-dark/8 bg-surface-panel px-5">
                 <Ionicons name="logo-euro" size={18} color={colors.mutedText} />
-                <TextInput
+                <VelveTextInput
                   value={price}
                   onChangeText={setPrice}
                   placeholder="0"
-                  placeholderTextColor={colors.mutedText}
                   keyboardType="numeric"
                   className="ml-2 flex-1 py-4 font-sans text-2xl font-semibold text-ink-dark"
                 />
@@ -173,11 +168,10 @@ export default function ListingScreen() {
               <Text className="mb-2 font-sans text-sm font-semibold text-ink-dark">
                 Sta trazis za razmenu?
               </Text>
-              <TextInput
+              <VelveTextInput
                 value={tradeFor}
                 onChangeText={setTradeFor}
                 placeholder="Npr. oversized jakna, Nike patike..."
-                placeholderTextColor={colors.mutedText}
                 className="rounded-[20px] border border-ink-dark/8 bg-surface-panel px-5 py-4 font-sans text-sm text-ink-dark"
               />
             </View>
@@ -250,11 +244,10 @@ export default function ListingScreen() {
           </ScrollView>
 
           {showCustomBrand ? (
-            <TextInput
+            <VelveTextInput
               value={customBrand}
               onChangeText={(text) => { setCustomBrand(text); setBrand(text) }}
               placeholder="Upisi brend..."
-              placeholderTextColor={colors.mutedText}
               autoFocus
               className="mt-3 rounded-[20px] border border-brand-accent-deep/20 bg-surface-panel px-5 py-4 font-sans text-sm text-ink-dark"
             />
@@ -305,11 +298,10 @@ export default function ListingScreen() {
           </View>
 
           {showCustomSize ? (
-            <TextInput
+            <VelveTextInput
               value={customSize}
               onChangeText={(text) => { setCustomSize(text); setSize(text) }}
               placeholder="Upisi velicinu (npr. 42, EU 38...)"
-              placeholderTextColor={colors.mutedText}
               autoFocus
               className="mt-3 rounded-[20px] border border-brand-accent-deep/20 bg-surface-panel px-5 py-4 font-sans text-sm text-ink-dark"
             />
@@ -359,6 +351,6 @@ export default function ListingScreen() {
           </Text>
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScreen>
   )
 }

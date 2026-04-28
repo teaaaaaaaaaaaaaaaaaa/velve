@@ -1,11 +1,8 @@
 import { useMemo, useState } from 'react'
 import {
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StatusBar,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
@@ -14,6 +11,8 @@ import { Ionicons } from '@expo/vector-icons'
 
 import { BrandBackground } from '@/components/BrandBackground'
 import { GlassSurface } from '@/components/GlassSurface'
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen'
+import { VelveTextInput } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
 
@@ -96,10 +95,7 @@ export default function BrandsScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      className="flex-1 bg-base-canvas"
-    >
+    <KeyboardAwareScreen className="bg-base-canvas">
       <StatusBar barStyle="dark-content" />
       <BrandBackground />
 
@@ -143,12 +139,11 @@ export default function BrandsScreen() {
             Velve edit
           </Text>
           <View className="mt-3 flex-row items-center rounded-pill bg-base-canvas px-4 py-3">
-            <TextInput
+            <VelveTextInput
               value={customBrand}
               onChangeText={setCustomBrand}
               onSubmitEditing={addCustomBrand}
               placeholder={copy.inputPlaceholder}
-              placeholderTextColor="rgba(43,42,43,0.46)"
               className="flex-1 font-sans text-sm text-ink-dark"
               returnKeyType="done"
             />
@@ -235,6 +230,6 @@ export default function BrandsScreen() {
           </Text>
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScreen>
   )
 }

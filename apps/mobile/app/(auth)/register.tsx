@@ -1,10 +1,8 @@
 import { useRef, useState } from 'react'
 import {
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -15,6 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BrandBackground } from '@/components/BrandBackground'
 import { BrandWordmark } from '@/components/BrandWordmark'
 import { GlassSurface } from '@/components/GlassSurface'
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen'
+import { VelveTextInput, type VelveTextInputRef } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 import { useAuth } from '@/hooks/useAuth'
 import { useI18n } from '@/i18n'
@@ -59,7 +59,7 @@ export default function RegisterScreen() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const passwordRef = useRef<TextInput>(null)
+  const passwordRef = useRef<VelveTextInputRef>(null)
   const scrollRef = useRef<ScrollView>(null)
 
   async function handleRegister() {
@@ -104,12 +104,7 @@ export default function RegisterScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-base-canvas"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
-      style={{ flex: 1 }}
-    >
+    <KeyboardAwareScreen className="bg-base-canvas" offset={10}>
       <BrandBackground />
 
       <ScrollView
@@ -134,10 +129,9 @@ export default function RegisterScreen() {
         </View>
 
         <GlassSurface style={{ paddingHorizontal: 20, paddingVertical: 20 }}>
-          <TextInput
+          <VelveTextInput
             className="mb-4 rounded-soft border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-base text-ink-dark"
             placeholder={t('auth.emailPlaceholder')}
-            placeholderTextColor={colors.mutedText}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -148,11 +142,10 @@ export default function RegisterScreen() {
             blurOnSubmit={false}
           />
 
-          <TextInput
+          <VelveTextInput
             ref={passwordRef}
             className="rounded-soft border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-base text-ink-dark"
             placeholder={t('auth.passwordLongPlaceholder')}
-            placeholderTextColor={colors.mutedText}
             secureTextEntry
             value={password}
             onChangeText={setPassword}
@@ -186,6 +179,6 @@ export default function RegisterScreen() {
           </TouchableOpacity>
         </GlassSurface>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScreen>
   )
 }

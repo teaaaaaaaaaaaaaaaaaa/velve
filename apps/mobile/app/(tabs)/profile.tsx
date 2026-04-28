@@ -9,7 +9,6 @@ import {
   RefreshControl,
   ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
@@ -21,6 +20,7 @@ import { ProfileSkeleton } from '@/components/BrandedLoader'
 import { DiscoveryCardItem } from '@/components/DiscoveryItemCard'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { RemoteImage } from '@/components/RemoteImage'
+import { VelveTextInput } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
 import { getApiErrorMessage } from '@/lib/apiErrors'
@@ -328,6 +328,12 @@ export default function ProfileScreen() {
               <BrandWordmark width={118} />
             </View>
             <TouchableOpacity
+              className="mr-3 h-11 w-11 items-center justify-center rounded-full bg-surface-tint"
+              onPress={() => router.push('/notifications')}
+            >
+              <Ionicons name="notifications-outline" size={20} color={colors.accentDeep} />
+            </TouchableOpacity>
+            <TouchableOpacity
               className="h-11 w-11 items-center justify-center rounded-full bg-surface-tint"
               onPress={() => router.push('/settings')}
             >
@@ -396,14 +402,24 @@ export default function ProfileScreen() {
             ) : null}
 
             <View className="mt-5 flex-row items-center justify-between">
-              <View className="items-center">
+              <TouchableOpacity
+                className="items-center"
+                onPress={() =>
+                  router.push({ pathname: '/connections', params: { userId: profile._id, tab: 'followers' } })
+                }
+              >
                 <Text className="font-display text-3xl text-ink-dark">{profile.followersCount}</Text>
                 <Text className="font-sans text-xs text-ink-dark/50">{t('profile.followers')}</Text>
-              </View>
-              <View className="items-center">
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="items-center"
+                onPress={() =>
+                  router.push({ pathname: '/connections', params: { userId: profile._id, tab: 'following' } })
+                }
+              >
                 <Text className="font-display text-3xl text-ink-dark">{profile.followingCount}</Text>
                 <Text className="font-sans text-xs text-ink-dark/50">{t('profile.following')}</Text>
-              </View>
+              </TouchableOpacity>
               <View className="items-center">
                 <Text className="font-display text-3xl text-ink-dark">{profile.closetCounts.live}</Text>
                 <Text className="font-sans text-xs text-ink-dark/50">{t('profile.active')}</Text>
@@ -634,12 +650,11 @@ export default function ProfileScreen() {
               <Text className="mb-2 font-sans text-xs uppercase tracking-[1.2px] text-ink-dark/45">
                 Ime
               </Text>
-              <TextInput
+              <VelveTextInput
                 value={editDisplayName}
                 onChangeText={setEditDisplayName}
                 maxLength={50}
                 placeholder="Tvoje ime"
-                placeholderTextColor="#2B2A2B66"
                 className="rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
               />
             </View>
@@ -648,14 +663,13 @@ export default function ProfileScreen() {
               <Text className="mb-2 font-sans text-xs uppercase tracking-[1.2px] text-ink-dark/45">
                 Bio
               </Text>
-              <TextInput
+              <VelveTextInput
                 value={editBio}
                 onChangeText={setEditBio}
                 maxLength={200}
                 multiline
                 textAlignVertical="top"
                 placeholder="Par reci o svom ukusu i komadima koje volis."
-                placeholderTextColor="#2B2A2B66"
                 className="min-h-[140px] rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm leading-6 text-ink-dark"
               />
               <Text className="mt-2 font-sans text-xs text-ink-dark/40">{editBio.length}/200</Text>

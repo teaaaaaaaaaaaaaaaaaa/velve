@@ -82,6 +82,7 @@ type TradeRecord = {
   canReject: boolean
   canCancel: boolean
   canComplete: boolean
+  canRate?: boolean
 }
 
 function formatTime(dateStr: string) {
@@ -441,22 +442,26 @@ export default function ChatListScreen() {
       try {
         setTradeActionId(tradeId)
 
+        let response
         if (action === 'accept') {
-          await client.put(`/api/trades/${tradeId}`, { status: 'accepted' })
+          response = await client.put(`/api/trades/${tradeId}`, { status: 'accepted' })
         } else if (action === 'reject') {
-          await client.put(`/api/trades/${tradeId}`, { status: 'rejected' })
+          response = await client.put(`/api/trades/${tradeId}`, { status: 'rejected' })
         } else if (action === 'cancel') {
-          await client.post(`/api/trades/${tradeId}/cancel`, {})
+          response = await client.post(`/api/trades/${tradeId}/cancel`, {})
         } else {
-          await client.put(`/api/trades/${tradeId}/complete`, {})
+          response = await client.put(`/api/trades/${tradeId}/complete`, {})
         }
 
         await loadAll()
+        if (action === 'complete' && response?.data?.data?.canRate) {
+          router.push({ pathname: '/rate-trade', params: { tradeId } })
+        }
       } finally {
         setTradeActionId(null)
       }
     },
-    [loadAll]
+    [loadAll, router]
   )
 
   const renderChatItem = useCallback(
@@ -596,8 +601,18 @@ export default function ChatListScreen() {
               key={trade._id}
               trade={trade}
               busy={tradeActionId === trade._id}
-              onAccept={() => runTradeAction(trade._id, 'accept')}
-              onReject={() => runTradeAction(trade._id, 'reject')}
+              onAccept={() =>
+                Alert.alert('Prihvati trade', 'Prihvatas ovu razmenu? Ovo menja status oba komada.', [
+                  { text: 'Prihvati', onPress: () => runTradeAction(trade._id, 'accept') },
+                  { text: 'Odustani', style: 'cancel' },
+                ])
+              }
+              onReject={() =>
+                Alert.alert('Odbij trade', 'Odbijas ovu ponudu?', [
+                  { text: 'Odbij', style: 'destructive', onPress: () => runTradeAction(trade._id, 'reject') },
+                  { text: 'Odustani', style: 'cancel' },
+                ])
+              }
               onCancel={() => runTradeAction(trade._id, 'cancel')}
               onComplete={() => runTradeAction(trade._id, 'complete')}
             />

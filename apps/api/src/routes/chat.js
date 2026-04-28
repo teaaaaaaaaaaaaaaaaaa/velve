@@ -191,6 +191,7 @@ router.post('/:id/message', requireAuth, messageLimiter, async (req, res) => {
       sender: req.dbUser,
       text: req.body.text,
       io: req.app.get('io'),
+      clientId: req.body.clientId,
     })
     res.json({ ok: true, data: message })
   } catch (err) {

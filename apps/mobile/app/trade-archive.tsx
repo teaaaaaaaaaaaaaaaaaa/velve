@@ -42,6 +42,7 @@ type TradeRecord = {
   updatedAt: string
   createdAt: string
   completedAt?: string
+  canRate?: boolean
 }
 
 function getTradeItemImage(item?: TradeItem | null) {
@@ -200,6 +201,20 @@ export default function TradeArchiveScreen() {
                     </Text>
                   </View>
                 </View>
+
+                {trade.canRate ? (
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.push({ pathname: '/rate-trade', params: { tradeId: trade._id } })
+                    }
+                    className="mt-4 flex-row items-center justify-center rounded-full bg-brand-accent-deep px-4 py-3"
+                  >
+                    <Ionicons name="star-outline" size={16} color={colors.baseCanvas} />
+                    <Text className="ml-2 font-sans text-sm font-semibold text-base-canvas">
+                      Oceni razmenu
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             ))}
           </View>
