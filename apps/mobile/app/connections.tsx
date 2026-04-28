@@ -36,6 +36,7 @@ export default function ConnectionsScreen() {
   const [errorMessage, setErrorMessage] = useState('')
 
   const title = activeTab === 'followers' ? 'Pratioci' : 'Pratis'
+  const emptyText = activeTab === 'followers' ? 'Ne prati vas niko.' : 'Ne pratite nikoga.'
 
   const endpoint = useMemo(() => {
     if (!userId) return ''
@@ -153,12 +154,10 @@ export default function ConnectionsScreen() {
             />
           </View>
         ) : users.length === 0 ? (
-          <View className="mt-8">
-            <EditorialEmptyState
-              icon="people-outline"
-              title={activeTab === 'followers' ? 'Jos nema pratilaca' : 'Jos ne pratis nikoga'}
-              description="Kada se povezes sa ljudima, njihovi profili ce biti ovde dostupni za brz pregled."
-            />
+          <View className="mt-14 items-center px-6">
+            <Text className="text-center font-sans text-base font-semibold text-ink-dark">
+              {emptyText}
+            </Text>
           </View>
         ) : (
           <View className="mt-5 gap-3">

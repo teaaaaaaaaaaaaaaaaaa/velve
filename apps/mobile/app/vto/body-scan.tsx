@@ -113,14 +113,14 @@ export default function BodyScanIntroScreen() {
             Da bi isprobao arhiv, potreban nam je tvoj digitalni duplikat.
           </Text>
           <Text className="mt-4 font-sans text-sm leading-7 text-ink-dark/65">
-            Pronadji cistu, belu pozadinu sa dobrim svetlom. Procedura je anonimna i slika se cuva samo kao body scan za Virtual Try-On.
+            Napravi jednu jasnu fotografiju celog tela. Najbolje radi kada stanes ispred svetle, mirne pozadine i ostavis malo prostora iznad glave i oko ramena.
           </Text>
         </View>
 
         <View className="rounded-[32px] bg-surface-panel px-5 py-6">
           <Text className="font-display text-3xl text-ink-dark">Priprema</Text>
           <Text className="mt-3 font-sans text-sm leading-6 text-ink-dark/65">
-            Stani ispred kamere celim telom, drzi telefon mirno i ostavi malo praznog prostora iznad glave i oko ramena.
+            Koristicemo sistemsku kameru ili sliku iz galerije, pa ces prvo videti preview. Ako fotografija nije dobra, samo je ponovi pre cuvanja.
           </Text>
         </View>
 

@@ -343,6 +343,7 @@ export default function ChatScreen() {
   const [typingUser, setTypingUser] = useState<string | null>(null)
   const [tradeRequest, setTradeRequest] = useState<TradeState | null>(null)
   const [composerHeight, setComposerHeight] = useState(86)
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null)
 
   const socketRef = useRef<Socket | null>(null)
   const flatListRef = useRef<FlatList<MessageRecord>>(null)
@@ -411,6 +412,11 @@ export default function ChatScreen() {
         setTypingUser(payload.displayName)
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
         typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 3000)
+      })
+
+      socket.on('message_deleted', (payload: { chatId: string; messageId: string }) => {
+        if (payload.chatId !== chatId) return
+        setMessages((prev) => prev.filter((message) => message._id !== payload.messageId))
       })
 
       socketRef.current = socket
@@ -584,6 +590,53 @@ export default function ChatScreen() {
     [chatId]
   )
 
+  const deleteMessage = useCallback(
+    async (message: MessageRecord) => {
+      if (deletingMessageId || message.deliveryStatus === 'pending') return
+
+      if (message.deliveryStatus === 'failed') {
+        setMessages((prev) => prev.filter((entry) => entry._id !== message._id))
+        return
+      }
+
+      try {
+        setDeletingMessageId(message._id)
+        await client.delete(`/api/chat/${chatId}/messages/${message._id}`)
+        setMessages((prev) => prev.filter((entry) => entry._id !== message._id))
+      } catch (error: any) {
+        Alert.alert(
+          'Poruka nije obrisana',
+          error?.response?.data?.error || error?.message || 'Pokusaj ponovo.'
+        )
+      } finally {
+        setDeletingMessageId(null)
+      }
+    },
+    [chatId, deletingMessageId]
+  )
+
+  const showMessageOptions = useCallback(
+    (message: MessageRecord, isMine: boolean) => {
+      if (!isMine || message.type !== 'text') return
+      if (message.deliveryStatus === 'pending') return
+
+      if (message.deliveryStatus === 'failed') {
+        Alert.alert('Poruka nije poslata', 'Sta zelis da uradis?', [
+          { text: 'Pokusaj ponovo', onPress: () => handleRetry(message) },
+          { text: 'Obrisi', style: 'destructive', onPress: () => deleteMessage(message) },
+          { text: 'Odustani', style: 'cancel' },
+        ])
+        return
+      }
+
+      Alert.alert('Poruka', 'Sta zelis da uradis?', [
+        { text: 'Obrisi poruku', style: 'destructive', onPress: () => deleteMessage(message) },
+        { text: 'Odustani', style: 'cancel' },
+      ])
+    },
+    [deleteMessage, handleRetry]
+  )
+
   const renderMessage = useCallback(
     ({ item, index }: { item: MessageRecord; index: number }) => {
       const isMine = getSenderId(item) === dbUser?._id
@@ -655,15 +708,7 @@ export default function ChatScreen() {
             <View className={`mb-1 px-4 ${isMine ? 'items-end' : 'items-start'}`}>
               <TouchableOpacity
                 activeOpacity={item.deliveryStatus === 'failed' ? 0.7 : 1}
-                onLongPress={
-                  item.deliveryStatus === 'failed'
-                    ? () =>
-                        Alert.alert('Poruka nije poslata', 'Šta želiš da uradiš?', [
-                          { text: 'Pokušaj ponovo', onPress: () => handleRetry(item) },
-                          { text: 'Otkaži', style: 'cancel' },
-                        ])
-                    : undefined
-                }
+                onLongPress={() => showMessageOptions(item, isMine)}
               >
               <View
                 className={`max-w-[82%] rounded-[22px] px-4 py-3 ${
@@ -703,7 +748,9 @@ export default function ChatScreen() {
                 {item.deliveryStatus === 'pending'
                   ? 'Slanje...'
                   : item.deliveryStatus === 'failed'
-                    ? 'Nije poslato — drži za opcije'
+                    ? 'Nije poslato - drzi za opcije'
+                  : deletingMessageId === item._id
+                    ? 'Brisanje...'
                     : formatTime(item.createdAt)}
               </Text>
               </TouchableOpacity>
@@ -721,7 +768,9 @@ export default function ChatScreen() {
       handleTradeDecision,
       otherUser,
       router,
+      showMessageOptions,
       submittingDecision,
+      deletingMessageId,
     ]
   )
 

@@ -213,6 +213,51 @@ router.post('/:id/read', requireAuth, async (req, res) => {
   }
 })
 
+// DELETE /api/chat/:id/messages/:messageId - delete current user's text message
+router.delete('/:id/messages/:messageId', requireAuth, async (req, res) => {
+  try {
+    if (
+      !mongoose.Types.ObjectId.isValid(req.params.id) ||
+      !mongoose.Types.ObjectId.isValid(req.params.messageId)
+    ) {
+      return res.status(400).json({ error: 'Invalid chat or message ID' })
+    }
+
+    const chat = await Chat.findById(req.params.id).lean()
+    if (!chat) return res.status(404).json({ error: 'Chat not found' })
+
+    const isParticipant = chat.participants.some((p) => String(p) === String(req.dbUser._id))
+    if (!isParticipant) {
+      return res.status(403).json({ error: 'Not a participant of this chat' })
+    }
+
+    const message = await Message.findOne({
+      _id: req.params.messageId,
+      chatId: req.params.id,
+      senderId: req.dbUser._id,
+      type: 'text',
+    })
+
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' })
+    }
+
+    await Message.deleteOne({ _id: message._id })
+
+    const io = req.app.get('io')
+    if (io) {
+      io.to(`chat:${req.params.id}`).emit('message_deleted', {
+        chatId: req.params.id,
+        messageId: req.params.messageId,
+      })
+    }
+
+    res.json({ ok: true, message: 'Message deleted' })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // DELETE /api/chat/:id - soft-delete only the current user's side of a chat
 router.delete('/:id', requireAuth, async (req, res) => {
   try {

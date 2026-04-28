@@ -1,25 +1,11 @@
 import { Ionicons } from '@expo/vector-icons'
+import * as ImagePicker from 'expo-image-picker'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, Text, TouchableOpacity, View } from 'react-native'
+import { useState } from 'react'
+import { ActivityIndicator, Alert, Image, Text, TouchableOpacity, View } from 'react-native'
 
-import { BrandedLoader } from '@/components/BrandedLoader'
-import { analyzeLocalImage, uploadBodyScanUri } from '@/lib/imageRequests'
-
-let CameraView: any = null
-let useCameraPermissions: any = null
-try {
-  const mod = require('expo-camera')
-  CameraView = mod.CameraView
-  useCameraPermissions = mod.useCameraPermissions
-} catch {
-  // Native module not available in this build
-}
-
-type AnalysisState = {
-  ready: boolean
-  message: string
-}
+import { colors } from '@/design/tokens'
+import { uploadBodyScanUri } from '@/lib/imageRequests'
 
 type BodyScanRouteParams = {
   returnTo?: string | string[]
@@ -37,102 +23,76 @@ function normalizeParam(value?: string | string[]) {
 }
 
 export default function BodyScanCameraScreen() {
-  if (!CameraView || !useCameraPermissions) {
-    return (
-      <View className="flex-1 items-center justify-center bg-base-canvas px-5">
-        <Text className="text-center font-sans text-base leading-6 text-ink-dark/65">
-          Kamera nije dostupna u ovom buildu. Pokreni "npx expo prebuild" pa ponovo builduj aplikaciju.
-        </Text>
-      </View>
-    )
-  }
-
-  return <BodyScanCameraInner />
-}
-
-function BodyScanCameraInner() {
   const router = useRouter()
   const params = useLocalSearchParams<BodyScanRouteParams>()
-  const cameraRef = useRef<any>(null)
-  const [permission, requestPermission] = useCameraPermissions()
-  const [analysis, setAnalysis] = useState<AnalysisState>({
-    ready: false,
-    message: 'Nisi u silueti ili pozadina nije cista bela.',
-  })
-  const [stableReadyCount, setStableReadyCount] = useState(0)
-  const [busy, setBusy] = useState(false)
+  const [photoUri, setPhotoUri] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [pickingSource, setPickingSource] = useState<'camera' | 'library' | null>(null)
 
   const returnTo = normalizeParam(params.returnTo)
   const itemId = normalizeParam(params.itemId)
   const itemIds = normalizeParam(params.itemIds)
   const mode = normalizeParam(params.mode)
 
-  useEffect(() => {
-    if (!permission?.granted) {
-      requestPermission()
-    }
-  }, [permission?.granted, requestPermission])
-
-  useEffect(() => {
-    if (!permission?.granted || !cameraRef.current || busy) {
-      return
-    }
-
-    let cancelled = false
-    const interval = setInterval(async () => {
-      if (cancelled || busy || !cameraRef.current) return
-
-      try {
-        setBusy(true)
-        const snapshot = await cameraRef.current.takePictureAsync({
-          quality: 0.35,
-          skipProcessing: true,
-        })
-
-        if (!snapshot?.uri || cancelled) return
-        const payload = await analyzeLocalImage(snapshot.uri, '/api/ai/analyze-body-scan')
-        if (cancelled) return
-
-        setAnalysis({
-          ready: !!payload?.ready,
-          message: payload?.message || 'Nisi u silueti ili pozadina nije cista bela.',
-        })
-        setStableReadyCount((prev) => (payload?.ready ? Math.min(prev + 1, 3) : 0))
-      } catch {
-        if (!cancelled) {
-          setStableReadyCount(0)
-          setAnalysis({
-            ready: false,
-            message: 'Nisi u silueti ili pozadina nije cista bela.',
-          })
-        }
-      } finally {
-        if (!cancelled) {
-          setBusy(false)
-        }
-      }
-    }, 1700)
-
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
-  }, [busy, permission?.granted])
-
-  async function captureFinal() {
-    if (!cameraRef.current) return
+  async function openCamera() {
     try {
-      setBusy(true)
-      const finalPhoto = await cameraRef.current.takePictureAsync({
+      setPickingSource('camera')
+      const permission = await ImagePicker.requestCameraPermissionsAsync()
+      if (!permission.granted) {
+        Alert.alert('Kamera nije dozvoljena', 'Dozvoli kameru da bi napravio body scan fotografiju.')
+        return
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
         quality: 0.9,
-        skipProcessing: false,
+        exif: false,
+        cameraType: ImagePicker.CameraType.front,
       })
 
-      if (!finalPhoto?.uri) {
-        throw new Error('No capture')
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setPhotoUri(result.assets[0].uri)
+      }
+    } catch (error: any) {
+      Alert.alert('Kamera nije otvorena', error?.message || 'Pokusaj ponovo.')
+    } finally {
+      setPickingSource(null)
+    }
+  }
+
+  async function openLibrary() {
+    try {
+      setPickingSource('library')
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (!permission.granted) {
+        Alert.alert('Galerija nije dozvoljena', 'Dozvoli pristup fotografijama ili snimi novu fotografiju kamerom.')
+        return
       }
 
-      await uploadBodyScanUri(finalPhoto.uri)
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.9,
+        exif: false,
+      })
+
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setPhotoUri(result.assets[0].uri)
+      }
+    } catch (error: any) {
+      Alert.alert('Fotografija nije izabrana', error?.message || 'Pokusaj ponovo.')
+    } finally {
+      setPickingSource(null)
+    }
+  }
+
+  async function saveBodyScan() {
+    if (!photoUri) return
+
+    try {
+      setSaving(true)
+      await uploadBodyScanUri(photoUri)
       router.replace({
         pathname: '/vto/body-scan-ready',
         params: {
@@ -147,86 +107,96 @@ function BodyScanCameraInner() {
         'Body scan nije sacuvan',
         error?.response?.data?.error ||
           error?.message ||
-          'Pokusaj ponovo sa boljim svetlom i cistom pozadinom.'
+          'Pokusaj ponovo sa jasnijom fotografijom celog tela.'
       )
     } finally {
-      setBusy(false)
+      setSaving(false)
     }
   }
 
-  if (!permission) {
-    return <BrandedLoader />
-  }
-
-  if (!permission.granted) {
-    return (
-      <View className="flex-1 items-center justify-center bg-base-canvas px-5">
-        <Text className="text-center font-sans text-sm leading-6 text-ink-dark/65">
-          Kamera je potrebna za body scan flow.
-        </Text>
-        <TouchableOpacity
-          onPress={requestPermission}
-          className="mt-5 items-center rounded-full bg-brand-accent-deep px-4 py-4"
-        >
-          <Text className="font-sans text-base font-semibold text-base-canvas">
-            Dozvoli kameru
-          </Text>
-        </TouchableOpacity>
-      </View>
-    )
-  }
-
-  const ready = analysis.ready && stableReadyCount >= 2
-
   return (
-    <View className="flex-1 bg-black">
-      <CameraView
-        ref={cameraRef}
-        facing="front"
-        style={{ flex: 1 }}
-      />
-
-      <View className="absolute inset-0 bg-black/20" />
-
+    <View className="flex-1 bg-base-canvas px-5 pb-8 pt-14">
       <TouchableOpacity
         onPress={() => router.back()}
-        className="absolute left-4 top-14 h-11 w-11 items-center justify-center rounded-full bg-black/35"
+        className="h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
       >
-        <Ionicons name="arrow-back" size={20} color="white" />
+        <Ionicons name="arrow-back" size={20} color={colors.inkDark} />
       </TouchableOpacity>
 
-      <View className="absolute inset-x-8 bottom-36 top-28 items-center justify-center">
-        <View
-          className={`h-[74%] w-[72%] rounded-[180px] border-2 ${
-            ready ? 'border-brand-highlight' : 'border-signal-danger'
-          } bg-white/5`}
-        />
-      </View>
+      <Text className="mt-8 font-display text-4xl text-ink-dark">Body scan fotografija</Text>
+      <Text className="mt-3 font-sans text-sm leading-6 text-ink-dark/65">
+        Snimi ili izaberi jednu fotografiju celog tela. Bez automatskog cekanja: pogledas preview,
+        ponovis ako treba, pa sacuvas.
+      </Text>
 
-      <View className="absolute bottom-10 left-5 right-5 rounded-[28px] bg-black/40 px-5 py-5">
-        <Text className={`font-display text-3xl ${ready ? 'text-brand-highlight' : 'text-base-canvas'}`}>
-          {ready ? 'Savrseno' : 'Silueta u magli'}
-        </Text>
-        <Text className="mt-3 font-sans text-sm leading-6 text-base-canvas/82">
-          {analysis.message}
-        </Text>
-
-        <TouchableOpacity
-          onPress={captureFinal}
-          disabled={!ready || busy}
-          className={`mt-5 items-center rounded-full px-4 py-4 ${
-            ready && !busy ? 'bg-brand-accent-deep' : 'bg-white/12'
-          }`}
-        >
-          {busy ? (
-            <ActivityIndicator size="small" color="white" />
-          ) : (
-            <Text className={`font-sans text-base font-semibold ${ready ? 'text-base-canvas' : 'text-base-canvas/45'}`}>
-              Sacuvaj body scan
+      <View className="mt-6 flex-1 overflow-hidden rounded-[28px] bg-surface-panel">
+        {photoUri ? (
+          <Image source={{ uri: photoUri }} className="h-full w-full" resizeMode="contain" />
+        ) : (
+          <View className="flex-1 items-center justify-center px-8">
+            <Ionicons name="body-outline" size={46} color={colors.accentDeep} />
+            <Text className="mt-4 text-center font-sans text-sm leading-6 text-ink-dark/58">
+              Cela figura treba da bude vidljiva, sa mirnom pozadinom i dobrim svetlom.
             </Text>
-          )}
-        </TouchableOpacity>
+          </View>
+        )}
       </View>
+
+      {photoUri ? (
+        <View className="mt-5 gap-3">
+          <TouchableOpacity
+            onPress={saveBodyScan}
+            disabled={saving}
+            className="items-center rounded-full bg-brand-accent-deep px-4 py-4"
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color={colors.baseCanvas} />
+            ) : (
+              <Text className="font-sans text-base font-semibold text-base-canvas">
+                Sacuvaj body scan
+              </Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setPhotoUri(null)}
+            disabled={saving}
+            className="items-center rounded-full bg-surface-panel px-4 py-4"
+          >
+            <Text className="font-sans text-base font-semibold text-ink-dark">
+              Izaberi drugu fotografiju
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View className="mt-5 gap-3">
+          <TouchableOpacity
+            onPress={openCamera}
+            disabled={Boolean(pickingSource)}
+            className="items-center rounded-full bg-brand-accent-deep px-4 py-4"
+          >
+            {pickingSource === 'camera' ? (
+              <ActivityIndicator size="small" color={colors.baseCanvas} />
+            ) : (
+              <Text className="font-sans text-base font-semibold text-base-canvas">
+                Snimi fotografiju
+              </Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={openLibrary}
+            disabled={Boolean(pickingSource)}
+            className="items-center rounded-full bg-surface-panel px-4 py-4"
+          >
+            {pickingSource === 'library' ? (
+              <ActivityIndicator size="small" color={colors.inkDark} />
+            ) : (
+              <Text className="font-sans text-base font-semibold text-ink-dark">
+                Izaberi iz galerije
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   )
 }

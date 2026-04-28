@@ -214,6 +214,32 @@ async function buildUserProfilePayload(userDoc, viewerId = null) {
   }
 }
 
+async function buildConnectionPayload({ userId, mode, viewerId }) {
+  const query = mode === 'followers' ? { followingId: userId } : { followerId: userId }
+  const populatePath = mode === 'followers' ? 'followerId' : 'followingId'
+  const connections = await Follow.find(query)
+    .sort({ createdAt: -1 })
+    .populate(populatePath, 'displayName photoURL bio averageRating completedTrades location')
+    .lean()
+
+  const users = connections.map((entry) => entry[populatePath]).filter(Boolean)
+  const viewerFollowing = users.length > 0
+    ? await Follow.find({
+        followerId: viewerId,
+        followingId: { $in: users.map((user) => user._id) },
+      })
+        .select('followingId')
+        .lean()
+    : []
+  const followingIds = new Set(viewerFollowing.map((entry) => String(entry.followingId)))
+
+  return users.map((user) => ({
+    ...user,
+    isSelf: String(user._id) === String(viewerId),
+    isFollowing: followingIds.has(String(user._id)),
+  }))
+}
+
 async function saveCurrentUser(req, res, updates) {
   const updated = await User.findByIdAndUpdate(req.dbUser._id, updates, { new: true })
   const payload = await buildUserProfilePayload(updated, req.dbUser._id)
@@ -447,6 +473,40 @@ router.put('/me/push-token', requireAuth, async (req, res) => {
   }
 })
 
+router.get('/:id/followers', requireAuth, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid user ID' })
+    }
+
+    const data = await buildConnectionPayload({
+      userId: req.params.id,
+      mode: 'followers',
+      viewerId: req.dbUser._id,
+    })
+    res.json({ ok: true, data })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.get('/:id/following', requireAuth, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid user ID' })
+    }
+
+    const data = await buildConnectionPayload({
+      userId: req.params.id,
+      mode: 'following',
+      viewerId: req.dbUser._id,
+    })
+    res.json({ ok: true, data })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 router.get('/body-scan', requireAuth, async (req, res) => {
   try {
     res.json({
@@ -468,11 +528,13 @@ router.post('/body-scan', requireAuth, imageUpload.single('image'), async (req, 
       return res.status(400).json({ error: 'image is required' })
     }
 
-    const analysis = await analyzeBodyScanFile(req.file)
-    if (!analysis?.ready) {
-      return res.status(400).json({
-        error: analysis?.message || 'Body scan nije prosao proveru. Pokusaj ponovo.',
-        data: analysis,
+    let analysis = null
+    try {
+      analysis = await analyzeBodyScanFile(req.file)
+    } catch (error) {
+      console.warn('[Users/body-scan] Body scan analysis skipped', {
+        userId: String(req.dbUser?._id || ''),
+        message: error.message,
       })
     }
 
@@ -495,6 +557,7 @@ router.post('/body-scan', requireAuth, imageUpload.single('image'), async (req, 
         url: uploadResult.url,
         createdAt: bodyScanCreatedAt,
         analysis,
+        validated: Boolean(analysis?.ready),
       },
     })
   } catch (err) {
