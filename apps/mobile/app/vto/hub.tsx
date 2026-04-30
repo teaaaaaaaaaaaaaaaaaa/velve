@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons'
 import * as FileSystem from 'expo-file-system/legacy'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
-import { Alert, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { Alert, Animated, PanResponder, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native'
 import * as Sharing from 'expo-sharing'
 
 import client from '@/api/client'
@@ -22,6 +22,73 @@ type OutfitPayload = {
   vtoImageUrl: string
   isChainRender?: boolean
   chainSteps?: number
+}
+
+function OutfitRow({
+  outfit,
+  deleting,
+  onDelete,
+}: {
+  outfit: OutfitPayload
+  deleting: boolean
+  onDelete: () => void
+}) {
+  const translateX = useRef(new Animated.Value(0)).current
+  const openedRef = useRef(false)
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+      onPanResponderMove: (_, gesture) => {
+        if (gesture.dx < 0) {
+          translateX.setValue(Math.max(gesture.dx, -86))
+        }
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const shouldOpen = gesture.dx < -54
+        openedRef.current = shouldOpen
+        Animated.spring(translateX, {
+          toValue: shouldOpen ? -72 : 0,
+          useNativeDriver: true,
+        }).start()
+      },
+    })
+  ).current
+
+  return (
+    <View className="overflow-hidden rounded-[24px] bg-signal-danger/10">
+      <View className="absolute bottom-0 right-0 top-0 w-[76px] items-center justify-center">
+        <TouchableOpacity
+          onPress={onDelete}
+          disabled={deleting}
+          className="h-11 w-11 items-center justify-center rounded-full bg-signal-danger"
+        >
+          <Ionicons name={deleting ? 'hourglass-outline' : 'trash-outline'} size={18} color={colors.baseCanvas} />
+        </TouchableOpacity>
+      </View>
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={{ transform: [{ translateX }] }}
+        className="flex-row items-center rounded-[24px] bg-surface-panel px-3 py-3"
+      >
+        <RemoteImage uri={outfit.vtoImageUrl} className="h-18 w-14 rounded-[16px]" />
+        <View className="ml-3 flex-1">
+          <Text className="font-display text-2xl text-ink-dark">{outfit.name}</Text>
+          <Text className="mt-1 font-sans text-xs text-ink-dark/55">
+            {outfit.isChainRender ? `Chain render u ${outfit.chainSteps || 1} koraka` : 'Prevuci ulevo za brisanje'}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={onDelete}
+          disabled={deleting}
+          className="ml-3 h-11 w-11 items-center justify-center rounded-full bg-base-canvas"
+        >
+          <Ionicons name={deleting ? 'hourglass-outline' : 'trash-outline'} size={18} color={colors.inkDark} />
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  )
 }
 
 export default function VtoHubScreen() {
@@ -119,6 +186,18 @@ export default function VtoHubScreen() {
 
   const currentImage = params.vtoImageUrl || bodyScan.url
   const hasRender = !!params.vtoImageUrl
+  const openOverflowMenu = () => {
+    const actions = [
+      ...(hasRender
+        ? [{ text: exporting ? 'Deljenje...' : 'Podeli trenutni render', onPress: shareImage }]
+        : []),
+      { text: 'Napravi novi outfit', onPress: () => router.push('/vto/select') },
+      { text: 'Body scan', onPress: () => router.push('/vto/body-scan') },
+      { text: 'Odustani', style: 'cancel' as const },
+    ]
+
+    Alert.alert('VTO opcije', hasRender ? 'Izaberi akciju za trenutni render.' : 'Prvo napravi outfit, pa ce deljenje biti dostupno.', actions)
+  }
 
   return (
     <ScrollView
@@ -131,11 +210,10 @@ export default function VtoHubScreen() {
           <Text className="font-display text-4xl text-ink-dark">Probna Soba</Text>
         </View>
         <TouchableOpacity
-          onPress={shareImage}
-          disabled={!hasRender || exporting}
-          className={`h-11 w-11 items-center justify-center rounded-full ${hasRender ? 'bg-surface-panel' : 'bg-surface-panel/60'}`}
+          onPress={openOverflowMenu}
+          className="h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
         >
-          <Ionicons name="share-social-outline" size={20} color={colors.inkDark} />
+          <Ionicons name="ellipsis-horizontal" size={22} color={colors.inkDark} />
         </TouchableOpacity>
       </View>
 
@@ -174,35 +252,40 @@ export default function VtoHubScreen() {
           <Text className="font-display text-3xl text-ink-dark">Kolekcija</Text>
           <View className="mt-4 gap-3">
             {outfits.map((outfit) => (
-              <View key={outfit._id} className="flex-row items-center rounded-[24px] bg-surface-panel px-3 py-3">
-                <RemoteImage
-                  uri={outfit.vtoImageUrl}
-                  className="h-18 w-14 rounded-[16px]"
-                />
-                <View className="ml-3 flex-1">
-                  <Text className="font-display text-2xl text-ink-dark">{outfit.name}</Text>
-                  {outfit.isChainRender ? (
-                    <Text className="mt-1 font-sans text-xs text-ink-dark/55">
-                      Chain render u {outfit.chainSteps || 1} koraka
-                    </Text>
-                  ) : null}
-                </View>
-                <TouchableOpacity
-                  onPress={() => deleteOutfit(outfit._id)}
-                  disabled={deletingOutfitId === outfit._id}
-                  className="ml-3 h-11 w-11 items-center justify-center rounded-full bg-base-canvas"
-                >
-                  <Ionicons
-                    name={deletingOutfitId === outfit._id ? 'hourglass-outline' : 'trash-outline'}
-                    size={18}
-                    color={colors.inkDark}
-                  />
-                </TouchableOpacity>
-              </View>
+              <OutfitRow
+                key={outfit._id}
+                outfit={outfit}
+                deleting={deletingOutfitId === outfit._id}
+                onDelete={() => deleteOutfit(outfit._id)}
+              />
             ))}
           </View>
         </View>
-      ) : null}
+      ) : (
+        <View className="mt-7 rounded-[28px] bg-surface-panel px-5 py-5">
+          <View className="h-14 w-14 items-center justify-center rounded-full bg-brand-highlight/35">
+            <Ionicons name="sparkles-outline" size={24} color={colors.inkDark} />
+          </View>
+          <Text className="mt-4 font-display text-3xl text-ink-dark">Stvori prvi outfit</Text>
+          <Text className="mt-2 font-sans text-sm leading-6 text-ink-dark/62">
+            Kolekcija je prazna dok ne sacuvas prvi render. Kreni kroz tri kratka koraka.
+          </Text>
+          <View className="mt-4 gap-3">
+            {['Izaberi digitalizovan komad', 'Pokreni Virtual Try-On render', 'Sacuvaj rezultat u kolekciju'].map((step, index) => (
+              <View key={step} className="flex-row items-center rounded-[18px] bg-base-canvas px-4 py-3">
+                <Text className="font-display text-xl text-brand-accent-deep">{index + 1}</Text>
+                <Text className="ml-3 flex-1 font-sans text-sm text-ink-dark/70">{step}</Text>
+              </View>
+            ))}
+          </View>
+          <TouchableOpacity
+            onPress={() => router.push('/vto/select')}
+            className="mt-5 items-center rounded-full bg-brand-highlight px-4 py-4"
+          >
+            <Text className="font-sans text-sm font-semibold text-ink-dark">Stvori prvi outfit</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
   )
 }

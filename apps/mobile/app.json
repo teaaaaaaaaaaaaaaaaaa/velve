@@ -45,6 +45,12 @@
           "locationWhenInUsePermission": "Velve koristi lokaciju da predlozi tvoj grad za trade."
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "color": "#431A43"
+        }
+      ],
       "@react-native-firebase/app",
       "@react-native-google-signin/google-signin"
     ],

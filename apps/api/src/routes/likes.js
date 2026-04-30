@@ -5,6 +5,7 @@ const { requireAuth } = require('../middleware/auth')
 const Like = require('../models/Like')
 const Item = require('../models/Item')
 const { enrichItems } = require('../lib/enrichItems')
+const { getPrimaryImage } = require('../lib/itemPresentation')
 const { sendPushToUser } = require('../lib/pushNotifications')
 const { createNotification } = require('../lib/notifications')
 
@@ -68,6 +69,7 @@ router.post('/:id/like', requireAuth, async (req, res) => {
     const enriched = await enrichItems(item, req.dbUser._id)
 
     if (!existingLike) {
+      const imageUrl = getPrimaryImage(item)
       createNotification({
         userId: item.userId,
         actorUserId: req.dbUser._id,
@@ -75,16 +77,18 @@ router.post('/:id/like', requireAuth, async (req, res) => {
         title: 'Novi lajk',
         body: `${req.dbUser.displayName || 'Korisnik'} je lajkovao/la "${item.title}"`,
         itemId: item._id,
-        data: { itemId: String(item._id), userId: String(req.dbUser._id) },
+        data: { itemId: String(item._id), userId: String(req.dbUser._id), imageUrl },
       })
 
       sendPushToUser(item.userId, {
         title: 'Novi lajk',
         body: `${req.dbUser.displayName || 'Korisnik'} je lajkovao/la "${item.title}"`,
+        imageUrl,
         data: {
           type: 'item_like',
           itemId: String(item._id),
           userId: String(req.dbUser._id),
+          imageUrl,
         },
       })
     }

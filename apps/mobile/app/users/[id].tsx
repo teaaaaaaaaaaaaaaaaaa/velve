@@ -8,6 +8,7 @@ import { BrandedLoader } from '@/components/BrandedLoader'
 import { DiscoveryCardItem, DiscoveryItemCard } from '@/components/DiscoveryItemCard'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { RemoteImage } from '@/components/RemoteImage'
+import { VelveStoryHighlights } from '@/components/VelveStoryHighlights'
 import { getApiErrorMessage } from '@/lib/apiErrors'
 
 type PublicUser = {
@@ -27,6 +28,8 @@ type PublicUser = {
   responseRate?: number | null
   successfulSwaps?: number
   profileCompleteness?: number
+  stylePreferences?: string[]
+  favoriteBrands?: string[]
 }
 
 export default function PublicProfileScreen() {
@@ -247,6 +250,8 @@ export default function PublicProfileScreen() {
           <Text className="mt-5 font-sans text-sm leading-6 text-ink-dark/75">
             {user.bio || 'Profil jos nema opis, ali trust signal i garderoba ispod vec govore o stilu ovog naloga.'}
           </Text>
+
+          <VelveStoryHighlights profile={user} />
 
           <View className="mt-5 flex-row rounded-[24px] bg-base-canvas px-4 py-4">
             <View className="flex-1 items-center">

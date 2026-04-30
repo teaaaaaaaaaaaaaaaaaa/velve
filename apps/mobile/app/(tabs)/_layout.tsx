@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Tabs, usePathname, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { io, Socket } from 'socket.io-client'
@@ -18,44 +18,67 @@ export default function TabsLayout() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0)
   const socketRef = useRef<Socket | null>(null)
+  const pathnameRef = useRef(pathname)
+  const lastNotificationBadgeFetchRef = useRef(0)
   // Hide only inside a specific conversation (e.g. /chat/<id>). The chat list
   // (/chat), closet, and trades keep the floating nav visible.
   const hideFloatingBar = /\/chat\/[^/]+$/.test(pathname)
 
-  // Resetuj badge kad korisnik otvori chat
+  useEffect(() => {
+    pathnameRef.current = pathname
+  }, [pathname])
+
+  // Resetuj badge kad korisnik otvori chat ili notification center.
   useEffect(() => {
     if (pathname.includes('chat')) {
       setUnreadCount(0)
     }
+    if (pathname === '/notifications') {
+      setNotificationUnreadCount(0)
+      lastNotificationBadgeFetchRef.current = Date.now()
+    }
   }, [pathname])
 
-  useEffect(() => {
+  const loadNotificationBadge = useCallback(async (force = false) => {
     if (!dbUser?._id) {
       setNotificationUnreadCount(0)
       return
     }
 
-    let active = true
-
-    async function loadNotificationBadge() {
-      try {
-        const response = await client.get('/api/notifications/unread-count')
-        if (active && response.data.ok) {
-          setNotificationUnreadCount(response.data.unreadCount || response.data.data?.unreadCount || 0)
-        }
-      } catch {
-        // Badge should never block tab navigation.
-      }
+    const now = Date.now()
+    if (!force && now - lastNotificationBadgeFetchRef.current < 30000) {
+      return
     }
 
-    loadNotificationBadge()
-    const interval = setInterval(loadNotificationBadge, 60000)
+    lastNotificationBadgeFetchRef.current = now
+
+    try {
+      const response = await client.get('/api/notifications/unread-count')
+      if (response.data.ok) {
+        setNotificationUnreadCount(response.data.unreadCount || response.data.data?.unreadCount || 0)
+      }
+    } catch (error: any) {
+      if (error?.response?.status === 429) {
+        lastNotificationBadgeFetchRef.current = Date.now() + 60000
+      }
+      // Badge should never block tab navigation.
+    }
+  }, [dbUser?._id])
+
+  useEffect(() => {
+    if (!dbUser?._id) {
+      setNotificationUnreadCount(0)
+      lastNotificationBadgeFetchRef.current = 0
+      return
+    }
+
+    loadNotificationBadge(true)
+    const interval = setInterval(() => loadNotificationBadge(false), 120000)
 
     return () => {
-      active = false
       clearInterval(interval)
     }
-  }, [dbUser?._id, pathname])
+  }, [dbUser?._id, loadNotificationBadge])
 
   // Socket.io konekcija — samo za badge, bez pollinga
   useEffect(() => {
@@ -78,7 +101,7 @@ export default function TabsLayout() {
 
       socket.on('badge_new_message', () => {
         // Dodaj badge samo ako korisnik nije trenutno u chat tabu
-        if (!pathname.includes('chat')) {
+        if (!pathnameRef.current.includes('chat')) {
           setUnreadCount((prev) => prev + 1)
         }
         setNotificationUnreadCount((prev) => prev + 1)
@@ -94,18 +117,6 @@ export default function TabsLayout() {
       socketRef.current = null
     }
   }, [dbUser?._id])
-
-  // Ažuriraj pathname ref u socket listeneru
-  useEffect(() => {
-    if (!socketRef.current) return
-    socketRef.current.off('badge_new_message')
-    socketRef.current.on('badge_new_message', () => {
-      if (!pathname.includes('chat')) {
-        setUnreadCount((prev) => prev + 1)
-      }
-      setNotificationUnreadCount((prev) => prev + 1)
-    })
-  }, [pathname])
 
   return (
     <Tabs

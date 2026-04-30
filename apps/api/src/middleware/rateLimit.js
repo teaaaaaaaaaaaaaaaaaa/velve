@@ -1,11 +1,14 @@
 const rateLimit = require('express-rate-limit')
 
-// Global: 100 requests per 15 minutes
+// Global API guard. Mobile sessions legitimately fan out across feed, profile,
+// notifications, and VTO surfaces, so keep abuse protection without punishing
+// normal navigation.
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: Number(process.env.API_RATE_LIMIT_MAX || 600),
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.method === 'OPTIONS',
   message: { error: 'Too many requests, please try again later.' },
 })
 

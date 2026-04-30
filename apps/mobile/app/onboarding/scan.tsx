@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons'
 
 import { BrandBackground } from '@/components/BrandBackground'
 import { GlassSurface } from '@/components/GlassSurface'
+import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock'
+import { OnboardingProgressHeader } from '@/components/OnboardingProgressHeader'
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
 
@@ -48,6 +50,7 @@ export default function OnboardingScanScreen() {
   const { locale } = useI18n()
 
   const copy = COPY[locale]
+  const unlockLabel = locale === 'sr' ? 'Virtual Try-On spreman' : 'Virtual Try-On ready'
 
   const handleSkip = () => {
     router.replace('/(tabs)/feed')
@@ -62,20 +65,27 @@ export default function OnboardingScanScreen() {
       <StatusBar barStyle="dark-content" />
       <BrandBackground />
 
-      <View className="flex-1 justify-between px-gutter pb-10 pt-14">
+      <View className="flex-1 justify-between pb-10">
         <View>
-          <Text className="font-logo text-[30px] leading-none text-brand-accent-deep/72">
-            {copy.mood}
-          </Text>
-          <Text className="mt-4 font-display text-[38px] leading-[40px] text-ink-dark">
-            {copy.title}
-          </Text>
-          <Text className="mt-4 max-w-[344px] font-sans text-base leading-7 text-ink-dark/68">
-            {copy.description}
-          </Text>
+          <OnboardingProgressHeader
+            stepLabel="VTO setup"
+            progress={1}
+            unlockLabel={unlockLabel}
+          />
+          <OnboardingAnimatedBlock className="px-gutter">
+            <Text className="font-logo text-[30px] leading-none text-brand-accent-deep/72">
+              {copy.mood}
+            </Text>
+            <Text className="mt-4 font-display text-[38px] leading-[40px] text-ink-dark">
+              {copy.title}
+            </Text>
+            <Text className="mt-4 max-w-[344px] font-sans text-base leading-7 text-ink-dark/68">
+              {copy.description}
+            </Text>
+          </OnboardingAnimatedBlock>
         </View>
 
-        <GlassSurface className="px-5 py-6">
+        <GlassSurface className="mx-gutter px-5 py-6">
           <View className="items-center">
             <View className="h-20 w-20 items-center justify-center rounded-full bg-brand-accent-deep/10">
               <Ionicons name="body-outline" size={40} color={colors.accentDeep} />
@@ -89,7 +99,7 @@ export default function OnboardingScanScreen() {
           </Text>
         </GlassSurface>
 
-        <View>
+        <View className="px-gutter">
           <TouchableOpacity
             onPress={handleStartScan}
             className="items-center rounded-pill bg-brand-accent-deep px-5 py-4"

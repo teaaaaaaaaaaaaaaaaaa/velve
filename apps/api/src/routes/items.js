@@ -14,7 +14,7 @@ const { sanitizeInput } = require('../lib/sanitize')
 const { enrichItems } = require('../lib/enrichItems')
 const { sendPushToUser } = require('../lib/pushNotifications')
 const { getBlockedUserIds, getHiddenItemIds } = require('../lib/discovery')
-const { withPrimaryImage } = require('../lib/itemPresentation')
+const { getPrimaryImage, withPrimaryImage } = require('../lib/itemPresentation')
 const { createItemCleanKey, uploadBuffer } = require('../lib/r2')
 const { AI_SERVER_URL, generateEmbedding, addEmbeddingToIndex } = require('../lib/aiClient')
 

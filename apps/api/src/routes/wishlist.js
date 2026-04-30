@@ -5,7 +5,7 @@ const { requireAuth } = require('../middleware/auth')
 const Wishlist = require('../models/Wishlist')
 const Item = require('../models/Item')
 const { enrichItems } = require('../lib/enrichItems')
-const { withPrimaryImage } = require('../lib/itemPresentation')
+const { getPrimaryImage, withPrimaryImage } = require('../lib/itemPresentation')
 const { sendPushToUser } = require('../lib/pushNotifications')
 const { createNotification } = require('../lib/notifications')
 
@@ -44,6 +44,7 @@ router.post('/:itemId', requireAuth, async (req, res) => {
     )
 
     if (!existingWishlist) {
+      const imageUrl = getPrimaryImage(item)
       createNotification({
         userId: item.userId,
         actorUserId: req.dbUser._id,
@@ -51,16 +52,18 @@ router.post('/:itemId', requireAuth, async (req, res) => {
         title: 'Komad je sacuvan',
         body: `${req.dbUser.displayName || 'Korisnik'} je sacuvao/la "${item.title}"`,
         itemId: item._id,
-        data: { itemId: String(item._id), userId: String(req.dbUser._id) },
+        data: { itemId: String(item._id), userId: String(req.dbUser._id), imageUrl },
       })
 
       sendPushToUser(item.userId, {
         title: 'Komad je sacuvan',
         body: `${req.dbUser.displayName || 'Korisnik'} je sacuvao/la "${item.title}"`,
+        imageUrl,
         data: {
           type: 'item_wishlist',
           itemId: String(item._id),
           userId: String(req.dbUser._id),
+          imageUrl,
         },
       })
     }

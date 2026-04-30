@@ -132,6 +132,17 @@ function DetailPanel({
   );
 }
 
+type SideAction = {
+  key: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  count?: number;
+  active?: boolean;
+  visible: boolean;
+  disabled?: boolean;
+  label: string;
+  onPress: () => void;
+};
+
 export default function ItemDetailsScreen() {
   const { id, viewOnly, openTrade } = useLocalSearchParams<{
     id: string;
@@ -194,7 +205,7 @@ export default function ItemDetailsScreen() {
     if (item.listingType === 'both') return ['trade', 'buy'] as Array<'trade' | 'buy'>;
     return ['trade'] as Array<'trade' | 'buy'>;
   }, [isOwn, item]);
-
+  const showProposalButton = availableProposalModes.length > 0;
   const hydrateEditState = (data: Item) => {
     setEditTitle(data.title || '');
     setEditDescription(data.description || '');
@@ -550,6 +561,81 @@ export default function ItemDetailsScreen() {
     }
   };
 
+  const sideActions = useMemo<SideAction[]>(() => {
+    const canTryOn = item && !isOwn ? hasDigitizedImage(item) : false;
+    const ownerCanTryOn = item && isOwn ? hasDigitizedImage(item) : false;
+
+    return [
+      {
+        key: 'like',
+        icon: isLiked ? 'heart' : 'heart-outline',
+        count: likesCount,
+        active: isLiked,
+        visible: !isOwn,
+        label: 'Lajkuj predmet',
+        onPress: handleLike,
+      },
+      {
+        key: 'proposal',
+        icon: 'swap-horizontal',
+        count: tradeRequestsCount,
+        visible: !isOwn && showProposalButton,
+        label: 'Posalji predlog',
+        onPress: openTradeComposer,
+      },
+      {
+        key: 'wishlist',
+        icon: isWishlisted ? 'bookmark' : 'bookmark-outline',
+        count: wishlistCount,
+        active: isWishlisted,
+        visible: !isOwn,
+        label: 'Sacuvaj predmet',
+        onPress: handleWishlist,
+      },
+      {
+        key: 'tryon',
+        icon: 'body-outline',
+        visible: Boolean(canTryOn || ownerCanTryOn),
+        disabled: checkingBodyScan,
+        label: 'Probaj na sebi',
+        onPress: handleTryOn,
+      },
+      {
+        key: 'digitize-edit',
+        icon: isOwn && item && !hasDigitizedImage(item) ? 'sparkles-outline' : 'pencil-outline',
+        visible: Boolean(isOwn),
+        disabled: digitizing,
+        label: isOwn && item && !hasDigitizedImage(item) ? 'Digitizuj predmet' : 'Izmeni objavu',
+        onPress: isOwn && item && !hasDigitizedImage(item) ? handleDigitize : openEditModal,
+      },
+      {
+        key: 'delete',
+        icon: 'trash-outline',
+        visible: Boolean(isOwn),
+        label: 'Obrisi objavu',
+        onPress: handleDelete,
+      },
+    ];
+  }, [
+    checkingBodyScan,
+    digitizing,
+    handleDelete,
+    handleDigitize,
+    handleLike,
+    handleTryOn,
+    handleWishlist,
+    isLiked,
+    isOwn,
+    isWishlisted,
+    item,
+    likesCount,
+    openEditModal,
+    openTradeComposer,
+    showProposalButton,
+    tradeRequestsCount,
+    wishlistCount,
+  ]);
+
   useEffect(() => {
     fetchItemDetails();
   }, [id]);
@@ -575,9 +661,16 @@ export default function ItemDetailsScreen() {
               </TouchableOpacity>
 
               <View className="items-center rounded-[30px] bg-surface-panel px-5 py-8">
-                <View className="h-20 w-20 items-center justify-center rounded-full bg-brand-accent-light/25">
-                  <Ionicons name="bag-remove-outline" size={34} color={colors.accentDeep} />
-                </View>
+                {unavailableItem.primaryImage ? (
+                  <RemoteImage
+                    uri={unavailableItem.primaryImage}
+                    className="h-36 w-28 rounded-[24px] bg-base-canvas"
+                  />
+                ) : (
+                  <View className="h-20 w-20 items-center justify-center rounded-full bg-brand-accent-light/25">
+                    <Ionicons name="bag-remove-outline" size={34} color={colors.accentDeep} />
+                  </View>
+                )}
                 <Text className="mt-5 text-center font-display text-4xl text-ink-dark">
                   Ovaj artikal vise nije dostupan
                 </Text>
@@ -587,11 +680,15 @@ export default function ItemDetailsScreen() {
                     : 'Artikal je prodat, arhiviran ili vise nije aktivan.'}
                 </Text>
                 <TouchableOpacity
-                  onPress={() => router.replace('/(tabs)/feed')}
+                  onPress={() =>
+                    unavailableItem.category
+                      ? router.replace({ pathname: '/search', params: { category: unavailableItem.category } })
+                      : router.replace('/(tabs)/feed')
+                  }
                   className="mt-6 rounded-full bg-brand-accent-deep px-5 py-3.5"
                 >
                   <Text className="font-sans text-sm font-semibold text-base-canvas">
-                    Nazad na feed
+                    {unavailableItem.category ? `Nadji slicne: ${unavailableItem.category}` : 'Nazad na feed'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -645,7 +742,6 @@ export default function ItemDetailsScreen() {
   }
 
   const heroImage = getPrimaryItemImage(item);
-  const showProposalButton = availableProposalModes.length > 0;
   const showPrice =
     (item.listingType === 'sell' || item.listingType === 'both') && item.price != null;
   const showTradeFor =
@@ -1097,65 +1193,23 @@ export default function ItemDetailsScreen() {
           />
           {!isViewOnly ? (
             <View className="absolute right-3 items-center gap-3" style={{ bottom: heroCardBottomOffset + 118 }}>
-              <GlassCountActionButton
-                icon={isLiked ? 'heart' : 'heart-outline'}
-                count={likesCount}
-                active={isLiked}
-                onPress={handleLike}
-                accessibilityLabel="Lajkuj predmet"
-                tone="dark"
-              />
-              {!isOwn && showProposalButton ? (
-                <GlassCountActionButton
-                  icon="swap-horizontal"
-                  count={tradeRequestsCount}
-                  onPress={openTradeComposer}
-                  accessibilityLabel="Posalji predlog"
-                  tone="dark"
-                />
-              ) : null}
-              {!isOwn ? (
-                <GlassCountActionButton
-                  icon={isWishlisted ? 'bookmark' : 'bookmark-outline'}
-                  count={wishlistCount}
-                  active={isWishlisted}
-                  onPress={handleWishlist}
-                  accessibilityLabel="Sacuvaj predmet"
-                  tone="dark"
-                />
-              ) : null}
-              {!isOwn && hasDigitizedImage(item) ? (
-                <GlassCountActionButton
-                  icon="body-outline"
-                  onPress={handleTryOn}
-                  accessibilityLabel="Probaj na sebi"
-                  tone="dark"
-                />
-              ) : null}
-              {isOwn ? (
-                <>
-                  {!hasDigitizedImage(item) ? (
-                    <GlassCountActionButton
-                      icon="sparkles-outline"
-                      onPress={handleDigitize}
-                      accessibilityLabel="Digitizuj predmet"
-                      tone="dark"
-                    />
-                  ) : null}
+              {sideActions.map((action) => (
+                <View
+                  key={action.key}
+                  pointerEvents={action.visible ? 'auto' : 'none'}
+                  style={{ opacity: action.visible ? 1 : 0 }}
+                >
                   <GlassCountActionButton
-                    icon="pencil-outline"
-                    onPress={openEditModal}
-                    accessibilityLabel="Izmeni objavu"
+                    icon={action.icon}
+                    count={action.count}
+                    active={action.active}
+                    disabled={action.disabled}
+                    onPress={action.onPress}
+                    accessibilityLabel={action.label}
                     tone="dark"
                   />
-                  <GlassCountActionButton
-                    icon="trash-outline"
-                    onPress={handleDelete}
-                    accessibilityLabel="Obrisi objavu"
-                    tone="dark"
-                  />
-                </>
-              ) : null}
+                </View>
+              ))}
             </View>
           ) : null}
         </View>

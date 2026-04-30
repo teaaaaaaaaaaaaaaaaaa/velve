@@ -41,6 +41,12 @@ type SettingRowProps = {
   right?: ReactNode
 }
 
+const LANGUAGE_NAMES = {
+  sr: 'Srpski',
+  en: 'English',
+  ru: 'Russian',
+} as const
+
 function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View className="mt-5 rounded-[26px] bg-surface-panel px-4 py-4">
@@ -88,6 +94,7 @@ export default function SettingsScreen() {
   const [preferences, setPreferences] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES)
   const [loadingPreferences, setLoadingPreferences] = useState(true)
   const [savingPreference, setSavingPreference] = useState<keyof NotificationPreferences | null>(null)
+  const [savingLocale, setSavingLocale] = useState(false)
 
   const loadPreferences = useCallback(async () => {
     try {
@@ -150,6 +157,22 @@ export default function SettingsScreen() {
     Linking.openURL(url).catch(() => Alert.alert('Greska', 'Link trenutno nije dostupan.'))
   }
 
+  const changeLocale = useCallback(
+    async (language: keyof typeof LANGUAGE_NAMES) => {
+      if (locale === language || savingLocale) return
+
+      try {
+        setSavingLocale(true)
+        await setLocale(language)
+      } catch {
+        Alert.alert('Greska', 'Jezik trenutno nije moguce sacuvati.')
+      } finally {
+        setSavingLocale(false)
+      }
+    },
+    [locale, savingLocale, setLocale]
+  )
+
   const switchProps = (key: keyof NotificationPreferences) => ({
     value: preferences[key],
     disabled: loadingPreferences || Boolean(savingPreference),
@@ -211,19 +234,23 @@ export default function SettingsScreen() {
         </SettingsSection>
 
         <SettingsSection title="Jezik">
+          <Text className="mt-3 font-sans text-sm leading-6 text-ink-dark/60">
+            Trenutni jezik: {LANGUAGE_NAMES[locale]}
+          </Text>
           <View className="mt-4 flex-row gap-3">
             {(['sr', 'en', 'ru'] as const).map((language) => {
               const isActive = locale === language
               return (
                 <TouchableOpacity
                   key={language}
+                  disabled={savingLocale}
                   className={`flex-1 items-center rounded-full px-4 py-3 ${
                     isActive ? 'bg-brand-accent-deep' : 'border border-ink-dark/10 bg-base-canvas'
                   }`}
-                  onPress={() => setLocale(language)}
+                  onPress={() => changeLocale(language)}
                 >
                   <Text className={`font-sans text-sm font-semibold ${isActive ? 'text-base-canvas' : 'text-ink-dark'}`}>
-                    {t(`language.${language}` as 'language.sr')}
+                    {LANGUAGE_NAMES[language]}
                   </Text>
                 </TouchableOpacity>
               )

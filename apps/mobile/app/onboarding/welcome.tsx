@@ -3,6 +3,7 @@ import { StatusBar, Text, TouchableOpacity, View } from 'react-native'
 
 import { BrandBackground } from '@/components/BrandBackground'
 import { BrandWordmark } from '@/components/BrandWordmark'
+import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock'
 import { useI18n } from '@/i18n'
 
 export default function WelcomeScreen() {
@@ -16,7 +17,7 @@ export default function WelcomeScreen() {
 
       <View className="flex-1 px-gutter pb-12 z-10">
         
-        <View className="flex-1 items-center justify-center">
+        <OnboardingAnimatedBlock className="flex-1 items-center justify-center">
           <View className="mb-10 items-center justify-center">
             <BrandWordmark width={220} tone="deep" />
           </View>
@@ -28,7 +29,7 @@ export default function WelcomeScreen() {
           <Text className="mt-6 text-center max-w-[320px] font-sans text-[17px] leading-[28px] text-ink-dark/60">
             {t('onboarding.welcomeDescription')}
           </Text>
-        </View>
+        </OnboardingAnimatedBlock>
 
         {/* Bottom CTA */}
         <View className="w-full mt-auto">

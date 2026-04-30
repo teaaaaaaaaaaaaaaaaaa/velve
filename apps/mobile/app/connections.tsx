@@ -25,26 +25,72 @@ type ConnectionUser = {
   location?: { city?: string }
 }
 
+type ConnectionProfile = {
+  _id: string
+  displayName?: string
+  photoURL?: string
+  bio?: string
+  followersCount?: number
+  followingCount?: number
+  completedTrades?: number
+  isSelf?: boolean
+  location?: { city?: string; region?: string }
+}
+
 export default function ConnectionsScreen() {
   const router = useRouter()
   const { dbUser } = useAuth()
   const params = useLocalSearchParams<{ userId?: string; tab?: ConnectionTab }>()
   const userId = params.userId
   const [activeTab, setActiveTab] = useState<ConnectionTab>(params.tab === 'following' ? 'following' : 'followers')
+  const [profileUser, setProfileUser] = useState<ConnectionProfile | null>(null)
   const [users, setUsers] = useState<ConnectionUser[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
 
-  const title = activeTab === 'followers' ? 'Pratioci' : 'Pratis'
-  const emptyText = activeTab === 'followers' ? 'Ne prati vas niko.' : 'Ne pratite nikoga.'
   const isOwnConnections = Boolean(userId && dbUser?._id && String(userId) === String(dbUser._id))
+  const profileName = profileUser?.displayName || (isOwnConnections ? dbUser?.displayName || 'Tvoj profil' : 'Profil')
+  const profileInitial = profileName.charAt(0).toUpperCase()
+  const title = activeTab === 'followers' ? 'Pratioci' : 'Prati'
+  const contextLabel = isOwnConnections ? 'Tvoj social closet' : `@${profileName}`
+  const emptyText = activeTab === 'followers'
+    ? isOwnConnections
+      ? 'Ne prati vas niko.'
+      : `Niko jos ne prati profil ${profileName}.`
+    : isOwnConnections
+      ? 'Ne pratite nikoga.'
+      : `${profileName} jos nikoga ne prati.`
 
   const endpoint = useMemo(() => {
     if (!userId) return ''
     return `/api/users/${userId}/${activeTab}`
   }, [activeTab, userId])
+
+  useEffect(() => {
+    setActiveTab(params.tab === 'following' ? 'following' : 'followers')
+  }, [params.tab])
+
+  const loadProfileUser = useCallback(async () => {
+    if (!userId) return
+    try {
+      const response = await client.get(`/api/users/${userId}`)
+      if (response.data.ok) {
+        setProfileUser(response.data.data || null)
+      }
+    } catch {
+      if (isOwnConnections && dbUser) {
+        setProfileUser({
+          _id: String(dbUser._id),
+          displayName: dbUser.displayName,
+          photoURL: dbUser.photoURL,
+          followersCount: dbUser.followersCount,
+          followingCount: dbUser.followingCount,
+        })
+      }
+    }
+  }, [dbUser, isOwnConnections, userId])
 
   const loadConnections = useCallback(async () => {
     if (!endpoint) return
@@ -63,11 +109,15 @@ export default function ConnectionsScreen() {
     loadConnections().finally(() => setLoading(false))
   }, [loadConnections])
 
+  useEffect(() => {
+    loadProfileUser()
+  }, [loadProfileUser])
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
-    await loadConnections()
+    await Promise.all([loadProfileUser(), loadConnections()])
     setRefreshing(false)
-  }, [loadConnections])
+  }, [loadConnections, loadProfileUser])
 
   const toggleFollow = useCallback(async (connection: ConnectionUser) => {
     if (connection.isSelf || busyId) return
@@ -146,10 +196,45 @@ export default function ConnectionsScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
-          Social closet
-        </Text>
-        <Text className="mt-1 font-display text-4xl text-ink-dark">{title}</Text>
+        <View className="rounded-[28px] bg-surface-panel px-4 py-4">
+          <View className="flex-row items-center">
+            {profileUser?.photoURL ? (
+              <RemoteImage uri={profileUser.photoURL} className="h-16 w-16 rounded-full" />
+            ) : (
+              <View className="h-16 w-16 items-center justify-center rounded-full bg-brand-accent-light/35">
+                <Text className="font-display text-3xl text-brand-accent-deep">{profileInitial}</Text>
+              </View>
+            )}
+            <View className="ml-3 flex-1">
+              <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
+                {contextLabel}
+              </Text>
+              <Text className="mt-1 font-display text-4xl text-ink-dark">{title}</Text>
+              <Text className="mt-1 font-sans text-sm text-ink-dark/55" numberOfLines={1}>
+                {activeTab === 'followers'
+                  ? `Ljudi koji prate ${isOwnConnections ? 'tvoj profil' : profileName}`
+                  : isOwnConnections
+                    ? 'Profili koje pratis'
+                    : `Profili koje prati ${profileName}`}
+              </Text>
+            </View>
+          </View>
+
+          <View className="mt-4 flex-row gap-2">
+            <View className="flex-1 rounded-[18px] bg-base-canvas px-3 py-3">
+              <Text className="text-center font-display text-2xl text-ink-dark">
+                {profileUser?.followersCount ?? (activeTab === 'followers' ? users.length : 0)}
+              </Text>
+              <Text className="text-center font-sans text-xs text-ink-dark/50">Pratioci</Text>
+            </View>
+            <View className="flex-1 rounded-[18px] bg-base-canvas px-3 py-3">
+              <Text className="text-center font-display text-2xl text-ink-dark">
+                {profileUser?.followingCount ?? (activeTab === 'following' ? users.length : 0)}
+              </Text>
+              <Text className="text-center font-sans text-xs text-ink-dark/50">Prati</Text>
+            </View>
+          </View>
+        </View>
 
         <View className="mt-5 flex-row rounded-[22px] bg-surface-panel p-1">
           {(['followers', 'following'] as const).map((tab) => (
@@ -157,6 +242,7 @@ export default function ConnectionsScreen() {
               key={tab}
               className={`flex-1 rounded-[18px] px-4 py-3 ${activeTab === tab ? 'bg-brand-accent-deep' : ''}`}
               onPress={() => {
+                if (activeTab === tab) return
                 setActiveTab(tab)
                 setLoading(true)
               }}
@@ -166,7 +252,7 @@ export default function ConnectionsScreen() {
                   activeTab === tab ? 'text-base-canvas' : 'text-ink-dark/60'
                 }`}
               >
-                {tab === 'followers' ? 'Pratioci' : 'Pratis'}
+                {tab === 'followers' ? 'Pratioci' : 'Prati'}
               </Text>
             </TouchableOpacity>
           ))}

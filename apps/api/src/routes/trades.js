@@ -460,14 +460,21 @@ router.post('/', requireAuth, async (req, res) => {
         ? `${senderName} nudi ${normalizedOfferedPrice} EUR za tvoj predmet`
         : `${senderName} zeli da kupi "${requestedItem.title}"`
       : `${senderName} zeli da zameni "${offeredItem.title}" za tvoj predmet`
+    const requestedItemImage = getPrimaryImage(requestedItem)
+    const offeredItemImage = offeredItem ? getPrimaryImage(offeredItem) : ''
+    const pushImage = offeredItemImage || requestedItemImage
 
     sendPushToUser(receiverId, {
       title: isBuyRequest ? 'Novi zahtev za kupovinu' : 'Novi zahtev za razmenu',
       body: pushBody,
+      imageUrl: pushImage,
       data: {
         type: 'trade_request',
         tradeId: trade._id.toString(),
         chatId: chat._id.toString(),
+        itemId: String(requestedItem._id),
+        requestedItemImage,
+        offeredItemImage,
       },
     })
 
@@ -480,7 +487,14 @@ router.post('/', requireAuth, async (req, res) => {
       itemId: requestedItem._id,
       tradeId: trade._id,
       chatId: chat._id,
-      data: { tradeId: String(trade._id), chatId: String(chat._id), itemId: String(requestedItem._id) },
+      data: {
+        tradeId: String(trade._id),
+        chatId: String(chat._id),
+        itemId: String(requestedItem._id),
+        imageUrl: pushImage,
+        requestedItemImage,
+        offeredItemImage,
+      },
     })
 
     res.status(201).json({ ok: true, data: { trade, chatId: chat._id } })
@@ -554,6 +568,7 @@ router.put('/:id', requireAuth, async (req, res) => {
         : 'Zahtev je odbijen.'
 
     const chat = await appendTradeStatusMessage(trade, req.dbUser._id, status, actionLabel)
+    const pushImage = getPrimaryImage(offeredItem || requestedItem)
 
     sendPushToUser(trade.senderId, {
       title: status === 'accepted' ? 'Trade prihvacen' : 'Trade odbijen',
@@ -561,11 +576,13 @@ router.put('/:id', requireAuth, async (req, res) => {
         status === 'accepted'
           ? `${req.dbUser.displayName || 'Korisnik'} je prihvatio tvoj zahtev`
           : `${req.dbUser.displayName || 'Korisnik'} je odbio tvoj zahtev`,
+      imageUrl: pushImage,
       data: {
         type: 'trade_update',
         tradeId: trade._id.toString(),
         status,
         chatId: chat?._id ? String(chat._id) : '',
+        imageUrl: pushImage,
       },
     })
 

@@ -20,6 +20,7 @@ import { ProfileSkeleton } from '@/components/BrandedLoader'
 import { DiscoveryCardItem } from '@/components/DiscoveryItemCard'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { RemoteImage } from '@/components/RemoteImage'
+import { VelveStoryHighlights } from '@/components/VelveStoryHighlights'
 import { VelveTextInput } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
@@ -51,6 +52,7 @@ type UserProfile = {
   closetCounts: ClosetCounts
   bodyScanUrl?: string | null
   bodyScanCreatedAt?: string | null
+  stylePreferences?: string[]
   favoriteBrands?: string[]
   location?: { city?: string; region?: string }
 }
@@ -400,6 +402,8 @@ export default function ProfileScreen() {
                 ))}
               </View>
             ) : null}
+
+            <VelveStoryHighlights profile={profile} />
 
             <View className="mt-5 flex-row items-center justify-between">
               <TouchableOpacity

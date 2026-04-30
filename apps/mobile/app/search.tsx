@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons'
-import { Stack, useRouter } from 'expo-router'
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  ActivityIndicator,
   FlatList,
   Modal,
   RefreshControl,
@@ -14,12 +15,12 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import client from '@/api/client'
-import { BrandedLoader } from '@/components/BrandedLoader'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { ImmersiveFeedCard, ImmersiveFeedItem } from '@/components/ImmersiveFeedCard'
 import { VelveTextInput } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
+import { getStorage } from '@/lib/storage'
 
 type SearchFilters = {
   category: string
@@ -39,29 +40,73 @@ const EMPTY_FILTERS: SearchFilters = {
 
 const CATEGORY_FILTERS = ['Majice', 'Haljine', 'Pantalone', 'Jakne', 'Obuca', 'Dodaci']
 const SIZE_FILTERS = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
+const SEARCH_HISTORY_KEY = '@velve:search-history'
+const TRENDING_TAGS = ['kozne jakne', 'vintage denim', 'adidas samba', 'mango kaput', 'crna torba', 'oversized blazer']
 
 export default function SearchScreen() {
   const router = useRouter()
+  const params = useLocalSearchParams<{ category?: string; q?: string }>()
   const insets = useSafeAreaInsets()
   const { height: windowHeight } = useWindowDimensions()
   const { locale } = useI18n()
 
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(params.q || '')
   const [items, setItems] = useState<ImmersiveFeedItem[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
-  const [filters, setFilters] = useState<SearchFilters>(EMPTY_FILTERS)
-  const [draftFilters, setDraftFilters] = useState<SearchFilters>(EMPTY_FILTERS)
+  const initialFilters = { ...EMPTY_FILTERS, category: params.category || '' }
+  const [filters, setFilters] = useState<SearchFilters>(initialFilters)
+  const [draftFilters, setDraftFilters] = useState<SearchFilters>(initialFilters)
   const [filterOpen, setFilterOpen] = useState(false)
+  const [searchHistory, setSearchHistory] = useState<string[]>([])
 
   const pageHeight = Math.max(windowHeight, 1)
 
   const updateItem = useCallback((itemId: string, updater: (item: ImmersiveFeedItem) => ImmersiveFeedItem) => {
     setItems((prev) => prev.map((item) => (item._id === itemId ? updater(item) : item)))
   }, [])
+
+  useEffect(() => {
+    getStorage()
+      .getItem(SEARCH_HISTORY_KEY)
+      .then((value) => {
+        if (!value) return
+        const parsed = JSON.parse(value)
+        if (Array.isArray(parsed)) {
+          setSearchHistory(parsed.filter((entry) => typeof entry === 'string').slice(0, 8))
+        }
+      })
+      .catch(() => undefined)
+  }, [])
+
+  const persistSearchHistory = useCallback((nextHistory: string[]) => {
+    setSearchHistory(nextHistory)
+    getStorage().setItem(SEARCH_HISTORY_KEY, JSON.stringify(nextHistory)).catch(() => undefined)
+  }, [])
+
+  const recordSearchQuery = useCallback(
+    (value: string) => {
+      const normalized = value.trim()
+      if (normalized.length < 2) return
+      const nextHistory = [
+        normalized,
+        ...searchHistory.filter((entry) => entry.toLowerCase() !== normalized.toLowerCase()),
+      ].slice(0, 8)
+      persistSearchHistory(nextHistory)
+    },
+    [persistSearchHistory, searchHistory]
+  )
+
+  const useSuggestion = useCallback(
+    (value: string) => {
+      setQuery(value)
+      recordSearchQuery(value)
+    },
+    [recordSearchQuery]
+  )
 
   const loadResults = useCallback(
     async (mode: 'replace' | 'append' = 'replace') => {
@@ -219,16 +264,17 @@ export default function SearchScreen() {
     setNextCursor(null)
   }, [])
 
-  if (loading && items.length === 0) {
-    return <BrandedLoader dark />
-  }
-
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
-      {items.length === 0 ? (
+      {loading && items.length === 0 ? (
+        <View className="flex-1 items-center justify-center bg-white">
+          <ActivityIndicator color={colors.accentDeep} />
+          <Text className="mt-3 font-sans text-sm text-ink-dark/45">Ucitavamo search...</Text>
+        </View>
+      ) : items.length === 0 ? (
         <View className="flex-1 bg-white px-5 pt-24">
           <EditorialEmptyState
             icon="search-outline"
@@ -289,6 +335,7 @@ export default function SearchScreen() {
             <VelveTextInput
               value={query}
               onChangeText={setQuery}
+              onSubmitEditing={() => recordSearchQuery(query)}
               placeholder="Pretrazi komade, brend ili kategoriju..."
               className="ml-3 flex-1 font-sans text-sm text-ink-dark"
               autoFocus
@@ -319,6 +366,55 @@ export default function SearchScreen() {
           </View>
         ) : null}
       </View>
+
+      {!query.trim() ? (
+        <View
+          className="absolute left-4 right-4 z-10 rounded-[24px] bg-base-canvas/95 px-4 py-4"
+          style={{ top: insets.top + 78 }}
+        >
+          <View className="flex-row items-center justify-between">
+            <Text className="font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/45">
+              Trending
+            </Text>
+            {searchHistory.length > 0 ? (
+              <TouchableOpacity onPress={() => persistSearchHistory([])}>
+                <Text className="font-sans text-xs font-semibold text-brand-accent-deep">Ocisti istoriju</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <View className="mt-3 flex-row flex-wrap gap-2">
+            {TRENDING_TAGS.map((tag) => (
+              <TouchableOpacity
+                key={tag}
+                onPress={() => useSuggestion(tag)}
+                className="rounded-full bg-brand-highlight/35 px-3 py-2"
+              >
+                <Text className="font-sans text-xs font-semibold text-ink-dark">{tag}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {searchHistory.length > 0 ? (
+            <View className="mt-4">
+              <Text className="font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/45">
+                Prethodne pretrage
+              </Text>
+              <View className="mt-2 gap-2">
+                {searchHistory.slice(0, 4).map((entry) => (
+                  <TouchableOpacity
+                    key={entry}
+                    onPress={() => useSuggestion(entry)}
+                    className="flex-row items-center rounded-[18px] bg-surface-panel px-3 py-3"
+                  >
+                    <Ionicons name="time-outline" size={16} color={colors.mutedText} />
+                    <Text className="ml-2 flex-1 font-sans text-sm text-ink-dark">{entry}</Text>
+                    <Ionicons name="arrow-up-outline" size={14} color={colors.mutedText} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
 
       <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
         <View className="flex-1 justify-end bg-ink-dark/30">

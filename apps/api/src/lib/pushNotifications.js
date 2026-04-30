@@ -10,7 +10,15 @@ const expo = new Expo()
  * - Rate limits: logs error for monitoring
  * - Other errors: logs for debugging
  */
-async function sendPushToUser(userId, { title, body, data = {} }) {
+function normalizeRichImageUrl(imageUrl) {
+  if (!imageUrl || typeof imageUrl !== 'string') return ''
+
+  const trimmed = imageUrl.trim()
+  if (!/^https:\/\//i.test(trimmed)) return ''
+  return trimmed
+}
+
+async function sendPushToUser(userId, { title, body, data = {}, imageUrl = '' }) {
   try {
     const user = await User.findById(userId).select('expoPushToken notificationPreferences').lean()
     if (!user?.expoPushToken || !Expo.isExpoPushToken(user.expoPushToken)) {
@@ -35,15 +43,22 @@ async function sendPushToUser(userId, { title, body, data = {} }) {
       return
     }
 
-    const messages = [
-      {
-        to: user.expoPushToken,
-        sound: 'default',
-        title,
-        body,
-        data,
-      },
-    ]
+    const richImageUrl = normalizeRichImageUrl(imageUrl || data.imageUrl)
+    const pushData = richImageUrl ? { ...data, imageUrl: richImageUrl } : data
+    const message = {
+      to: user.expoPushToken,
+      sound: 'default',
+      title,
+      body,
+      data: pushData,
+    }
+
+    if (richImageUrl) {
+      message.richContent = { image: richImageUrl }
+      message.mutableContent = true
+    }
+
+    const messages = [message]
 
     const chunks = expo.chunkPushNotifications(messages)
     const tickets = []

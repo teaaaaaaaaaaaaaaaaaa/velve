@@ -8,6 +8,7 @@ import {
   Easing,
   ScrollView,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
@@ -34,11 +35,14 @@ const AI_STEPS = [
   'Prepoznajemo detalje komada...',
   'Pisemo opis na srpskom...',
 ]
+const AI_TIMEOUT_SECONDS = 120
 
 function AiLoadingOverlay({ onCancel }: { onCancel: () => void }) {
   const [stepIndex, setStepIndex] = useState(0)
+  const [secondsLeft, setSecondsLeft] = useState(AI_TIMEOUT_SECONDS)
   const fade = useRef(new Animated.Value(1)).current
   const pulse = useRef(new Animated.Value(1)).current
+  const progress = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -79,8 +83,32 @@ function AiLoadingOverlay({ onCancel }: { onCancel: () => void }) {
     return () => clearInterval(timer)
   }, [fade])
 
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: 1,
+      duration: AI_TIMEOUT_SECONDS * 1000,
+      easing: Easing.linear,
+      useNativeDriver: false,
+    }).start()
+
+    const countdown = setInterval(() => {
+      setSecondsLeft((prev) => Math.max(0, prev - 1))
+    }, 1000)
+
+    return () => clearInterval(countdown)
+  }, [progress])
+
   return (
     <View className="absolute inset-0 z-50 items-center justify-center bg-base-canvas/95">
+      <TouchableOpacity
+        onPress={onCancel}
+        accessibilityRole="button"
+        accessibilityLabel="Otkazi AI generisanje"
+        className="absolute right-5 top-14 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
+      >
+        <Ionicons name="close" size={22} color={colors.inkDark} />
+      </TouchableOpacity>
+
       <Animated.View style={{ transform: [{ scale: pulse }] }}>
         <View className="h-20 w-20 items-center justify-center rounded-3xl bg-brand-accent-deep/10">
           <Ionicons name="sparkles" size={32} color={colors.accentDeep} />
@@ -92,6 +120,23 @@ function AiLoadingOverlay({ onCancel }: { onCancel: () => void }) {
           {AI_STEPS[stepIndex]}
         </Text>
       </Animated.View>
+
+      <View className="mt-6 w-[72%]">
+        <View className="h-2 overflow-hidden rounded-full bg-ink-dark/10">
+          <Animated.View
+            className="h-full rounded-full bg-brand-accent-deep"
+            style={{
+              width: progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['6%', '100%'],
+              }),
+            }}
+          />
+        </View>
+        <Text className="mt-3 text-center font-sans text-xs text-ink-dark/45">
+          Automatski timeout za {secondsLeft}s
+        </Text>
+      </View>
 
       <BrandWordmark width={100} style={{ marginTop: 32, opacity: 0.25 }} />
 
@@ -123,6 +168,7 @@ export default function DescriptionScreen() {
   const [saving, setSaving] = useState(false)
   const [imageUrl, setImageUrl] = useState('')
   const abortControllerRef = useRef<AbortController | null>(null)
+  const titleInputRef = useRef<TextInput>(null)
 
   // Fetch item to get image URL for AI
   useEffect(() => {
@@ -140,6 +186,7 @@ export default function DescriptionScreen() {
   const handleCancelGeneration = useCallback(() => {
     abortControllerRef.current?.abort()
     setGenerating(false)
+    requestAnimationFrame(() => titleInputRef.current?.focus())
   }, [])
 
   const generateAiDescription = useCallback(async () => {
@@ -157,7 +204,7 @@ export default function DescriptionScreen() {
           image_url: imageUrl,
           language: 'sr',
         },
-        { timeout: 60000, signal: controller.signal }
+        { timeout: AI_TIMEOUT_SECONDS * 1000, signal: controller.signal }
       )
 
       const payload = response.data?.data
@@ -309,6 +356,7 @@ export default function DescriptionScreen() {
           <View>
             <Text className="mb-2 font-sans text-sm font-semibold text-ink-dark">Naslov</Text>
             <VelveTextInput
+              ref={titleInputRef}
               value={title}
               onChangeText={setTitle}
               placeholder="Ti smisli naslov svog komada"

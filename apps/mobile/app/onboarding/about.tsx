@@ -22,6 +22,8 @@ import client from '@/api/client'
 import { BrandBackground } from '@/components/BrandBackground'
 import { GlassSurface } from '@/components/GlassSurface'
 import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen'
+import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock'
+import { OnboardingProgressHeader } from '@/components/OnboardingProgressHeader'
 import { VelveTextInput } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
@@ -160,16 +162,19 @@ export default function AboutScreen() {
 
   // Location auto-detect state
   const [detectedCity, setDetectedCity] = useState<string | null>(null)
-  const [detectingLocation, setDetectingLocation] = useState(true)
+  const [detectingLocation, setDetectingLocation] = useState(false)
   const [showManualPicker, setShowManualPicker] = useState(false)
+  const [locationNotice, setLocationNotice] = useState('')
 
   const copy = COPY[locale]
+  const unlockLabel = locale === 'sr' ? 'Otkljucan trade fit' : 'Trade fit unlocked'
   const shoeValue = Number.parseInt(shoeSize, 10)
+  const hasValidShoeSize = Number.isFinite(shoeValue) && shoeValue >= 36 && shoeValue <= 47
+  const canShowShoeStep = Boolean(clothingSize)
+  const canShowCityStep = canShowShoeStep && hasValidShoeSize
   const isValid =
     Boolean(clothingSize) &&
-    Number.isFinite(shoeValue) &&
-    shoeValue >= 36 &&
-    shoeValue <= 47 &&
+    hasValidShoeSize &&
     Boolean(selectedCity)
 
   // Auto-detect location on mount
@@ -188,6 +193,7 @@ export default function AboutScreen() {
         if (status !== 'granted' || cancelled) {
           setDetectingLocation(false)
           setShowManualPicker(true)
+          setLocationNotice('Dozvola za lokaciju nije odobrena. Izaberi grad rucno.')
           return
         }
 
@@ -209,12 +215,15 @@ export default function AboutScreen() {
 
         if (matched) {
           setDetectedCity(matched)
+          setLocationNotice('')
         } else {
           setShowManualPicker(true)
+          setLocationNotice('Nismo prepoznali grad iz lokacije. Izaberi ga rucno.')
         }
       } catch {
         if (!cancelled) {
           setShowManualPicker(true)
+          setLocationNotice(copy.detectionFailed)
         }
       } finally {
         if (!cancelled) {
@@ -223,9 +232,15 @@ export default function AboutScreen() {
       }
     }
 
+    if (!canShowCityStep) {
+      setDetectingLocation(false)
+      return () => { cancelled = true }
+    }
+
+    setDetectingLocation(true)
     detectLocation()
     return () => { cancelled = true }
-  }, [])
+  }, [canShowCityStep])
 
   const onboardingData = useMemo(
     () => ({
@@ -288,6 +303,7 @@ export default function AboutScreen() {
   const handleRejectDetected = () => {
     setDetectedCity(null)
     setShowManualPicker(true)
+    setLocationNotice('Izaberi grad rucno.')
   }
 
   return (
@@ -295,24 +311,12 @@ export default function AboutScreen() {
       <StatusBar barStyle="dark-content" />
       <BrandBackground />
 
-      <View className="px-gutter pb-4 pt-14">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="mb-5 h-12 w-12 items-center justify-center rounded-full bg-base-canvas/82"
-        >
-          <Ionicons name="arrow-back" size={20} color={colors.accentDeep} />
-        </TouchableOpacity>
-
-        <View className="self-start rounded-pill bg-brand-accent-deep/8 px-4 py-2">
-          <Text className="font-sans text-xs uppercase tracking-[1.2px] text-brand-accent-deep">
-            {copy.step}
-          </Text>
-        </View>
-
-        <View className="mt-4 h-2 overflow-hidden rounded-full bg-ink-dark/8">
-          <View className="h-full w-full rounded-full bg-brand-accent-deep" />
-        </View>
-      </View>
+      <OnboardingProgressHeader
+        stepLabel={copy.step}
+        progress={5 / 6}
+        unlockLabel={unlockLabel}
+        onBack={() => router.back()}
+      />
 
       <ScrollView
         className="flex-1 px-gutter"
@@ -320,15 +324,17 @@ export default function AboutScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text className="font-logo text-[30px] leading-none text-brand-accent-deep/72">
-          {copy.mood}
-        </Text>
-        <Text className="mt-4 font-display text-[38px] leading-[40px] text-ink-dark">
-          {copy.title}
-        </Text>
-        <Text className="mt-4 max-w-[344px] font-sans text-base leading-7 text-ink-dark/68">
-          {copy.description}
-        </Text>
+        <OnboardingAnimatedBlock>
+          <Text className="font-logo text-[30px] leading-none text-brand-accent-deep/72">
+            {copy.mood}
+          </Text>
+          <Text className="mt-4 font-display text-[38px] leading-[40px] text-ink-dark">
+            {copy.title}
+          </Text>
+          <Text className="mt-4 max-w-[344px] font-sans text-base leading-7 text-ink-dark/68">
+            {copy.description}
+          </Text>
+        </OnboardingAnimatedBlock>
 
         <GlassSurface className="mt-6 px-5 py-5">
           <Text className="font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/44">
@@ -361,6 +367,8 @@ export default function AboutScreen() {
           </View>
         </GlassSurface>
 
+        {canShowShoeStep ? (
+        <OnboardingAnimatedBlock delay={110}>
         <GlassSurface className="mt-5 px-5 py-5">
           <Text className="font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/44">
             {copy.shoeSize}
@@ -378,7 +386,11 @@ export default function AboutScreen() {
           </View>
           <Text className="mt-3 font-sans text-sm text-ink-dark/52">{copy.shoeHint}</Text>
         </GlassSurface>
+        </OnboardingAnimatedBlock>
+        ) : null}
 
+        {canShowCityStep ? (
+        <OnboardingAnimatedBlock delay={160}>
         <GlassSurface className="mt-5 px-5 py-5">
           <Text className="font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/44">
             {copy.city}
@@ -449,36 +461,47 @@ export default function AboutScreen() {
 
           {/* Manual city picker fallback */}
           {showManualPicker && !selectedCity ? (
-            <View className="mt-4 flex-row flex-wrap justify-between">
-              {SERBIAN_CITIES.map((city) => {
-                const isSelected = selectedCity === city
-                return (
-                  <TouchableOpacity
-                    key={city}
-                    onPress={() => {
-                      setSelectedCity(city)
-                      setShowManualPicker(false)
-                    }}
-                    className={`mb-3 flex-row items-center justify-between rounded-soft border px-4 py-4 ${
-                      isSelected
-                        ? 'border-brand-accent-deep bg-brand-accent-deep'
-                        : 'border-brand-accent-deep/10 bg-base-canvas'
-                    }`}
-                    style={{ width: '48%' }}
-                  >
-                    <Text
-                      className={`font-sans text-sm ${
-                        isSelected ? 'text-base-canvas' : 'text-ink-dark'
+            <View className="mt-4">
+              {locationNotice ? (
+                <View className="mb-4 flex-row rounded-[18px] bg-brand-highlight/25 px-4 py-3">
+                  <Ionicons name="information-circle-outline" size={18} color={colors.inkDark} />
+                  <Text className="ml-2 flex-1 font-sans text-sm leading-5 text-ink-dark/70">
+                    {locationNotice}
+                  </Text>
+                </View>
+              ) : null}
+              <View className="flex-row flex-wrap justify-between">
+                {SERBIAN_CITIES.map((city) => {
+                  const isSelected = selectedCity === city
+                  return (
+                    <TouchableOpacity
+                      key={city}
+                      onPress={() => {
+                        setSelectedCity(city)
+                        setShowManualPicker(false)
+                        setLocationNotice('')
+                      }}
+                      className={`mb-3 flex-row items-center justify-between rounded-soft border px-4 py-4 ${
+                        isSelected
+                          ? 'border-brand-accent-deep bg-brand-accent-deep'
+                          : 'border-brand-accent-deep/10 bg-base-canvas'
                       }`}
+                      style={{ width: '48%' }}
                     >
-                      {city}
-                    </Text>
-                    {isSelected ? (
-                      <Ionicons name="checkmark-circle" size={18} color={colors.highlight} />
-                    ) : null}
-                  </TouchableOpacity>
-                )
-              })}
+                      <Text
+                        className={`font-sans text-sm ${
+                          isSelected ? 'text-base-canvas' : 'text-ink-dark'
+                        }`}
+                      >
+                        {city}
+                      </Text>
+                      {isSelected ? (
+                        <Ionicons name="checkmark-circle" size={18} color={colors.highlight} />
+                      ) : null}
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
             </View>
           ) : null}
 
@@ -497,6 +520,8 @@ export default function AboutScreen() {
             </View>
           ) : null}
         </GlassSurface>
+        </OnboardingAnimatedBlock>
+        ) : null}
       </ScrollView>
 
       <View className="px-gutter pb-10 pt-4">

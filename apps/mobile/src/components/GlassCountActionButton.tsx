@@ -9,6 +9,7 @@ type Props = {
   onPress: () => void
   count?: number
   active?: boolean
+  disabled?: boolean
   accessibilityLabel: string
   tone?: 'light' | 'dark'
 }
@@ -48,6 +49,7 @@ export const GlassCountActionButton = memo(function GlassCountActionButton({
   onPress,
   count,
   active = false,
+  disabled = false,
   accessibilityLabel,
   tone = 'light',
 }: Props) {
@@ -59,6 +61,7 @@ export const GlassCountActionButton = memo(function GlassCountActionButton({
     <TouchableOpacity
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      disabled={disabled}
       onPress={onPress}
       activeOpacity={0.84}
       className="items-center px-2 py-3"
@@ -66,6 +69,7 @@ export const GlassCountActionButton = memo(function GlassCountActionButton({
         isDark ? darkBase : lightBase,
         isDark ? null : shadows.glass,
         active ? (isDark ? darkActive : lightActive) : null,
+        disabled ? { opacity: 0.38 } : null,
       ]}
     >
       <Ionicons name={icon} size={26} color={iconColor} />

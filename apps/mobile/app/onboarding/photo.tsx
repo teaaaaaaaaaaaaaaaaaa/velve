@@ -7,6 +7,8 @@ import { ActivityIndicator, Alert, Image, StatusBar, Text, TouchableOpacity, Vie
 import client from '@/api/client'
 import { BrandBackground } from '@/components/BrandBackground'
 import { GlassSurface } from '@/components/GlassSurface'
+import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock'
+import { OnboardingProgressHeader } from '@/components/OnboardingProgressHeader'
 import { colors } from '@/design/tokens'
 import { useAuth } from '@/hooks/useAuth'
 import { useI18n } from '@/i18n'
@@ -76,6 +78,7 @@ export default function OnboardingPhotoScreen() {
   const [photoUri, setPhotoUri] = useState<string | null>(null)
   const [busySource, setBusySource] = useState<'camera' | 'gallery' | 'save' | null>(null)
   const copy = COPY[locale]
+  const unlockLabel = locale === 'sr' ? 'Otkljucan trust signal' : 'Trust signal unlocked'
 
   async function pickPhoto(source: 'camera' | 'gallery') {
     try {
@@ -145,37 +148,29 @@ export default function OnboardingPhotoScreen() {
       <StatusBar barStyle="dark-content" />
       <BrandBackground />
 
-      <View className="flex-1 justify-between px-gutter pb-10 pt-14">
+      <View className="flex-1 justify-between pb-10">
         <View>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="mb-5 h-12 w-12 items-center justify-center rounded-full bg-base-canvas/82"
-          >
-            <Ionicons name="arrow-back" size={20} color={colors.accentDeep} />
-          </TouchableOpacity>
+          <OnboardingProgressHeader
+            stepLabel={copy.step}
+            progress={6 / 6}
+            unlockLabel={unlockLabel}
+            onBack={() => router.back()}
+          />
 
-          <View className="self-start rounded-pill bg-brand-accent-deep/8 px-4 py-2">
-            <Text className="font-sans text-xs uppercase tracking-[1.2px] text-brand-accent-deep">
-              {copy.step}
+          <OnboardingAnimatedBlock className="px-gutter">
+            <Text className="mt-1 font-logo text-[30px] leading-none text-brand-accent-deep/72">
+              {copy.mood}
             </Text>
-          </View>
-
-          <View className="mt-4 h-2 overflow-hidden rounded-full bg-ink-dark/8">
-            <View className="h-full w-full rounded-full bg-brand-accent-deep" />
-          </View>
-
-          <Text className="mt-5 font-logo text-[30px] leading-none text-brand-accent-deep/72">
-            {copy.mood}
-          </Text>
-          <Text className="mt-4 font-display text-[38px] leading-[40px] text-ink-dark">
-            {copy.title}
-          </Text>
-          <Text className="mt-4 max-w-[344px] font-sans text-base leading-7 text-ink-dark/68">
-            {copy.description}
-          </Text>
+            <Text className="mt-4 font-display text-[38px] leading-[40px] text-ink-dark">
+              {copy.title}
+            </Text>
+            <Text className="mt-4 max-w-[344px] font-sans text-base leading-7 text-ink-dark/68">
+              {copy.description}
+            </Text>
+          </OnboardingAnimatedBlock>
         </View>
 
-        <GlassSurface className="items-center px-5 py-6">
+        <GlassSurface className="mx-gutter items-center px-5 py-6">
           <View className="h-36 w-36 items-center justify-center overflow-hidden rounded-full bg-brand-accent-light/25">
             {photoUri ? (
               <Image source={{ uri: photoUri }} className="h-full w-full" resizeMode="cover" />
@@ -223,7 +218,7 @@ export default function OnboardingPhotoScreen() {
           )}
         </GlassSurface>
 
-        <View>
+        <View className="px-gutter">
           {photoUri ? (
             <TouchableOpacity
               onPress={savePhoto}

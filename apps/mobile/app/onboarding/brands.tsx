@@ -12,6 +12,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { BrandBackground } from '@/components/BrandBackground'
 import { GlassSurface } from '@/components/GlassSurface'
 import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen'
+import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock'
+import { OnboardingProgressHeader } from '@/components/OnboardingProgressHeader'
 import { VelveTextInput } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
@@ -75,6 +77,7 @@ export default function BrandsScreen() {
   const [customBrand, setCustomBrand] = useState('')
 
   const copy = COPY[locale]
+  const unlockLabel = locale === 'sr' ? 'Otkljucan brand signal' : 'Brand signal unlocked'
   const availableBrands = useMemo(
     () => SUGGESTED_BRANDS.filter((brand) => !selectedBrands.includes(brand)),
     [selectedBrands]
@@ -99,24 +102,12 @@ export default function BrandsScreen() {
       <StatusBar barStyle="dark-content" />
       <BrandBackground />
 
-      <View className="px-gutter pb-4 pt-14">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="mb-5 h-12 w-12 items-center justify-center rounded-full bg-base-canvas/82"
-        >
-          <Ionicons name="arrow-back" size={20} color={colors.accentDeep} />
-        </TouchableOpacity>
-
-        <View className="self-start rounded-pill bg-brand-accent-deep/8 px-4 py-2">
-          <Text className="font-sans text-xs uppercase tracking-[1.2px] text-brand-accent-deep">
-            {copy.step}
-          </Text>
-        </View>
-
-        <View className="mt-4 h-2 overflow-hidden rounded-full bg-ink-dark/8">
-          <View className="h-full w-4/5 rounded-full bg-brand-accent-deep" />
-        </View>
-      </View>
+      <OnboardingProgressHeader
+        stepLabel={copy.step.replace('5', '6')}
+        progress={4 / 6}
+        unlockLabel={unlockLabel}
+        onBack={() => router.back()}
+      />
 
       <ScrollView
         className="flex-1 px-gutter"
@@ -124,16 +115,19 @@ export default function BrandsScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text className="font-logo text-[30px] leading-none text-brand-accent-deep/72">
-          {copy.mood}
-        </Text>
-        <Text className="mt-4 font-display text-[38px] leading-[40px] text-ink-dark">
-          {copy.title}
-        </Text>
-        <Text className="mt-4 max-w-[344px] font-sans text-base leading-7 text-ink-dark/68">
-          {copy.description}
-        </Text>
+        <OnboardingAnimatedBlock>
+          <Text className="font-logo text-[30px] leading-none text-brand-accent-deep/72">
+            {copy.mood}
+          </Text>
+          <Text className="mt-4 font-display text-[38px] leading-[40px] text-ink-dark">
+            {copy.title}
+          </Text>
+          <Text className="mt-4 max-w-[344px] font-sans text-base leading-7 text-ink-dark/68">
+            {copy.description}
+          </Text>
+        </OnboardingAnimatedBlock>
 
+        <OnboardingAnimatedBlock delay={90}>
         <GlassSurface className="mt-6 px-5 py-5">
           <Text className="font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/44">
             Velve edit
@@ -163,6 +157,7 @@ export default function BrandsScreen() {
             </TouchableOpacity>
           </View>
         </GlassSurface>
+        </OnboardingAnimatedBlock>
 
         {selectedBrands.length ? (
           <View className="mt-6">
