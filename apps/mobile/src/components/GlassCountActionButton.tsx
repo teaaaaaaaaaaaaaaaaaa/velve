@@ -69,7 +69,7 @@ export const GlassCountActionButton = memo(function GlassCountActionButton({
         isDark ? darkBase : lightBase,
         isDark ? null : shadows.glass,
         active ? (isDark ? darkActive : lightActive) : null,
-        disabled ? { opacity: 0.38 } : null,
+        disabled ? { opacity: 0.4 } : null,
       ]}
     >
       <Ionicons name={icon} size={26} color={iconColor} />

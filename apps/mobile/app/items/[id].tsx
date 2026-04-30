@@ -1,10 +1,10 @@
 ﻿import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Alert } from '@/lib/velveAlert'
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Modal,
   ScrollView,
@@ -16,7 +16,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import client from '@/api/client';
 import { BrandBackground } from '@/components/BrandBackground';
-import { BrandedLoader } from '@/components/BrandedLoader';
 import { DiscoveryCardItem, DiscoveryItemCard } from '@/components/DiscoveryItemCard';
 import { EditorialEmptyState } from '@/components/EditorialEmptyState';
 import { GlassCountActionButton } from '@/components/GlassCountActionButton';
@@ -142,6 +141,37 @@ type SideAction = {
   label: string;
   onPress: () => void;
 };
+
+function ItemDetailsSkeleton() {
+  return (
+    <View className="flex-1 bg-base-canvas">
+      <Stack.Screen options={{ headerShown: false }} />
+      <BrandBackground />
+      <ScrollView contentContainerStyle={{ paddingBottom: 120 }} className="flex-1">
+        <View className="px-5 pb-8 pt-14">
+          <View className="mb-5 h-11 w-11 rounded-full bg-surface-panel" />
+          <View className="h-[520px] overflow-hidden rounded-[34px] bg-surface-panel">
+            <View className="absolute bottom-0 left-0 right-0 px-5 pb-6">
+              <View className="h-5 w-28 rounded-full bg-base-canvas/80" />
+              <View className="mt-3 h-10 w-56 rounded-full bg-base-canvas/80" />
+              <View className="mt-3 h-4 w-40 rounded-full bg-base-canvas/70" />
+            </View>
+          </View>
+          <View className="mt-5 rounded-[28px] bg-surface-panel px-4 py-5">
+            <View className="h-5 w-32 rounded-full bg-base-canvas" />
+            <View className="mt-4 h-4 w-full rounded-full bg-base-canvas" />
+            <View className="mt-3 h-4 w-4/5 rounded-full bg-base-canvas" />
+          </View>
+          <View className="mt-4 flex-row flex-wrap gap-3">
+            {[0, 1, 2, 3].map((entry) => (
+              <View key={entry} className="h-24 min-w-[46%] flex-1 rounded-[24px] bg-surface-panel" />
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
 
 export default function ItemDetailsScreen() {
   const { id, viewOnly, openTrade } = useLocalSearchParams<{
@@ -338,22 +368,45 @@ export default function ItemDetailsScreen() {
       },
     ]);
 
+  const markItemAsSold = async (viaVelve: boolean) => {
+    try {
+      setMarkingSold(true);
+      const response = await client.put(`/api/items/${id}/sold`, { viaVelve });
+
+      if (viaVelve && response.data?.tradeArchived) {
+        Alert.alert('Razmena arhivirana', 'Artikal je oznacen kao prodat i trade je dodat u arhivu.', [
+          { text: 'Otvori arhivu', onPress: () => router.replace('/trade-archive') },
+        ]);
+        return;
+      }
+
+      if (viaVelve && !response.data?.tradeArchived) {
+        Alert.alert(
+          'Artikal je arhiviran',
+          'Nismo nasli aktivan Velve trade za ovaj artikal, ali je artikal oznacen kao prodat.',
+          [{ text: 'U redu', onPress: () => router.replace('/(tabs)/closet') }]
+        );
+        return;
+      }
+
+      router.replace('/(tabs)/closet');
+    } catch {
+      Alert.alert('Greska', 'Nije moguce oznaciti predmet kao prodat.');
+    } finally {
+      setMarkingSold(false);
+    }
+  };
+
   const handleMarkAsSold = () =>
     Alert.alert('Oznaci kao prodato', 'Ovaj komad ce preci u arhivu.', [
       { text: 'Odustani', style: 'cancel' },
       {
         text: 'Oznaci',
-        onPress: async () => {
-          try {
-            setMarkingSold(true);
-            await client.put(`/api/items/${id}/sold`);
-            router.replace('/(tabs)/closet');
-          } catch {
-            Alert.alert('Greska', 'Nije moguce oznaciti predmet kao prodat.');
-          } finally {
-            setMarkingSold(false);
-          }
-        },
+        onPress: () =>
+          Alert.alert('Velve razmena?', 'Da li je ovo bilo putem Velve razmene?', [
+            { text: 'Ne', onPress: () => markItemAsSold(false) },
+            { text: 'Da', onPress: () => markItemAsSold(true) },
+          ]),
       },
     ]);
 
@@ -515,25 +568,42 @@ export default function ItemDetailsScreen() {
     }
   };
 
-  const handleReport = async () => {
-    try {
-      await client.post(`/api/items/${id}/report`, { reason: 'community_report' });
-      Alert.alert('Hvala', 'Prijava je poslata.');
-    } catch {
-      Alert.alert('Greska', 'Prijava trenutno nije moguca.');
-    }
+  const handleReport = () => {
+    Alert.alert('Prijavi objavu?', 'Velve tim ce pregledati ovu objavu i korisnika.', [
+      {
+        text: 'Prijavi',
+        onPress: async () => {
+          try {
+            await client.post(`/api/items/${id}/report`, { reason: 'community_report' });
+            Alert.alert('Hvala', 'Prijava je poslata.');
+          } catch {
+            Alert.alert('Greska', 'Prijava trenutno nije moguca.');
+          }
+        },
+      },
+      { text: 'Odustani', style: 'cancel' },
+    ]);
   };
 
-  const handleBlockSeller = async () => {
+  const handleBlockSeller = () => {
     if (!owner) return;
-    try {
-      await client.post(`/api/users/${owner._id}/block`);
-      Alert.alert('Korisnik blokiran', `@${owner.displayName} vise ti se nece prikazivati.`, [
-        { text: 'U redu', onPress: () => router.replace('/(tabs)/feed') },
-      ]);
-    } catch {
-      Alert.alert('Greska', 'Nije moguce blokirati korisnika.');
-    }
+    Alert.alert('Blokiraj korisnika?', `@${owner.displayName} vise neces vidjati u feedu.`, [
+      {
+        text: 'Blokiraj',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await client.post(`/api/users/${owner._id}/block`);
+            Alert.alert('Korisnik blokiran', `@${owner.displayName} vise ti se nece prikazivati.`, [
+              { text: 'U redu', onPress: () => router.replace('/(tabs)/feed') },
+            ]);
+          } catch {
+            Alert.alert('Greska', 'Nije moguce blokirati korisnika.');
+          }
+        },
+      },
+      { text: 'Odustani', style: 'cancel' },
+    ]);
   };
 
   const showActions = () =>
@@ -696,8 +766,10 @@ export default function ItemDetailsScreen() {
               <View className="mt-8">
                 <Text className="font-display text-3xl text-ink-dark">Slicni dostupni komadi</Text>
                 {loadingSimilar ? (
-                  <View className="items-center py-8">
-                    <ActivityIndicator size="small" color={colors.accentDeep} />
+                  <View className="flex-row gap-3 py-4">
+                    {[0, 1, 2].map((entry) => (
+                      <View key={entry} className="h-56 w-44 rounded-[24px] bg-surface-panel" />
+                    ))}
                   </View>
                 ) : similarItems.length === 0 ? (
                   <View className="items-center py-8">
@@ -733,12 +805,7 @@ export default function ItemDetailsScreen() {
       );
     }
 
-    return (
-      <>
-        <Stack.Screen options={{ headerShown: false }} />
-        <BrandedLoader />
-      </>
-    );
+    return <ItemDetailsSkeleton />;
   }
 
   const heroImage = getPrimaryItemImage(item);
@@ -889,8 +956,10 @@ export default function ItemDetailsScreen() {
                 Izaberi svoj komad koji saljes u razmenu.
               </Text>
               {loadingUserItems ? (
-                <View className="items-center py-10">
-                  <ActivityIndicator size="large" color={colors.accentDeep} />
+                <View className="gap-3 py-2">
+                  {[0, 1, 2].map((entry) => (
+                    <View key={entry} className="h-[88px] rounded-[22px] bg-surface-panel" />
+                  ))}
                 </View>
               ) : null}
               {!loadingUserItems && currentUserItems.length === 0 ? (
@@ -901,6 +970,7 @@ export default function ItemDetailsScreen() {
                   actionLabel="Dodaj objavu"
                   onAction={() => {
                     setShowTradeModal(false);
+                    (router as unknown as { dismissAll?: () => void }).dismissAll?.();
                     router.push('/upload-flow');
                   }}
                 />
@@ -1314,7 +1384,7 @@ export default function ItemDetailsScreen() {
                       className="items-center rounded-full bg-brand-highlight px-4 py-4"
                     >
                       {digitizing ? (
-                        <ActivityIndicator size="small" color="#2B2A2B" />
+                        <ActivityIndicator size="small" color={colors.inkDark} />
                       ) : (
                         <Text className="font-sans text-sm font-semibold text-ink-dark">Clean Cut</Text>
                       )}
@@ -1339,7 +1409,7 @@ export default function ItemDetailsScreen() {
                     className="items-center rounded-full border border-ink-dark/15 px-4 py-4"
                   >
                     {markingSold ? (
-                      <ActivityIndicator size="small" color="#431A43" />
+                      <ActivityIndicator size="small" color={colors.accentDeep} />
                     ) : (
                       <Text className="font-sans text-sm font-semibold text-ink-dark">Prodato</Text>
                     )}
@@ -1351,8 +1421,10 @@ export default function ItemDetailsScreen() {
           <View className="mt-8">
             <Text className="font-display text-3xl text-ink-dark">Slicni komadi</Text>
             {loadingSimilar ? (
-              <View className="items-center py-8">
-                <ActivityIndicator size="small" color="#431A43" />
+              <View className="flex-row gap-3 py-4">
+                {[0, 1, 2].map((entry) => (
+                  <View key={entry} className="h-56 w-44 rounded-[24px] bg-surface-panel" />
+                ))}
               </View>
             ) : similarItems.length === 0 ? (
               <View className="items-center py-8">

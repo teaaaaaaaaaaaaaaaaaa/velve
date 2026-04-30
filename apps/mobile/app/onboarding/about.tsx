@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Alert } from '@/lib/velveAlert'
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StatusBar,
   Text,

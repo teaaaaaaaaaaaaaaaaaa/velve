@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons'
+import { Alert } from '@/lib/velveAlert'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Platform,
   Text,

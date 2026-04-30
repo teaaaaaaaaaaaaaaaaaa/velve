@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons'
+import { Alert } from '@/lib/velveAlert'
 import { useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Alert,
   FlatList,
   Text,
   TouchableOpacity,
@@ -238,15 +238,11 @@ export default function VtoSelectScreen() {
                     : { itemIds: JSON.stringify(selectedItemIds) },
               })
             }
-            className={`items-center rounded-full px-4 py-4 ${
-              selectedItemIds.length > 0 ? 'bg-brand-accent-deep' : 'bg-brand-accent-deep/20'
+            className={`items-center rounded-full bg-brand-accent-deep px-4 py-4 ${
+              selectedItemIds.length > 0 ? '' : 'opacity-40'
             }`}
           >
-            <Text
-              className={`font-sans text-base font-semibold ${
-                selectedItemIds.length > 0 ? 'text-base-canvas' : 'text-ink-dark/45'
-              }`}
-            >
+            <Text className="font-sans text-base font-semibold text-base-canvas">
               {primaryLabel}
             </Text>
           </TouchableOpacity>

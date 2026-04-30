@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons'
+import { Alert } from '@/lib/velveAlert'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Alert, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import client from '@/api/client'
 import { BrandBackground } from '@/components/BrandBackground'
 import { colors } from '@/design/tokens'
+import { markBodyScanSkippedThisSession } from '@/lib/vtoSession'
 
 type BodyScanRouteParams = {
   returnTo?: string | string[]
@@ -69,6 +71,11 @@ export default function BodyScanIntroScreen() {
     ...(mode ? { mode } : {}),
   }
 
+  function skipBodyScan() {
+    markBodyScanSkippedThisSession()
+    router.replace('/vto/hub')
+  }
+
   async function deleteBodyScan() {
     Alert.alert('Obrisi body scan', 'Ovaj body scan vise nece biti dostupan za Virtual Try-On.', [
       { text: 'Odustani', style: 'cancel' },
@@ -100,12 +107,20 @@ export default function BodyScanIntroScreen() {
 
       <View className="flex-1 justify-between px-5 pb-10" style={{ paddingTop: insets.top + 8 }}>
         <View>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="mb-4 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
-          >
-            <Ionicons name="arrow-back" size={20} color={colors.inkDark} />
-          </TouchableOpacity>
+          <View className="mb-4 flex-row items-center justify-between">
+            <TouchableOpacity
+              onPress={() => router.back()}
+              className="h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
+            >
+              <Ionicons name="arrow-back" size={20} color={colors.inkDark} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={skipBodyScan}
+              className="rounded-full bg-surface-panel px-4 py-2.5"
+            >
+              <Text className="font-sans text-sm font-semibold text-ink-dark/65">Preskoci</Text>
+            </TouchableOpacity>
+          </View>
           <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
             Ritual skenera
           </Text>

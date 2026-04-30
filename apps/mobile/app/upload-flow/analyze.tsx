@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Alert } from '@/lib/velveAlert'
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
   ScrollView,
@@ -205,13 +205,11 @@ export default function CleanCutAnalyzeScreen() {
                 params: { imageUri },
               })
             }
-            className={`items-center rounded-full px-4 py-4 ${
-              analysis?.ready && !loading ? 'bg-brand-accent-deep' : 'bg-brand-accent-deep/25'
+            className={`items-center rounded-full bg-brand-accent-deep px-4 py-4 ${
+              analysis?.ready && !loading ? '' : 'opacity-40'
             }`}
           >
-            <Text
-              className={`font-sans text-base font-semibold ${analysis?.ready && !loading ? 'text-base-canvas' : 'text-ink-dark/45'}`}
-            >
+            <Text className="font-sans text-base font-semibold text-base-canvas">
               Generisi digitalni artikal
             </Text>
           </TouchableOpacity>

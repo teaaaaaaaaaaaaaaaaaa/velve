@@ -1,15 +1,16 @@
 import { Ionicons } from '@expo/vector-icons'
+import { Alert } from '@/lib/velveAlert'
 import * as FileSystem from 'expo-file-system/legacy'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { Alert, Animated, PanResponder, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native'
+import { Animated, PanResponder, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native'
 import * as Sharing from 'expo-sharing'
 
 import client from '@/api/client'
-import { BrandedLoader } from '@/components/BrandedLoader'
 import { BrandWordmark } from '@/components/BrandWordmark'
 import { RemoteImage } from '@/components/RemoteImage'
 import { colors } from '@/design/tokens'
+import { hasSkippedBodyScanThisSession } from '@/lib/vtoSession'
 
 type BodyScanPayload = {
   exists: boolean
@@ -88,6 +89,31 @@ function OutfitRow({
         </TouchableOpacity>
       </Animated.View>
     </View>
+  )
+}
+
+function VtoHubSkeleton() {
+  return (
+    <ScrollView
+      className="flex-1 bg-base-canvas"
+      contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, paddingTop: 56 }}
+    >
+      <View className="mb-5 flex-row items-center justify-between">
+        <View>
+          <View className="h-8 w-28 rounded-full bg-surface-panel" />
+          <View className="mt-3 h-10 w-44 rounded-full bg-surface-panel" />
+        </View>
+        <View className="h-11 w-11 rounded-full bg-surface-panel" />
+      </View>
+      <View className="h-[560px] rounded-[34px] bg-surface-panel" />
+      <View className="mt-5 rounded-[28px] bg-surface-panel px-4 py-4">
+        <View className="h-7 w-40 rounded-full bg-base-canvas" />
+        <View className="mt-4 h-4 w-full rounded-full bg-base-canvas" />
+        <View className="mt-3 h-4 w-2/3 rounded-full bg-base-canvas" />
+      </View>
+      <View className="mt-5 h-14 rounded-full bg-surface-panel" />
+      <View className="mt-7 h-28 rounded-[28px] bg-surface-panel" />
+    </ScrollView>
   )
 }
 
@@ -176,22 +202,22 @@ export default function VtoHubScreen() {
   }
 
   if (loading) {
-    return <BrandedLoader />
+    return <VtoHubSkeleton />
   }
 
-  if (!bodyScan.exists || !bodyScan.url) {
-    router.replace('/vto/body-scan')
-    return null
-  }
-
-  const currentImage = params.vtoImageUrl || bodyScan.url
+  const hasBodyScan = Boolean(bodyScan.exists && bodyScan.url)
+  const skippedBodyScan = hasSkippedBodyScanThisSession()
+  const currentImage = params.vtoImageUrl || bodyScan.url || null
   const hasRender = !!params.vtoImageUrl
   const openOverflowMenu = () => {
     const actions = [
       ...(hasRender
         ? [{ text: exporting ? 'Deljenje...' : 'Podeli trenutni render', onPress: shareImage }]
         : []),
-      { text: 'Napravi novi outfit', onPress: () => router.push('/vto/select') },
+      {
+        text: hasBodyScan ? 'Napravi novi outfit' : 'Napravi body scan',
+        onPress: () => router.push(hasBodyScan ? '/vto/select' : '/vto/body-scan'),
+      },
       { text: 'Body scan', onPress: () => router.push('/vto/body-scan') },
       { text: 'Odustani', style: 'cancel' as const },
     ]
@@ -217,17 +243,37 @@ export default function VtoHubScreen() {
         </TouchableOpacity>
       </View>
 
-      <View collapsable={false} className="overflow-hidden rounded-[34px] bg-white">
-        <RemoteImage
-          uri={currentImage}
-          className="h-[560px] w-full"
-        />
-        {hasRender ? (
-          <View className="absolute bottom-5 right-5 rounded-full bg-base-canvas/90 px-4 py-2">
-            <BrandWordmark width={78} />
+      {currentImage ? (
+        <View collapsable={false} className="overflow-hidden rounded-[34px] bg-white">
+          <RemoteImage
+            uri={currentImage}
+            className="h-[560px] w-full"
+          />
+          {hasRender ? (
+            <View className="absolute bottom-5 right-5 rounded-full bg-base-canvas/90 px-4 py-2">
+              <BrandWordmark width={78} />
+            </View>
+          ) : null}
+        </View>
+      ) : (
+        <View className="rounded-[34px] bg-surface-panel px-5 py-7">
+          <View className="h-16 w-16 items-center justify-center rounded-full bg-brand-highlight/35">
+            <Ionicons name="body-outline" size={30} color={colors.inkDark} />
           </View>
-        ) : null}
-      </View>
+          <Text className="mt-5 font-display text-4xl text-ink-dark">Body scan nije dodat</Text>
+          <Text className="mt-3 font-sans text-sm leading-6 text-ink-dark/65">
+            {skippedBodyScan
+              ? 'Preskocio si body scan u ovoj sesiji, pa te Hub vise ne vraca automatski nazad. Mozes ga dodati kad budes spreman.'
+              : 'Virtual Try-On najbolje radi kada postoji jedna jasna fotografija celog tela. Hub ostaje otvoren, a scan mozes pokrenuti kad god zelis.'}
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.push('/vto/body-scan')}
+            className="mt-6 items-center rounded-full bg-brand-accent-deep px-4 py-4"
+          >
+            <Text className="font-sans text-base font-semibold text-base-canvas">Napravi body scan</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <View className="mt-5 rounded-[28px] bg-surface-panel px-4 py-4">
         <Text className="font-display text-3xl text-ink-dark">Virtual Try-On</Text>
@@ -239,11 +285,11 @@ export default function VtoHubScreen() {
       </View>
 
       <TouchableOpacity
-        onPress={() => router.push('/vto/select')}
-        className="mt-5 items-center rounded-full bg-brand-accent-deep px-4 py-4"
+        onPress={() => router.push(hasBodyScan ? '/vto/select' : '/vto/body-scan')}
+        className={`mt-5 items-center rounded-full px-4 py-4 ${hasBodyScan ? 'bg-brand-accent-deep' : 'bg-brand-highlight'}`}
       >
-        <Text className="font-sans text-base font-semibold text-base-canvas">
-          Odaberi artikal
+        <Text className={`font-sans text-base font-semibold ${hasBodyScan ? 'text-base-canvas' : 'text-ink-dark'}`}>
+          {hasBodyScan ? 'Odaberi artikal' : 'Dodaj body scan'}
         </Text>
       </TouchableOpacity>
 
@@ -279,10 +325,12 @@ export default function VtoHubScreen() {
             ))}
           </View>
           <TouchableOpacity
-            onPress={() => router.push('/vto/select')}
+            onPress={() => router.push(hasBodyScan ? '/vto/select' : '/vto/body-scan')}
             className="mt-5 items-center rounded-full bg-brand-highlight px-4 py-4"
           >
-            <Text className="font-sans text-sm font-semibold text-ink-dark">Stvori prvi outfit</Text>
+            <Text className="font-sans text-sm font-semibold text-ink-dark">
+              {hasBodyScan ? 'Stvori prvi outfit' : 'Prvo dodaj body scan'}
+            </Text>
           </TouchableOpacity>
         </View>
       )}

@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons'
+import { Alert } from '@/lib/velveAlert'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
-import { ActivityIndicator, Alert, Image, StatusBar, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Image, StatusBar, Text, TouchableOpacity, View } from 'react-native'
 
 import client from '@/api/client'
 import { BrandBackground } from '@/components/BrandBackground'
@@ -156,8 +157,22 @@ export default function OnboardingPhotoScreen() {
             unlockLabel={unlockLabel}
             onBack={() => router.back()}
           />
+          <TouchableOpacity
+            onPress={() => router.push('/onboarding/scan')}
+            disabled={busySource === 'save'}
+            className="absolute right-5 top-14 z-20 rounded-full bg-surface-panel px-4 py-2.5"
+          >
+            <Text className="font-sans text-sm font-semibold text-ink-dark/60">
+              {copy.skip}
+            </Text>
+          </TouchableOpacity>
 
           <OnboardingAnimatedBlock className="px-gutter">
+            <View className="mb-4 self-start rounded-full bg-brand-highlight/30 px-3 py-1.5">
+              <Text className="font-sans text-xs font-semibold uppercase text-ink-dark/55">
+                Opcionalno
+              </Text>
+            </View>
             <Text className="mt-1 font-logo text-[30px] leading-none text-brand-accent-deep/72">
               {copy.mood}
             </Text>
@@ -234,16 +249,6 @@ export default function OnboardingPhotoScreen() {
               )}
             </TouchableOpacity>
           ) : null}
-
-          <TouchableOpacity
-            onPress={() => router.push('/onboarding/scan')}
-            disabled={busySource === 'save'}
-            className="mt-3 items-center rounded-pill border border-ink-dark/10 bg-base-canvas/70 px-5 py-4"
-          >
-            <Text className="font-sans text-base font-medium text-ink-dark/60">
-              {copy.skip}
-            </Text>
-          </TouchableOpacity>
         </View>
       </View>
     </View>

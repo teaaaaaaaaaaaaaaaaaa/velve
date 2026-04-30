@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons'
+import { Alert } from '@/lib/velveAlert'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
-import { Alert, Text, TouchableOpacity, View } from 'react-native'
+import { Text, TouchableOpacity, View } from 'react-native'
 
 import { BrandBackground } from '@/components/BrandBackground'
 import { GlassSurface } from '@/components/GlassSurface'

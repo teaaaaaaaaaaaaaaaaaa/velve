@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons'
+import { Alert } from '@/lib/velveAlert'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
   ScrollView,
@@ -163,6 +163,7 @@ export default function DescriptionScreen() {
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<{ title?: string; description?: string }>({})
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -220,15 +221,17 @@ export default function DescriptionScreen() {
 
   const publish = useCallback(
     async (status: 'available' | 'draft') => {
-      if (!title.trim()) {
-        Alert.alert('Greska', 'Naslov je obavezan.')
-        return
+      const nextErrors = {
+        title: title.trim() ? undefined : 'Naslov je obavezan.',
+        description: description.trim() ? undefined : 'Opis je obavezan.',
       }
-      if (!description.trim()) {
-        Alert.alert('Greska', 'Opis je obavezan.')
+
+      if (nextErrors.title || nextErrors.description) {
+        setFieldErrors(nextErrors)
         return
       }
 
+      setFieldErrors({})
       setSaving(true)
       try {
         await client.put(`/api/items/${params.itemId}`, {
@@ -262,6 +265,27 @@ export default function DescriptionScreen() {
     },
     [title, description, params, router]
   )
+
+  const confirmPublish = useCallback(() => {
+    const nextErrors = {
+      title: title.trim() ? undefined : 'Naslov je obavezan.',
+      description: description.trim() ? undefined : 'Opis je obavezan.',
+    }
+
+    if (nextErrors.title || nextErrors.description) {
+      setFieldErrors(nextErrors)
+      return
+    }
+
+    Alert.alert(
+      'Objavi komad?',
+      'Komad ce biti vidljiv u feedu i drugim clanovima Velvea.',
+      [
+        { text: 'Objavi', onPress: () => publish('available') },
+        { text: 'Odustani', style: 'cancel' },
+      ]
+    )
+  }, [description, publish, title])
 
   return (
     <KeyboardAwareScreen className="bg-base-canvas">
@@ -358,10 +382,20 @@ export default function DescriptionScreen() {
             <VelveTextInput
               ref={titleInputRef}
               value={title}
-              onChangeText={setTitle}
+              onChangeText={(value) => {
+                setTitle(value)
+                if (fieldErrors.title) setFieldErrors((prev) => ({ ...prev, title: undefined }))
+              }}
               placeholder="Ti smisli naslov svog komada"
-              className="rounded-[20px] border border-ink-dark/8 bg-surface-panel px-5 py-4 font-sans text-sm text-ink-dark"
+              className={`rounded-[20px] border bg-surface-panel px-5 py-4 font-sans text-sm text-ink-dark ${
+                fieldErrors.title ? 'border-signal-danger/35' : 'border-ink-dark/8'
+              }`}
             />
+            {fieldErrors.title ? (
+              <Text className="mt-2 font-sans text-xs text-signal-danger">
+                {fieldErrors.title}
+              </Text>
+            ) : null}
           </View>
 
           {/* Description */}
@@ -369,12 +403,24 @@ export default function DescriptionScreen() {
             <Text className="mb-2 font-sans text-sm font-semibold text-ink-dark">Opis</Text>
             <VelveTextInput
               value={description}
-              onChangeText={setDescription}
+              onChangeText={(value) => {
+                setDescription(value)
+                if (fieldErrors.description) {
+                  setFieldErrors((prev) => ({ ...prev, description: undefined }))
+                }
+              }}
               placeholder="Opisi komad prirodno: boja, kroj, detalji, stanje..."
               multiline
               textAlignVertical="top"
-              className="min-h-[140px] rounded-[20px] border border-ink-dark/8 bg-surface-panel px-5 py-4 font-sans text-sm leading-6 text-ink-dark"
+              className={`min-h-[140px] rounded-[20px] border bg-surface-panel px-5 py-4 font-sans text-sm leading-6 text-ink-dark ${
+                fieldErrors.description ? 'border-signal-danger/35' : 'border-ink-dark/8'
+              }`}
             />
+            {fieldErrors.description ? (
+              <Text className="mt-2 font-sans text-xs text-signal-danger">
+                {fieldErrors.description}
+              </Text>
+            ) : null}
           </View>
 
           {/* Summary chips */}
@@ -425,7 +471,7 @@ export default function DescriptionScreen() {
       >
         <TouchableOpacity
           disabled={saving}
-          onPress={() => publish('available')}
+          onPress={confirmPublish}
           className="items-center rounded-full bg-brand-accent-deep px-4 py-4"
         >
           {saving ? (

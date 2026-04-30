@@ -1,8 +1,10 @@
 import '../global.css'
 import React, { useEffect, useState } from 'react'
+import { Text, TouchableOpacity, View } from 'react-native'
 import { Stack, useRouter, useSegments, ErrorBoundary } from 'expo-router'
 import { useFonts } from 'expo-font'
 import { BrandedLoader } from '@/components/BrandedLoader'
+import { VelveFeedbackProvider } from '@/components/VelveFeedbackProvider'
 import { useAuth, useAuthProvider, AuthContext } from '@/hooks/useAuth'
 import { I18nProvider, useI18n } from '@/i18n'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
@@ -10,7 +12,7 @@ import { usePushNotifications } from '@/hooks/usePushNotifications'
 export { ErrorBoundary }
 
 function AuthGate() {
-  const { currentUser, loading } = useAuth()
+  const { currentUser, loading, profileError, refreshDbUser, logout } = useAuth()
   const { t } = useI18n()
   const router = useRouter()
   const segments = useSegments()
@@ -71,6 +73,34 @@ function AuthGate() {
     return <BrandedLoader label={t('common.loading')} />
   }
 
+  if (currentUser && profileError) {
+    return (
+      <View className="flex-1 items-center justify-center bg-base-canvas px-5">
+        <View className="w-full rounded-[28px] bg-surface-panel px-5 py-6">
+          <Text className="font-display text-3xl text-ink-dark">Sesija nije bezbedna</Text>
+          <Text className="mt-3 font-sans text-sm leading-6 text-ink-dark/62">
+            Ne mozemo da potvrdimo tvoj Velve profil. Pokusaj ponovo ili se odjavi pa udji opet.
+          </Text>
+          <Text className="mt-3 font-sans text-xs text-ink-dark/45">{profileError}</Text>
+
+          <TouchableOpacity
+            onPress={refreshDbUser}
+            className="mt-6 items-center rounded-full bg-brand-accent-deep px-4 py-4"
+          >
+            <Text className="font-sans text-base font-semibold text-base-canvas">Pokusaj ponovo</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={logout}
+            className="mt-3 items-center rounded-full border border-ink-dark/10 bg-base-canvas/70 px-4 py-4"
+          >
+            <Text className="font-sans text-base font-semibold text-ink-dark">Odjavi se</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    )
+  }
+
   return (
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
@@ -98,7 +128,9 @@ function RootLayout() {
   return (
     <I18nProvider>
       <AuthContext.Provider value={auth}>
-        <AuthGate />
+        <VelveFeedbackProvider>
+          <AuthGate />
+        </VelveFeedbackProvider>
       </AuthContext.Provider>
     </I18nProvider>
   )

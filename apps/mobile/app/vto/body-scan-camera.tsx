@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons'
+import { Alert } from '@/lib/velveAlert'
 import * as ImagePicker from 'expo-image-picker'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
-import { ActivityIndicator, Alert, Image, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native'
 
 import { colors } from '@/design/tokens'
 import { uploadBodyScanUri } from '@/lib/imageRequests'

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
+import { Alert } from '@/lib/velveAlert'
 import {
-  Alert,
   Platform,
   ScrollView,
   Text,
@@ -226,7 +226,7 @@ export default function LoginScreen() {
                 className={
                   googleSignInAvailable
                     ? 'items-center rounded-pill bg-brand-accent-deep px-4 py-4'
-                    : 'items-center rounded-pill bg-ink-dark/10 px-4 py-4'
+                    : 'items-center rounded-pill bg-brand-accent-deep px-4 py-4 opacity-40'
                 }
                 onPress={handleGoogleLogin}
                 disabled={!googleSignInAvailable}
@@ -235,7 +235,7 @@ export default function LoginScreen() {
                   className={
                     googleSignInAvailable
                       ? 'font-sans text-base font-semibold text-base-canvas'
-                      : 'font-sans text-base font-semibold text-ink-dark/45'
+                      : 'font-sans text-base font-semibold text-base-canvas'
                   }
                 >
                   {t('auth.google')}

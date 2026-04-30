@@ -364,6 +364,40 @@ async function cancelTradesForItemMutation({ itemIds = [], actorUser, reason }) 
   await syncAcceptedTradeAvailability([...impactedAvailabilityIds])
 }
 
+async function archiveLatestVelveTradeForSoldItem(item, actorUser) {
+  const trade = await TradeRequest.findOne({
+    status: { $in: ['pending', 'accepted'] },
+    completedAt: { $exists: false },
+    $or: [
+      { requestedItemId: item._id },
+      { offeredItemId: item._id },
+    ],
+  }).sort({ acceptedAt: -1, createdAt: -1 })
+
+  if (!trade) return null
+
+  const actorId = String(actorUser._id)
+  const isSender = String(trade.senderId) === actorId
+  const isReceiver = String(trade.receiverId) === actorId
+  if (!isSender && !isReceiver) return null
+
+  trade.status = 'accepted'
+  trade.respondedAt = trade.respondedAt || new Date()
+  trade.acceptedAt = trade.acceptedAt || new Date()
+  trade.completedAt = new Date()
+  trade.completedBy = isSender ? 'sender' : 'receiver'
+  await trade.save()
+
+  await appendTradeStatusMessage(
+    trade,
+    actorUser._id,
+    'completed',
+    'Trade je oznacen kao zavrsen jer je artikal prodat putem Velve razmene.'
+  )
+
+  return trade
+}
+
 // GET /api/items — searchable item list with cursor pagination
 router.get('/', maybeAuth, async (req, res) => {
   try {
@@ -1211,26 +1245,34 @@ router.put('/:id/sold', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Item is deleted' })
     }
 
-    if (item.status === 'pending_trade') {
+    if (item.status === 'pending_trade' && !req.body?.viaVelve) {
       return res.status(400).json({ error: 'Item is in active trade flow and cannot be marked sold yet' })
     }
 
-    if (['sold', 'swapped', 'traded'].includes(item.status)) {
-      return res.json({ ok: true, data: serializeClosetItem(item.toObject()) })
+    let updated = item
+    if (!['sold', 'swapped', 'traded'].includes(item.status)) {
+      updated = await Item.findByIdAndUpdate(
+        req.params.id,
+        {
+          status: 'sold',
+          archivedAt: new Date(),
+          archivedReason: 'sold',
+          unavailableReason: '',
+        },
+        { new: true }
+      )
     }
 
-    const updated = await Item.findByIdAndUpdate(
-      req.params.id,
-      {
-        status: 'sold',
-        archivedAt: new Date(),
-        archivedReason: 'sold',
-        unavailableReason: '',
-      },
-      { new: true }
-    )
+    const archivedTrade = req.body?.viaVelve
+      ? await archiveLatestVelveTradeForSoldItem(updated, req.dbUser)
+      : null
 
-    res.json({ ok: true, data: serializeClosetItem(updated.toObject()) })
+    res.json({
+      ok: true,
+      data: serializeClosetItem(updated.toObject()),
+      tradeArchived: Boolean(archivedTrade),
+      tradeId: archivedTrade ? String(archivedTrade._id) : null,
+    })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

@@ -1,8 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { Alert } from '@/lib/velveAlert'
 import { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   Text,
   TouchableOpacity,

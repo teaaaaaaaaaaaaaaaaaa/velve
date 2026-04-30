@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { Alert } from 'react-native'
 import { auth, getAuthToken } from '@/config/firebase'
 import { API_URL } from '@/config/api'
 
@@ -13,7 +12,6 @@ const client = axios.create({
   },
 })
 
-let lastOfflineAlert = 0
 
 // Request interceptor: dodaje Firebase ID token u svaki zahtev
 client.interceptors.request.use(async (config) => {
@@ -33,7 +31,8 @@ client.interceptors.request.use(async (config) => {
   return config
 })
 
-// Response interceptor: loguje odgovore i greške + offline detekcija
+// Response interceptor: loguje odgovore i greske.
+// Ekrani prikazuju network/API greske inline uz Retry gde god korisnik moze da nastavi tok.
 client.interceptors.response.use(
   (response) => {
     console.log('[APIClient] Response:', response.status, response.config.url)
@@ -49,33 +48,6 @@ client.interceptors.response.use(
       response: error.response?.data,
       currentUserUid: auth.currentUser?.uid ?? null,
     })
-
-    // Network/offline error detection
-    if (!error.response && error.message?.includes('Network Error')) {
-      const now = Date.now()
-      // Prevent spamming alerts - max one per 10 seconds
-      if (now - lastOfflineAlert > 10000) {
-        lastOfflineAlert = now
-        Alert.alert(
-          'Nema interneta',
-          'Proveri internet konekciju i pokušaj ponovo.',
-          [{ text: 'OK' }]
-        )
-      }
-    }
-
-    // Timeout error
-    if (error.code === 'ECONNABORTED') {
-      const now = Date.now()
-      if (now - lastOfflineAlert > 10000) {
-        lastOfflineAlert = now
-        Alert.alert(
-          'Spor internet',
-          'Server ne odgovara. Pokušaj ponovo za par sekundi.',
-          [{ text: 'OK' }]
-        )
-      }
-    }
 
     // Auth expired
     if (status === 401) {

@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons'
+import { Alert } from '@/lib/velveAlert'
 import { useRouter } from 'expo-router'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import {
-  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -312,28 +312,45 @@ export default function FeedScreen() {
     }
   }, [])
 
-  const handleReportItem = useCallback(async (item: ImmersiveFeedItem) => {
-    try {
-      await client.post(`/api/items/${item._id}/report`, { reason: 'community_report' })
-      setActionItem(null)
-      Alert.alert('Hvala', 'Prijava je poslata i pregledaćemo objavu.')
-    } catch {
-      Alert.alert('Greška', 'Nije moguće poslati prijavu trenutno.')
-    }
+  const handleReportItem = useCallback((item: ImmersiveFeedItem) => {
+    Alert.alert('Prijavi objavu?', 'Velve tim ce pregledati ovu objavu i korisnika.', [
+      {
+        text: 'Prijavi',
+        onPress: async () => {
+          try {
+            await client.post(`/api/items/${item._id}/report`, { reason: 'community_report' })
+            setActionItem(null)
+            Alert.alert('Hvala', 'Prijava je poslata i pregledacemo objavu.')
+          } catch {
+            Alert.alert('Greska', 'Nije moguce poslati prijavu trenutno.')
+          }
+        },
+      },
+      { text: 'Odustani', style: 'cancel' },
+    ])
   }, [])
 
-  const handleBlockSeller = useCallback(async (item: ImmersiveFeedItem) => {
-    try {
-      await client.post(`/api/users/${item.userId._id}/block`)
-      setItems((prev) => prev.filter((entry) => entry.userId._id !== item.userId._id))
-      setActionItem(null)
-      Alert.alert(
-        'Korisnik blokiran',
-        `Sadržaj korisnika @${item.userId.displayName} više ti se neće prikazivati.`
-      )
-    } catch {
-      Alert.alert('Greška', 'Nije moguće blokirati korisnika trenutno.')
-    }
+  const handleBlockSeller = useCallback((item: ImmersiveFeedItem) => {
+    Alert.alert('Blokiraj korisnika?', `@${item.userId.displayName} vise neces vidjati u feedu.`, [
+      {
+        text: 'Blokiraj',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await client.post(`/api/users/${item.userId._id}/block`)
+            setItems((prev) => prev.filter((entry) => entry.userId._id !== item.userId._id))
+            setActionItem(null)
+            Alert.alert(
+              'Korisnik blokiran',
+              `Sadrzaj korisnika @${item.userId.displayName} vise ti se nece prikazivati.`
+            )
+          } catch {
+            Alert.alert('Greska', 'Nije moguce blokirati korisnika trenutno.')
+          }
+        },
+      },
+      { text: 'Odustani', style: 'cancel' },
+    ])
   }, [])
 
   const prefetchedRef = useRef(new Set<string>())

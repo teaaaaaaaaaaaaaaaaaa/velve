@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons'
+import { Alert } from '@/lib/velveAlert'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   RefreshControl,
   ScrollView,

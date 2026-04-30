@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { Alert } from '@/lib/velveAlert'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, Animated, Easing, Text, View } from 'react-native'
+import { Animated, Easing, Text, View } from 'react-native'
 
 import client from '@/api/client'
 import { BrandWordmark } from '@/components/BrandWordmark'

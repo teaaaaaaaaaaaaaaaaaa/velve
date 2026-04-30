@@ -146,15 +146,11 @@ export default function CategoryScreen() {
               params: { itemId, category, condition },
             })
           }
-          className={`items-center rounded-full px-4 py-4 ${
-            canContinue ? 'bg-brand-accent-deep' : 'bg-ink-dark/12'
+          className={`items-center rounded-full bg-brand-accent-deep px-4 py-4 ${
+            canContinue ? '' : 'opacity-40'
           }`}
         >
-          <Text
-            className={`font-sans text-base font-semibold ${
-              canContinue ? 'text-base-canvas' : 'text-ink-dark/35'
-            }`}
-          >
+          <Text className="font-sans text-base font-semibold text-base-canvas">
             Nastavi
           </Text>
         </TouchableOpacity>

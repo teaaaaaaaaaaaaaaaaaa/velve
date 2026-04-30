@@ -167,11 +167,11 @@ export default function VtoArchiveScreen() {
         <TouchableOpacity
           disabled={digitizedItems.length === 0}
           onPress={() => router.push(bodyScan.exists ? '/vto/hub' : '/vto/body-scan')}
-          className={`items-center rounded-[28px] px-4 py-4 ${
-            digitizedItems.length > 0 ? 'bg-brand-accent-deep' : 'bg-brand-accent-deep/20'
+          className={`items-center rounded-[28px] bg-brand-accent-deep px-4 py-4 ${
+            digitizedItems.length > 0 ? '' : 'opacity-40'
           }`}
         >
-          <Text className={`font-display text-xl ${digitizedItems.length > 0 ? 'text-base-canvas' : 'text-ink-dark/45'}`}>
+          <Text className="font-display text-xl text-base-canvas">
             Magicno Isprobaj (VTO)
           </Text>
         </TouchableOpacity>

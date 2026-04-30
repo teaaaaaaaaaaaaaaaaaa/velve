@@ -1,7 +1,8 @@
 ﻿import { Ionicons } from '@expo/vector-icons'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
+import { Alert } from '@/lib/velveAlert'
 import { useEffect, useState } from 'react'
-import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
 
 import client from '@/api/client'
 import { BrandedLoader } from '@/components/BrandedLoader'
@@ -88,29 +89,46 @@ export default function PublicProfileScreen() {
     }
   }, [router, user?.isSelf])
 
-  const handleReport = async () => {
+  const handleReport = () => {
     if (!id) return
-    try {
-      await client.post(`/api/users/${id}/report`, { reason: 'community_report' })
-      Alert.alert('Hvala', 'Profil je prijavljen i pregledace ga tim.')
-    } catch {
-      Alert.alert('Greska', 'Prijava trenutno nije moguca.')
-    }
+    Alert.alert('Prijavi profil?', 'Velve tim ce pregledati ovaj profil i aktivnost korisnika.', [
+      {
+        text: 'Prijavi',
+        onPress: async () => {
+          try {
+            await client.post(`/api/users/${id}/report`, { reason: 'community_report' })
+            Alert.alert('Hvala', 'Profil je prijavljen i pregledace ga tim.')
+          } catch {
+            Alert.alert('Greska', 'Prijava trenutno nije moguca.')
+          }
+        },
+      },
+      { text: 'Odustani', style: 'cancel' },
+    ])
   }
 
-  const handleBlock = async () => {
+  const handleBlock = () => {
     if (!id || !user) return
-    try {
-      await client.post(`/api/users/${id}/block`)
-      Alert.alert('Korisnik blokiran', `Sadrzaj profila @${user.displayName} vise ti se nece prikazivati.`, [
-        {
-          text: 'U redu',
-          onPress: () => router.replace('/(tabs)/feed'),
+    Alert.alert('Blokiraj korisnika?', `@${user.displayName} vise neces vidjati u feedu.`, [
+      {
+        text: 'Blokiraj',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await client.post(`/api/users/${id}/block`)
+            Alert.alert('Korisnik blokiran', `Sadrzaj profila @${user.displayName} vise ti se nece prikazivati.`, [
+              {
+                text: 'U redu',
+                onPress: () => router.replace('/(tabs)/feed'),
+              },
+            ])
+          } catch {
+            Alert.alert('Greska', 'Blokiranje trenutno nije moguce.')
+          }
         },
-      ])
-    } catch {
-      Alert.alert('Greska', 'Blokiranje trenutno nije moguce.')
-    }
+      },
+      { text: 'Odustani', style: 'cancel' },
+    ])
   }
 
   const handleMoreOptions = () => {

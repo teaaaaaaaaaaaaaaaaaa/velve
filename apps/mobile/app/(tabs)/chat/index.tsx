@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons'
+import { Alert } from '@/lib/velveAlert'
 import { useRouter } from 'expo-router'
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   RefreshControl,
   ScrollView,
@@ -613,8 +613,18 @@ export default function ChatListScreen() {
                   { text: 'Odustani', style: 'cancel' },
                 ])
               }
-              onCancel={() => runTradeAction(trade._id, 'cancel')}
-              onComplete={() => runTradeAction(trade._id, 'complete')}
+              onCancel={() =>
+                Alert.alert('Otkazi trade', 'Ova ponuda ce biti otkazana za oba ucesnika.', [
+                  { text: 'Otkazi trade', style: 'destructive', onPress: () => runTradeAction(trade._id, 'cancel') },
+                  { text: 'Odustani', style: 'cancel' },
+                ])
+              }
+              onComplete={() =>
+                Alert.alert('Zavrsi trade', 'Potvrdi tek kada je razmena stvarno zavrsena.', [
+                  { text: 'Zavrsi trade', onPress: () => runTradeAction(trade._id, 'complete') },
+                  { text: 'Odustani', style: 'cancel' },
+                ])
+              }
             />
           ))
         )}

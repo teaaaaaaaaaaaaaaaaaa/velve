@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons'
+import { Alert } from '@/lib/velveAlert'
 import { useRouter } from 'expo-router'
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Alert,
   FlatList,
   RefreshControl,
   Text,
@@ -11,7 +11,6 @@ import {
 } from 'react-native'
 
 import client from '@/api/client'
-import { BrandedLoader } from '@/components/BrandedLoader'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { RemoteImage } from '@/components/RemoteImage'
 import { colors } from '@/design/tokens'
@@ -213,6 +212,39 @@ const ClosetCard = memo(function ClosetCard({
   )
 })
 
+function ClosetSkeleton() {
+  return (
+    <View className="flex-1 bg-base-canvas px-5 pt-14">
+      <View className="mb-5 flex-row items-center justify-between">
+        <View className="flex-1">
+          <View className="h-3 w-16 rounded-full bg-surface-panel" />
+          <View className="mt-3 h-10 w-40 rounded-full bg-surface-panel" />
+        </View>
+        <View className="h-11 w-11 rounded-full bg-surface-panel" />
+      </View>
+      <View className="mb-6 rounded-[28px] bg-surface-panel px-4 py-5">
+        <View className="h-4 w-full rounded-full bg-base-canvas" />
+        <View className="mt-3 h-4 w-2/3 rounded-full bg-base-canvas" />
+        <View className="mt-5 flex-row gap-3">
+          <View className="h-12 flex-1 rounded-full bg-base-canvas" />
+          <View className="h-12 flex-1 rounded-full bg-base-canvas" />
+        </View>
+      </View>
+      <View className="mb-6 h-16 rounded-[24px] bg-surface-panel" />
+      {[0, 1, 2].map((entry) => (
+        <View key={entry} className="mb-4 flex-row rounded-[28px] bg-surface-panel px-4 py-4">
+          <View className="h-28 w-24 rounded-[20px] bg-base-canvas" />
+          <View className="ml-4 flex-1">
+            <View className="h-7 w-40 rounded-full bg-base-canvas" />
+            <View className="mt-3 h-4 w-28 rounded-full bg-base-canvas" />
+            <View className="mt-5 h-8 w-32 rounded-full bg-base-canvas" />
+          </View>
+        </View>
+      ))}
+    </View>
+  )
+}
+
 export default function ClosetScreen() {
   const router = useRouter()
 
@@ -400,11 +432,11 @@ export default function ClosetScreen() {
               <Text className="font-sans text-sm font-semibold text-base-canvas">Nova objava</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              className={`flex-1 items-center rounded-full px-4 py-3 ${hasReadyForVto ? 'bg-brand-highlight' : 'bg-brand-highlight/35'}`}
+              className={`flex-1 items-center rounded-full bg-brand-highlight px-4 py-3 ${hasReadyForVto ? '' : 'opacity-40'}`}
               disabled={!hasReadyForVto}
               onPress={() => router.push('/vto/archive')}
             >
-              <Text className={`font-sans text-sm font-semibold ${hasReadyForVto ? 'text-ink-dark' : 'text-ink-dark/45'}`}>
+              <Text className="font-sans text-sm font-semibold text-ink-dark">
                 Magično Isprobaj
               </Text>
             </TouchableOpacity>
@@ -445,7 +477,7 @@ export default function ClosetScreen() {
   )
 
   if (loading) {
-    return <BrandedLoader />
+    return <ClosetSkeleton />
   }
 
   return (

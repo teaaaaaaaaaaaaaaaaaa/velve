@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Alert } from '@/lib/velveAlert'
 import {
   View,
   Text,
   RefreshControl,
-  Alert,
   FlatList,
   ScrollView,
   TouchableOpacity,
@@ -134,12 +134,17 @@ export default function WishlistScreen() {
   }, [])
 
   const handleRemove = async (itemId: string) => {
-    try {
-      await client.delete(`/api/wishlist/${itemId}`)
-      setItems((prev) => prev.filter((item) => item._id !== itemId))
-    } catch {
-      Alert.alert('Velve', copy[locale].removeError)
-    }
+    Alert.alert('Ukloni iz sacuvanog?', 'Ovaj komad vise nece biti u tvom moodboardu.', [
+      { text: 'Ukloni', style: 'destructive', onPress: async () => {
+        try {
+          await client.delete(`/api/wishlist/${itemId}`)
+          setItems((prev) => prev.filter((item) => item._id !== itemId))
+        } catch {
+          Alert.alert('Greska', copy[locale].removeError)
+        }
+      } },
+      { text: 'Odustani', style: 'cancel' },
+    ])
   }
 
   if (loading) {

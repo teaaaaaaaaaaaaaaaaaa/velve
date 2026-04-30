@@ -8,6 +8,7 @@ import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock'
 import { OnboardingProgressHeader } from '@/components/OnboardingProgressHeader'
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
+import { markBodyScanSkippedThisSession } from '@/lib/vtoSession'
 
 const COPY = {
   sr: {
@@ -53,6 +54,7 @@ export default function OnboardingScanScreen() {
   const unlockLabel = locale === 'sr' ? 'Virtual Try-On spreman' : 'Virtual Try-On ready'
 
   const handleSkip = () => {
+    markBodyScanSkippedThisSession()
     router.replace('/(tabs)/feed')
   }
 
@@ -72,7 +74,20 @@ export default function OnboardingScanScreen() {
             progress={1}
             unlockLabel={unlockLabel}
           />
+          <TouchableOpacity
+            onPress={handleSkip}
+            className="absolute right-5 top-14 z-20 rounded-full bg-surface-panel px-4 py-2.5"
+          >
+            <Text className="font-sans text-sm font-semibold text-ink-dark/60">
+              {copy.skip}
+            </Text>
+          </TouchableOpacity>
           <OnboardingAnimatedBlock className="px-gutter">
+            <View className="mb-4 self-start rounded-full bg-brand-highlight/30 px-3 py-1.5">
+              <Text className="font-sans text-xs font-semibold uppercase text-ink-dark/55">
+                Opcionalno
+              </Text>
+            </View>
             <Text className="font-logo text-[30px] leading-none text-brand-accent-deep/72">
               {copy.mood}
             </Text>
@@ -109,14 +124,6 @@ export default function OnboardingScanScreen() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={handleSkip}
-            className="mt-3 items-center rounded-pill border border-ink-dark/10 bg-base-canvas/70 px-5 py-4"
-          >
-            <Text className="font-sans text-base font-medium text-ink-dark/60">
-              {copy.skip}
-            </Text>
-          </TouchableOpacity>
         </View>
       </View>
     </View>

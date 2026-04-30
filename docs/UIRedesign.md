@@ -3,60 +3,9 @@
 > Samo neuradjene i polovično uradjene stavke. Uradjene su izbrisane.
 
 ---
-
-## 1. EKRANI KOJI FALE
-
-### 1.1 Item not available / Sold out ekran ⚠️ PARTIAL
-Ako korisnik otvori link ka artiklu koji je već prodat/arhiviran, detekcija postoji (status 410) ali nema dedicated "Ovaj artikal više nije dostupan" ekrana sa predlogom sličnih stvari.
-
-**Fix:** Dedicated ekran sa "Slični artikli" sekcijom umesto samo status prikaza.
-
 ---
 
-## 2. EKRANI SA LOŠIM UX/UI
 
-### 2.1 VTO Hub — Konfuzno inicijalno stanje ⚠️ PARTIAL
-**Uradjeno:** Delete dugme postoji (Alert confirmation).  
-**Nedostaje:**
-- Onboarding card kada nema rendera ("Stvori prvi outfit" sa koracima)
-- Share dugme je u header-u — treba u overflow meniju kad nema šta da se deli
-- Nema swipe-to-delete na outfit kolekciji
-
----
-
- 
----
-
-### 2.3 Upload Flow — AI overlay se ne može otkazati ⚠️ PARTIAL
-Timeout od 120s postoji ali overlay nema cancel dugme ni vidljiv progress bar.
-
-**Nedostaje:**
-- "X" dugme za otkazivanje overlaya
-- Vidljiv progress bar ili countdown
-- Ako se otkaže → fokus na title field
-
----
-
-### 2.4 Closet — Nema progress indikacije za digitizaciju ⚠️ PARTIAL
-Postoji step messaging i animacija ali nema vizuelnog progress bara.
-
-**Fix:** Animated progress bar ili step indikator (Upload → Uklanjanje pozadine → Finalizacija).
-
----
-
-### 2.5 Onboarding About — Detekcija grada ❌ NOT DONE
-Detekcija lokacije se pokreće automatski na mount. Ako se dozvola odbije, nema vizuelnog indikatora.
-
-**Fix:** Eksplicitan "Detektuj moju lokaciju" dugme, ne auto-trigger na mount. Jasna poruka pre i posle.
-
----
-
-### 2.6 Search — Nema istorije pretrage ⚠️ PARTIs   AL
-Filter sheet postoji (kategorija, veličina, grad, cena). Ali nedostaje:
-- Istorija prethodnih pretraga
-- Trending tagovi pre unosa
-
----
 
 ## 3. LOŠA LOGIKA / TOKOVI
 
@@ -107,31 +56,30 @@ Skeleton loaderi za Feed, Profile, Chat postoje. Ali Item detalj, Closet, VTO Hu
 
 ---
 
-### 4.2 Error handling — Alert vs inline vs tiho ⚠️ PARTIAL
-Alerts za destruktivne akcije postoje. Toast notifikacije i granularno rukovanje tipovima grešaka nije konzistentno.
+### 4.2 Error handling - standardizovan DONE
+VelveFeedbackProvider renderuje jedinstvene Velve confirmation modale i 2s toast notifikacije. API client vise ne prikazuje globalne network alertove; ekrani hvataju network/API greske inline gde tok ima Retry.
 
 **Standard:**
 
-| Tip greške | Pattern |
+| Tip greske | Pattern |
 |---|---|
-| Destruktivna akcija (brisanje, blokiranje) | Alert.alert() sa potvrdom |
+| Destruktivna akcija (brisanje, blokiranje) | Velve confirmation modal sa potvrdom |
 | Mutacija podataka (edit, status promena) | Toast notifikacija (2s) |
-| Form validacija | Inline greška ispod fielda |
-| Network/API greška | Inline na ekranu sa Retry dugmetom |
-| Kritična greška (auth) | Full-page error sa logout opcijom |
+| Form validacija | Inline greska ispod fielda |
+| Network/API greska | Inline na ekranu sa Retry dugmetom |
+| Kriticna greska (auth) | Full-page error sa logout opcijom |
 
 ---
 
-### 4.3 Confirmations — nedosledni ⚠️ PARTIAL
-**Ima potvrde:** Accept trade, Reject trade, Delete draft, Cancel trade, Complete trade, Logout, Block user, Report item  
-**Nema potvrde:** Remove from wishlist, Delete chat, Publish item
+### 4.3 Confirmations - standardizovane DONE
+**Pokriveno:** Accept trade, Reject trade, Delete draft, Cancel trade, Complete trade, Logout, Block user, Report item, Remove from wishlist, Delete chat, Publish item.
 
-**Fix:** Sve destruktivne ili nepovratne akcije treba da imaju potvrdu.
+**Fix:** Sve destruktivne ili nepovratne akcije imaju Velve confirmation modal.
 
 ---
 
-### 4.4 Disabled stanja — različite opacity vrednosti ❌ NOT DONE
-`opacity-35`, `opacity-45`, `opacity-50` se koriste naizmenično.
+### 4.4 Disabled stanja - standardizovana DONE
+Disabled CTA elementi koriste `opacity-40` / `0.4` kao jedinstveni standard.
 
 **Fix:** Standardizovati na `opacity-40` za sve disabled elemente.
 
