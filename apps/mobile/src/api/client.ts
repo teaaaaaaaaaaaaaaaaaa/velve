@@ -1,8 +1,12 @@
-import axios from 'axios'
+import axios, { type InternalAxiosRequestConfig } from 'axios'
 import { auth, getAuthToken } from '@/config/firebase'
 import { API_URL } from '@/config/api'
 
 console.log('[APIClient] Using baseURL:', API_URL)
+
+type RetriableRequestConfig = InternalAxiosRequestConfig & {
+  _retryWithFreshAuth?: boolean
+}
 
 const client = axios.create({
   baseURL: API_URL,
@@ -38,10 +42,11 @@ client.interceptors.response.use(
     console.log('[APIClient] Response:', response.status, response.config.url)
     return response
   },
-  (error) => {
+  async (error) => {
     const url = error.config?.url || ''
     const baseURL = error.config?.baseURL || ''
     const status = error.response?.status
+    const originalConfig = error.config as RetriableRequestConfig | undefined
 
     console.log('[APIClient] Error:', status, `${baseURL}${url}`, {
       message: error.message,
@@ -54,6 +59,27 @@ client.interceptors.response.use(
       console.log('[APIClient] Auth token expired or invalid', {
         currentUserUid: auth.currentUser?.uid ?? null,
       })
+
+      const user = auth.currentUser
+      if (user && originalConfig && !originalConfig._retryWithFreshAuth) {
+        originalConfig._retryWithFreshAuth = true
+
+        try {
+          const freshToken = await getAuthToken(user, true)
+          originalConfig.headers.Authorization = `Bearer ${freshToken}`
+          console.log('[APIClient] Retrying request with refreshed auth token', {
+            method: originalConfig.method?.toUpperCase(),
+            url: `${baseURL}${url}`,
+            uid: user.uid,
+          })
+          return client(originalConfig)
+        } catch (refreshError: any) {
+          console.log('[APIClient] Failed to refresh auth token after 401', {
+            message: refreshError?.message,
+            currentUserUid: auth.currentUser?.uid ?? null,
+          })
+        }
+      }
     }
 
     return Promise.reject(error)
