@@ -1,86 +1,180 @@
-import { Ionicons } from '@expo/vector-icons'
-import { Alert } from '@/lib/velveAlert'
-import { useRouter } from 'expo-router'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  FlatList,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native'
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import client from '@/api/client'
-import { BrandedLoader } from '@/components/BrandedLoader'
-import { RemoteImage } from '@/components/RemoteImage'
-import { VelveTextInput } from '@/components/VelveTextInput'
-import { colors } from '@/design/tokens'
-import { getPrimaryItemImage, hasDigitizedImage } from '@/lib/itemImages'
-import { resolveVtoGarmentCategory } from '@/lib/vtoCategory'
+import client from '@/api/client';
+import { BrandedLoader } from '@/components/BrandedLoader';
+import { RemoteImage } from '@/components/RemoteImage';
+import { VelveTextInput } from '@/components/VelveTextInput';
+import { colors } from '@/design/tokens';
+import { getPrimaryItemImage, hasDigitizedImage } from '@/lib/itemImages';
+import { Alert } from '@/lib/velveAlert';
+import { resolveVtoGarmentCategory } from '@/lib/vtoCategory';
 
 type ClosetItem = {
-  _id: string
-  title: string
-  brand?: string
-  category?: string
-  images?: string[]
-  imageClean?: string | null
-  primaryImage?: string | null
-  isDigitized?: boolean
+  _id: string;
+  title: string;
+  brand?: string;
+  category?: string;
+  images?: string[];
+  imageClean?: string | null;
+  primaryImage?: string | null;
+  isDigitized?: boolean;
+  userId?: string | { _id?: string; displayName?: string };
+};
+
+type SelectableItem = ClosetItem & {
+  source: 'closet' | 'wishlist' | 'app-search';
+};
+
+const MAX_SELECTED_ITEMS = 4;
+
+function buildSearchableText(item: ClosetItem) {
+  return `${item.title} ${item.brand ?? ''} ${item.category ?? ''}`.toLowerCase();
 }
 
-const MAX_SELECTED_ITEMS = 4
+function dedupeItems(items: SelectableItem[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item._id)) {
+      return false;
+    }
+
+    seen.add(item._id);
+    return true;
+  });
+}
 
 export default function VtoSelectScreen() {
-  const router = useRouter()
-  const insets = useSafeAreaInsets()
-  const [loading, setLoading] = useState(true)
-  const [items, setItems] = useState<ClosetItem[]>([])
-  const [query, setQuery] = useState('')
-  const [category, setCategory] = useState<'all' | 'tops' | 'bottoms' | 'one-pieces'>('all')
-  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([])
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
+  const [baseItems, setBaseItems] = useState<SelectableItem[]>([]);
+  const [searchResults, setSearchResults] = useState<SelectableItem[]>([]);
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState<'all' | 'tops' | 'bottoms' | 'one-pieces'>('all');
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
 
   useEffect(() => {
-    client
-      .get('/api/items/closet')
-      .then((response) => {
-        const payload = response.data?.data || {}
-        const merged = [...(payload.live || []), ...(payload.drafts || [])]
-        setItems(merged.filter((item: ClosetItem) => hasDigitizedImage(item)))
-      })
-      .finally(() => setLoading(false))
-  }, [])
+    let active = true;
 
-  const filteredItems = useMemo(() => {
-    return items.filter((item) => {
-      const searchable = `${item.title} ${item.brand || ''} ${item.category || ''}`.toLowerCase()
-      const matchesQuery = searchable.includes(query.trim().toLowerCase())
-      const normalizedCategory = resolveVtoGarmentCategory(item.category)
-      const matchesCategory = category === 'all' || normalizedCategory === category
+    (async () => {
+      try {
+        const [closetResponse, wishlistResponse] = await Promise.all([
+          client.get('/api/items/closet'),
+          client.get('/api/wishlist', { params: { limit: 50 } }),
+        ]);
 
-      return matchesQuery && matchesCategory
-    })
-  }, [category, items, query])
+        if (!active) return;
+
+        const closetPayload = closetResponse.data?.data || {};
+        const ownItems = [...(closetPayload.live ?? []), ...(closetPayload.drafts ?? [])]
+          .filter((item: ClosetItem) => hasDigitizedImage(item))
+          .map((item: ClosetItem) => ({ ...item, source: 'closet' as const }));
+
+        const wishlistItems = (wishlistResponse.data?.data || [])
+          .filter((item: ClosetItem) => hasDigitizedImage(item))
+          .map((item: ClosetItem) => ({ ...item, source: 'wishlist' as const }));
+
+        setBaseItems(dedupeItems([...ownItems, ...wishlistItems]));
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+
+    let active = true;
+    const timeout = setTimeout(async () => {
+      try {
+        setSearching(true);
+
+        const globalResponse = await client.get('/api/items', {
+          params: {
+            limit: 24,
+            search: trimmedQuery,
+          },
+        });
+
+        if (!active) return;
+
+        const ownMatches = baseItems
+          .filter((item) => item.source === 'closet')
+          .filter((item) => buildSearchableText(item).includes(trimmedQuery.toLowerCase()));
+
+        const globalMatches = (globalResponse.data?.data || [])
+          .filter((item: ClosetItem) => hasDigitizedImage(item))
+          .map((item: ClosetItem) => ({ ...item, source: 'app-search' as const }));
+
+        setSearchResults(dedupeItems([...ownMatches, ...globalMatches]));
+      } catch {
+        if (active) {
+          setSearchResults([]);
+        }
+      } finally {
+        if (active) {
+          setSearching(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+    };
+  }, [baseItems, query]);
+
+  const visibleItems = useMemo(() => {
+    const sourceItems = query.trim() ? searchResults : baseItems;
+
+    return sourceItems.filter((item) => {
+      const normalizedCategory = resolveVtoGarmentCategory(item.category);
+      const matchesCategory = category === 'all' || normalizedCategory === category;
+      return matchesCategory;
+    });
+  }, [baseItems, category, query, searchResults]);
 
   const toggleSelection = useCallback((itemId: string) => {
     setSelectedItemIds((prev) => {
       if (prev.includes(itemId)) {
-        return prev.filter((entry) => entry !== itemId)
+        return prev.filter((entry) => entry !== itemId);
       }
 
       if (prev.length >= MAX_SELECTED_ITEMS) {
-        Alert.alert('Limit dostignut', 'Mozes da izaberes najvise 4 komada za outfit render.')
-        return prev
+        Alert.alert('Limit dostignut', 'Mozes da izaberes najvise 4 komada za outfit render.');
+        return prev;
       }
 
-      return [...prev, itemId]
-    })
-  }, [])
+      return [...prev, itemId];
+    });
+  }, []);
 
   const renderItem = useCallback(
-    ({ item }: { item: ClosetItem }) => {
-      const selectedIndex = selectedItemIds.indexOf(item._id)
-      const isSelected = selectedIndex >= 0
+    ({ item }: { item: SelectableItem }) => {
+      const selectedIndex = selectedItemIds.indexOf(item._id);
+      const isSelected = selectedIndex >= 0;
+      const sourceLabel =
+        item.source === 'closet'
+          ? 'Moj item'
+          : item.source === 'wishlist'
+            ? 'Sacuvano'
+            : 'Iz aplikacije';
 
       return (
         <TouchableOpacity
@@ -91,7 +185,7 @@ export default function VtoSelectScreen() {
           }`}
         >
           <RemoteImage
-            uri={getPrimaryItemImage(item) || undefined}
+            uri={getPrimaryItemImage(item) ?? undefined}
             className="aspect-[0.82] w-full"
           />
           <View className="px-3 pb-4 pt-3">
@@ -114,14 +208,14 @@ export default function VtoSelectScreen() {
               </View>
             </View>
             <Text className="mt-1 font-sans text-xs text-ink-dark/55">
-              {item.brand || 'Digital item'}
+              {[item.brand ?? 'Digital item', sourceLabel].filter(Boolean).join(' • ')}
             </Text>
           </View>
         </TouchableOpacity>
-      )
+      );
     },
     [selectedItemIds, toggleSelection]
-  )
+  );
 
   const listHeader = useMemo(
     () => (
@@ -144,9 +238,18 @@ export default function VtoSelectScreen() {
         <VelveTextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Pretraga"
+          placeholder="Nadji iz aplikacije"
           className="rounded-[24px] bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
         />
+
+        <View className="mt-3 flex-row items-center justify-between">
+          <Text className="font-sans text-sm text-ink-dark/55">
+            {query.trim()
+              ? 'Pretrazujes celu aplikaciju.'
+              : 'Prikazani su tvoji komadi i sacuvani komadi drugih korisnika.'}
+          </Text>
+          {searching ? <ActivityIndicator size="small" color={colors.accentDeep} /> : null}
+        </View>
 
         <View className="mt-4 flex-row flex-wrap gap-2">
           {[
@@ -178,22 +281,26 @@ export default function VtoSelectScreen() {
         </Text>
       </View>
     ),
-    [category, query, router, selectedItemIds.length]
-  )
+    [category, query, router, searching, selectedItemIds.length]
+  );
 
   if (loading) {
-    return <BrandedLoader />
+    return <BrandedLoader />;
   }
 
   const primaryLabel =
-    selectedItemIds.length > 1 ? 'Try On Outfit' : selectedItemIds.length === 1 ? 'Try On' : 'Izaberi komad'
+    selectedItemIds.length > 1
+      ? 'Try On Outfit'
+      : selectedItemIds.length === 1
+        ? 'Try On'
+        : 'Izaberi komad';
 
   return (
     <SafeAreaView className="flex-1 bg-base-canvas" edges={['top', 'bottom']}>
       <View className="flex-1">
         <FlatList
           className="flex-1"
-          data={filteredItems}
+          data={visibleItems}
           keyExtractor={(item) => item._id}
           renderItem={renderItem}
           numColumns={2}
@@ -201,16 +308,20 @@ export default function VtoSelectScreen() {
           ListHeaderComponent={listHeader}
           ListEmptyComponent={
             <View className="rounded-[28px] bg-surface-panel px-4 py-6">
-              <Text className="font-display text-2xl text-ink-dark">Nema spremnih komada</Text>
+              <Text className="font-display text-2xl text-ink-dark">
+                {query.trim() ? 'Nema rezultata u aplikaciji' : 'Nema spremnih komada'}
+              </Text>
               <Text className="mt-2 font-sans text-sm leading-6 text-ink-dark/65">
-                Prvo digitalizuj bar jedan artikal kroz Clean Cut, pa se vrati ovde.
+                {query.trim()
+                  ? 'Probaj drugi naziv, brend ili kategoriju. Prikazujemo samo komade koji vec imaju Clean Cut i mogu odmah u Try-On.'
+                  : 'Ovde ce se pojaviti tvoji digitizovani itemi i sacuvani digitizovani komadi drugih korisnika.'}
               </Text>
             </View>
           }
           contentContainerStyle={{
             paddingHorizontal: 20,
             paddingBottom: Math.max(insets.bottom, 16) + 116,
-            flexGrow: filteredItems.length === 0 ? 1 : undefined,
+            flexGrow: visibleItems.length === 0 ? 1 : undefined,
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -249,5 +360,5 @@ export default function VtoSelectScreen() {
         </View>
       </View>
     </SafeAreaView>
-  )
+  );
 }

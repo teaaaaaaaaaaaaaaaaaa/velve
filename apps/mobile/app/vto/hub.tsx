@@ -231,7 +231,13 @@ export default function VtoHubScreen() {
       contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, paddingTop: 56 }}
     >
       <View className="mb-5 flex-row items-center justify-between">
-        <View>
+        <TouchableOpacity
+          onPress={() => router.replace('/(tabs)/profile')}
+          className="h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
+        >
+          <Ionicons name="close" size={20} color={colors.inkDark} />
+        </TouchableOpacity>
+        <View className="flex-1 px-4">
           <Text className="font-logo text-[38px] text-brand-accent-deep">Velve</Text>
           <Text className="font-display text-4xl text-ink-dark">Probna Soba</Text>
         </View>

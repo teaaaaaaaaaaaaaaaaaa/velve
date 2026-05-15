@@ -1,121 +1,116 @@
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Alert } from '@/lib/velveAlert'
-import { useEffect, useMemo, useState } from 'react'
-import {
-  ActivityIndicator,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native'
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
-import client from '@/api/client'
-import { BrandedLoader } from '@/components/BrandedLoader'
-import { RemoteImage } from '@/components/RemoteImage'
-import { VelveTextInput } from '@/components/VelveTextInput'
-import { colors } from '@/design/tokens'
-import { getPrimaryItemImage } from '@/lib/itemImages'
+import client from '@/api/client';
+import { BrandedLoader } from '@/components/BrandedLoader';
+import { RemoteImage } from '@/components/RemoteImage';
+import { VelveTextInput } from '@/components/VelveTextInput';
+import { colors } from '@/design/tokens';
+import { getPrimaryItemImage } from '@/lib/itemImages';
+import { Alert } from '@/lib/velveAlert';
 
 type ItemPayload = {
-  _id: string
-  title: string
-  brand?: string
-  category?: string
-  images?: string[]
-  imageClean?: string | null
-  primaryImage?: string | null
-}
+  _id: string;
+  title: string;
+  brand?: string;
+  category?: string;
+  images?: string[];
+  imageClean?: string | null;
+  primaryImage?: string | null;
+};
 
 type RenderRouteParams = {
-  itemId?: string | string[]
-  itemIds?: string | string[]
-  mode?: string | string[]
-}
+  itemId?: string | string[];
+  itemIds?: string | string[];
+  mode?: string | string[];
+};
 
 type RenderResult = {
-  vtoImageUrl: string | null
-  renderModel: string
-  isChainRender: boolean
-  chainSteps: number
-  categoriesUsed: string[]
-}
+  vtoImageUrl: string | null;
+  renderModel: string;
+  isChainRender: boolean;
+  chainSteps: number;
+  categoriesUsed: string[];
+};
 
 function normalizeParam(value?: string | string[]) {
   if (Array.isArray(value)) {
-    return value[0]
+    return value[0];
   }
 
-  return value
+  return value;
 }
 
 function parseSelectedItemIds(itemId?: string | string[], itemIds?: string | string[]) {
-  const singleItemId = normalizeParam(itemId)
-  const rawItemIds = normalizeParam(itemIds)
+  const singleItemId = normalizeParam(itemId);
+  const rawItemIds = normalizeParam(itemIds);
 
   if (rawItemIds) {
     try {
-      const parsed = JSON.parse(rawItemIds)
+      const parsed = JSON.parse(rawItemIds);
       if (Array.isArray(parsed)) {
-        return parsed.map((entry) => String(entry || '').trim()).filter(Boolean)
+        return parsed.map((entry) => String(entry ?? '').trim()).filter(Boolean);
       }
     } catch {
       return rawItemIds
         .split(',')
-        .map((entry) => String(entry || '').trim())
-        .filter(Boolean)
+        .map((entry) => String(entry ?? '').trim())
+        .filter(Boolean);
     }
   }
 
-  return singleItemId ? [singleItemId] : []
+  return singleItemId ? [singleItemId] : [];
 }
 
 export default function VtoRenderScreen() {
-  const router = useRouter()
-  const params = useLocalSearchParams<RenderRouteParams>()
+  const router = useRouter();
+  const params = useLocalSearchParams<RenderRouteParams>();
   const [requestId] = useState(
     () => `vto-mobile-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  )
-  const [items, setItems] = useState<ItemPayload[]>([])
-  const [renderResult, setRenderResult] = useState<RenderResult | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  );
+  const [items, setItems] = useState<ItemPayload[]>([]);
+  const [renderResult, setRenderResult] = useState<RenderResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [outfitName, setOutfitName] = useState(() =>
     parseSelectedItemIds(params.itemId, params.itemIds).length > 1
       ? 'Velve Outfit'
       : 'Misty Night Out'
-  )
+  );
 
-  const mode = normalizeParam(params.mode)
+  const mode = normalizeParam(params.mode);
   const selectedItemIds = useMemo(
     () => parseSelectedItemIds(params.itemId, params.itemIds),
     [params.itemId, params.itemIds]
-  )
-  const isMultiItem = selectedItemIds.length > 1
+  );
+  const isMultiItem = selectedItemIds.length > 1;
 
   useEffect(() => {
     if (selectedItemIds.length === 0) {
-      router.replace('/vto/select')
-      return
+      router.replace('/vto/select');
+      return;
     }
 
-    let active = true
-    ;(async () => {
+    let active = true;
+    (async () => {
       try {
         console.log('[VTO][Mobile] Render requested', {
           requestId,
           itemIds: selectedItemIds,
-          mode: mode || 'closet',
-        })
+          mode: mode ?? 'closet',
+        });
 
         if (mode === 'quick') {
-          const bodyScanResponse = await client.get('/api/users/body-scan')
-          const hasBodyScan = bodyScanResponse.data?.data?.exists
+          const bodyScanResponse = await client.get('/api/users/body-scan');
+          const hasBodyScan = bodyScanResponse.data?.data?.exists;
 
           if (!hasBodyScan) {
             console.log('[VTO][Mobile] Missing body scan, redirecting to onboarding', {
               requestId,
               itemIds: selectedItemIds,
-            })
+            });
             if (active) {
               router.replace({
                 pathname: '/vto/body-scan',
@@ -126,15 +121,15 @@ export default function VtoRenderScreen() {
                     : { itemIds: JSON.stringify(selectedItemIds) }),
                   mode: 'quick',
                 },
-              })
+              });
             }
-            return
+            return;
           }
         }
 
         const itemRequests = Promise.all(
           selectedItemIds.map((itemId) => client.get(`/api/items/${itemId}`))
-        )
+        );
         const renderRequest =
           selectedItemIds.length > 1
             ? client.post(
@@ -146,15 +141,15 @@ export default function VtoRenderScreen() {
                 '/api/vto/try-on',
                 { itemId: selectedItemIds[0], requestId },
                 { timeout: 120000 }
-              )
+              );
 
-        const [itemResponses, tryOnResponse] = await Promise.all([itemRequests, renderRequest])
+        const [itemResponses, tryOnResponse] = await Promise.all([itemRequests, renderRequest]);
 
-        if (!active) return
+        if (!active) return;
         const loadedItems = itemResponses
           .map((response) => response.data?.data)
-          .filter(Boolean) as ItemPayload[]
-        const payload = tryOnResponse.data?.data || {}
+          .filter(Boolean) as ItemPayload[];
+        const payload = tryOnResponse.data?.data || {};
 
         console.log('[VTO][Mobile] Render response received', {
           requestId,
@@ -163,9 +158,9 @@ export default function VtoRenderScreen() {
           hasVtoImageUrl: Boolean(payload?.vtoImageUrl),
           isChainRender: Boolean(payload?.isChainRender),
           chainSteps: payload?.chainSteps || 1,
-        })
+        });
 
-        setItems(loadedItems)
+        setItems(loadedItems);
         setRenderResult({
           vtoImageUrl: payload?.vtoImageUrl || null,
           renderModel: payload?.renderModel || 'fashn-vton-1.5',
@@ -174,16 +169,16 @@ export default function VtoRenderScreen() {
           categoriesUsed: Array.isArray(payload?.categoriesUsed)
             ? payload.categoriesUsed.map((entry: unknown) => String(entry))
             : [],
-        })
+        });
       } catch (error: any) {
         const message =
-          error?.response?.data?.error || error?.message || 'Pokusaj ponovo za nekoliko trenutaka.'
+          error?.response?.data?.error || error?.message || 'Pokusaj ponovo za nekoliko trenutaka.';
         console.log('[VTO][Mobile] Render failed', {
           requestId,
           itemIds: selectedItemIds,
           message,
           status: error?.response?.status || null,
-        })
+        });
 
         if (active) {
           Alert.alert('Try-On nije uspeo', message, [
@@ -194,36 +189,36 @@ export default function VtoRenderScreen() {
                   router.replace({
                     pathname: '/items/[id]',
                     params: { id: selectedItemIds[0] },
-                  })
-                  return
+                  });
+                  return;
                 }
 
-                router.replace('/vto/select')
+                router.replace('/vto/select');
               },
             },
-          ])
+          ]);
         }
       } finally {
         if (active) {
           console.log('[VTO][Mobile] Render request finished', {
             requestId,
             itemIds: selectedItemIds,
-          })
-          setLoading(false)
+          });
+          setLoading(false);
         }
       }
-    })()
+    })();
 
     return () => {
-      active = false
-    }
-  }, [mode, requestId, router, selectedItemIds])
+      active = false;
+    };
+  }, [mode, requestId, router, selectedItemIds]);
 
   async function saveOutfit() {
-    if (!renderResult?.vtoImageUrl || selectedItemIds.length === 0) return
+    if (!renderResult?.vtoImageUrl || selectedItemIds.length === 0) return;
 
     try {
-      setSaving(true)
+      setSaving(true);
       await client.post('/api/vto/outfits', {
         name: outfitName.trim() || 'Untitled Outfit',
         itemIds: selectedItemIds,
@@ -232,20 +227,20 @@ export default function VtoRenderScreen() {
         isChainRender: renderResult.isChainRender,
         chainSteps: renderResult.chainSteps,
         categoriesUsed: renderResult.categoriesUsed,
-      })
+      });
 
-      Alert.alert('Sacuvano', 'Outfit je dodat u kolekciju.')
+      Alert.alert('Sacuvano', 'Outfit je dodat u kolekciju.');
       router.replace({
         pathname: '/vto/hub',
         params: { vtoImageUrl: renderResult.vtoImageUrl },
-      })
+      });
     } catch (error: any) {
       Alert.alert(
         'Ne mogu da sacuvam fit',
         error?.response?.data?.error || error?.message || 'Pokusaj ponovo.'
-      )
+      );
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
@@ -259,21 +254,32 @@ export default function VtoRenderScreen() {
         }
         showSpinner
       />
-    )
+    );
   }
 
   return (
     <ScrollView className="flex-1 bg-base-canvas" contentContainerStyle={{ paddingBottom: 48 }}>
       <View className="px-5 pb-8 pt-14">
+        <View className="mb-4 flex-row justify-end">
+          <TouchableOpacity
+            onPress={() =>
+              router.replace({
+                pathname: '/vto/hub',
+                params: { vtoImageUrl: renderResult?.vtoImageUrl ?? undefined },
+              })
+            }
+            className="h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
+          >
+            <Ionicons name="close" size={20} color={colors.inkDark} />
+          </TouchableOpacity>
+        </View>
         <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
           Digitalni snajder
         </Text>
-        <Text className="mt-2 font-display text-4xl text-ink-dark">
-          Try-On rezultat
-        </Text>
+        <Text className="mt-2 font-display text-4xl text-ink-dark">Try-On rezultat</Text>
 
         <RemoteImage
-          uri={renderResult?.vtoImageUrl || undefined}
+          uri={renderResult?.vtoImageUrl ?? undefined}
           className="mt-6 h-[560px] w-full rounded-[34px] bg-white"
         />
 
@@ -283,7 +289,8 @@ export default function VtoRenderScreen() {
           </Text>
           {renderResult?.isChainRender ? (
             <Text className="mt-2 font-sans text-sm leading-6 text-ink-dark/65">
-              Outfit je renderovan u {renderResult.chainSteps} koraka modelom {renderResult.renderModel}.
+              Outfit je renderovan u {renderResult.chainSteps} koraka modelom{' '}
+              {renderResult.renderModel}.
             </Text>
           ) : null}
 
@@ -291,7 +298,7 @@ export default function VtoRenderScreen() {
             {items.map((item) => (
               <View key={item._id} className="flex-row items-center">
                 <RemoteImage
-                  uri={getPrimaryItemImage(item) || undefined}
+                  uri={getPrimaryItemImage(item) ?? undefined}
                   className="h-24 w-20 rounded-[20px]"
                 />
                 <View className="ml-3 flex-1">
@@ -332,17 +339,15 @@ export default function VtoRenderScreen() {
             onPress={() =>
               router.replace({
                 pathname: '/vto/hub',
-                params: { vtoImageUrl: renderResult?.vtoImageUrl || undefined },
+                params: { vtoImageUrl: renderResult?.vtoImageUrl ?? undefined },
               })
             }
             className="mt-3 items-center rounded-full border border-brand-accent-deep/15 bg-base-canvas px-4 py-4"
           >
-            <Text className="font-sans text-base font-semibold text-ink-dark">
-              Otvori hub
-            </Text>
+            <Text className="font-sans text-base font-semibold text-ink-dark">Otvori hub</Text>
           </TouchableOpacity>
         </View>
       </View>
     </ScrollView>
-  )
+  );
 }

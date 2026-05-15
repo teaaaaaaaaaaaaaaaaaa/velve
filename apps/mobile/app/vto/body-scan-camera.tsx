@@ -1,47 +1,50 @@
-import { Ionicons } from '@expo/vector-icons'
-import { Alert } from '@/lib/velveAlert'
-import * as ImagePicker from 'expo-image-picker'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useState } from 'react'
-import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native';
 
-import { colors } from '@/design/tokens'
-import { uploadBodyScanUri } from '@/lib/imageRequests'
+import { colors } from '@/design/tokens';
+import { uploadBodyScanUri } from '@/lib/imageRequests';
+import { Alert } from '@/lib/velveAlert';
 
 type BodyScanRouteParams = {
-  returnTo?: string | string[]
-  itemId?: string | string[]
-  itemIds?: string | string[]
-  mode?: string | string[]
-}
+  returnTo?: string | string[];
+  itemId?: string | string[];
+  itemIds?: string | string[];
+  mode?: string | string[];
+};
 
 function normalizeParam(value?: string | string[]) {
   if (Array.isArray(value)) {
-    return value[0]
+    return value[0];
   }
 
-  return value
+  return value;
 }
 
 export default function BodyScanCameraScreen() {
-  const router = useRouter()
-  const params = useLocalSearchParams<BodyScanRouteParams>()
-  const [photoUri, setPhotoUri] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [pickingSource, setPickingSource] = useState<'camera' | 'library' | null>(null)
+  const router = useRouter();
+  const params = useLocalSearchParams<BodyScanRouteParams>();
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [pickingSource, setPickingSource] = useState<'camera' | 'library' | null>(null);
 
-  const returnTo = normalizeParam(params.returnTo)
-  const itemId = normalizeParam(params.itemId)
-  const itemIds = normalizeParam(params.itemIds)
-  const mode = normalizeParam(params.mode)
+  const returnTo = normalizeParam(params.returnTo);
+  const itemId = normalizeParam(params.itemId);
+  const itemIds = normalizeParam(params.itemIds);
+  const mode = normalizeParam(params.mode);
 
   async function openCamera() {
     try {
-      setPickingSource('camera')
-      const permission = await ImagePicker.requestCameraPermissionsAsync()
+      setPickingSource('camera');
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Kamera nije dozvoljena', 'Dozvoli kameru da bi napravio body scan fotografiju.')
-        return
+        Alert.alert(
+          'Kamera nije dozvoljena',
+          'Dozvoli kameru da bi napravio body scan fotografiju.'
+        );
+        return;
       }
 
       const result = await ImagePicker.launchCameraAsync({
@@ -50,25 +53,28 @@ export default function BodyScanCameraScreen() {
         quality: 0.9,
         exif: false,
         cameraType: ImagePicker.CameraType.front,
-      })
+      });
 
       if (!result.canceled && result.assets?.[0]?.uri) {
-        setPhotoUri(result.assets[0].uri)
+        setPhotoUri(result.assets[0].uri);
       }
     } catch (error: any) {
-      Alert.alert('Kamera nije otvorena', error?.message || 'Pokusaj ponovo.')
+      Alert.alert('Kamera nije otvorena', error?.message || 'Pokusaj ponovo.');
     } finally {
-      setPickingSource(null)
+      setPickingSource(null);
     }
   }
 
   async function openLibrary() {
     try {
-      setPickingSource('library')
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      setPickingSource('library');
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Galerija nije dozvoljena', 'Dozvoli pristup fotografijama ili snimi novu fotografiju kamerom.')
-        return
+        Alert.alert(
+          'Galerija nije dozvoljena',
+          'Dozvoli pristup fotografijama ili snimi novu fotografiju kamerom.'
+        );
+        return;
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -76,24 +82,24 @@ export default function BodyScanCameraScreen() {
         allowsEditing: false,
         quality: 0.9,
         exif: false,
-      })
+      });
 
       if (!result.canceled && result.assets?.[0]?.uri) {
-        setPhotoUri(result.assets[0].uri)
+        setPhotoUri(result.assets[0].uri);
       }
     } catch (error: any) {
-      Alert.alert('Fotografija nije izabrana', error?.message || 'Pokusaj ponovo.')
+      Alert.alert('Fotografija nije izabrana', error?.message || 'Pokusaj ponovo.');
     } finally {
-      setPickingSource(null)
+      setPickingSource(null);
     }
   }
 
   async function saveBodyScan() {
-    if (!photoUri) return
+    if (!photoUri) return;
 
     try {
-      setSaving(true)
-      await uploadBodyScanUri(photoUri)
+      setSaving(true);
+      await uploadBodyScanUri(photoUri);
       router.replace({
         pathname: '/vto/body-scan-ready',
         params: {
@@ -102,16 +108,16 @@ export default function BodyScanCameraScreen() {
           ...(itemIds ? { itemIds } : {}),
           ...(mode ? { mode } : {}),
         },
-      })
+      });
     } catch (error: any) {
       Alert.alert(
         'Body scan nije sacuvan',
         error?.response?.data?.error ||
           error?.message ||
           'Pokusaj ponovo sa jasnijom fotografijom celog tela.'
-      )
+      );
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
@@ -127,7 +133,7 @@ export default function BodyScanCameraScreen() {
       <Text className="mt-8 font-display text-4xl text-ink-dark">Body scan fotografija</Text>
       <Text className="mt-3 font-sans text-sm leading-6 text-ink-dark/65">
         Snimi ili izaberi jednu fotografiju celog tela. Bez automatskog cekanja: pogledas preview,
-        ponovis ako treba, pa sacuvas.
+        ponovis ako treba, pa sacuvas. Kada je upload gotov, pozadina se automatski cisti.
       </Text>
 
       <View className="mt-6 flex-1 overflow-hidden rounded-[28px] bg-surface-panel">
@@ -199,5 +205,5 @@ export default function BodyScanCameraScreen() {
         </View>
       )}
     </View>
-  )
+  );
 }
