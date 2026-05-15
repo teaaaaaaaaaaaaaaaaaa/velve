@@ -4,6 +4,10 @@ const userSchema = new mongoose.Schema(
   {
     firebaseUid: { type: String, required: true, unique: true },
     email: { type: String, required: true },
+    role: { type: String, enum: ['user', 'moderator', 'admin'], default: 'user' },
+    accountStatus: { type: String, enum: ['active', 'suspended'], default: 'active' },
+    suspendedAt: { type: Date },
+    suspendedReason: { type: String, maxlength: 300 },
     displayName: { type: String, default: '' },
     photoURL: { type: String, default: '' },
     bio: { type: String, default: '' },
@@ -45,6 +49,8 @@ const userSchema = new mongoose.Schema(
 
 // Indexes
 userSchema.index({ email: 1 })
+userSchema.index({ role: 1 })
+userSchema.index({ accountStatus: 1 })
 userSchema.index({ averageRating: -1 }) // For sorting by rating
 userSchema.index({ phone: 1 })
 

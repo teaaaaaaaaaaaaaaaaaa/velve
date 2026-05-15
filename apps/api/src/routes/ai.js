@@ -1,6 +1,9 @@
 const express = require('express')
 const { requireAuth } = require('../middleware/auth')
 const { imageUpload } = require('../lib/uploadMiddleware')
+const { getInternalAiHeaders } = require('../lib/aiClient')
+const { validateAndNormalizeImage } = require('../lib/uploadSecurity')
+const { assertR2PublicUrlWithPrefix } = require('../lib/imageSecurity')
 
 const router = express.Router()
 
@@ -11,15 +14,17 @@ async function forwardImageToAi(endpoint, file) {
     throw new Error('Image file is required')
   }
 
+  const normalizedImage = await validateAndNormalizeImage(file, { forceJpeg: true })
   const formData = new FormData()
   formData.append(
     'file',
-    new Blob([file.buffer], { type: file.mimetype }),
-    file.originalname || 'image.jpg'
+    new Blob([normalizedImage.buffer], { type: normalizedImage.contentType }),
+    `image.${normalizedImage.extension}`
   )
 
   const response = await fetch(`${AI_SERVER_URL}${endpoint}`, {
     method: 'POST',
+    headers: getInternalAiHeaders(),
     body: formData,
   })
 
@@ -44,10 +49,21 @@ router.post('/generate-description', requireAuth, async (req, res) => {
     if (!category) {
       return res.status(400).json({ error: 'category is required' })
     }
+    if (image_url) {
+      try {
+        assertR2PublicUrlWithPrefix(
+          image_url,
+          `items/${req.dbUser._id}`,
+          'image_url must be an image uploaded by the current user'
+        )
+      } catch (error) {
+        return res.status(error.statusCode || 400).json({ error: error.message })
+      }
+    }
 
     const response = await fetch(`${AI_SERVER_URL}/generate-description`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getInternalAiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ category, size, brand, condition, color, language: language || 'sr', image_url: image_url || '' }),
     })
 

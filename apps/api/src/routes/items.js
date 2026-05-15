@@ -16,7 +16,9 @@ const { sendPushToUser } = require('../lib/pushNotifications')
 const { getBlockedUserIds, getHiddenItemIds } = require('../lib/discovery')
 const { getPrimaryImage, withPrimaryImage } = require('../lib/itemPresentation')
 const { createItemCleanKey, uploadBuffer } = require('../lib/r2')
-const { AI_SERVER_URL, generateEmbedding, addEmbeddingToIndex } = require('../lib/aiClient')
+const { AI_SERVER_URL, generateEmbedding, addEmbeddingToIndex, getInternalAiHeaders } = require('../lib/aiClient')
+const { assertR2PublicUrlWithPrefix, filterOwnedItemImageUrls } = require('../lib/imageSecurity')
+const { assertCanInteract } = require('../lib/interactions')
 
 const OWNER_ACTIVE_STATUSES = ['available', 'pending_trade', 'unavailable']
 const OWNER_DRAFT_STATUSES = ['draft']
@@ -755,12 +757,22 @@ router.post('/:id/digitize', requireAuth, async (req, res) => {
     if (!imageOriginal) {
       return res.status(400).json({ error: 'Item must have at least one original image' })
     }
+    try {
+      assertR2PublicUrlWithPrefix(
+        imageOriginal,
+        `items/${req.dbUser._id}`,
+        'Item image must be uploaded by the current user'
+      )
+    } catch (error) {
+      return res.status(error.statusCode || 400).json({ error: error.message })
+    }
 
     const formData = new FormData()
     formData.append('image_url', imageOriginal)
 
     const aiResponse = await fetch(`${AI_SERVER_URL}/remove-background`, {
       method: 'POST',
+      headers: getInternalAiHeaders(),
       body: formData,
     })
 
@@ -907,7 +919,12 @@ router.post('/', requireAuth, async (req, res) => {
       }
     }
 
-    const imageList = Array.isArray(images) ? images.filter((u) => typeof u === 'string').slice(0, 5) : []
+    let imageList
+    try {
+      imageList = filterOwnedItemImageUrls(images, req.dbUser._id)
+    } catch (error) {
+      return res.status(error.statusCode || 400).json({ error: error.message })
+    }
     const sortOrder = await getNextSortOrder(req.dbUser._id)
 
     const itemData = {
@@ -1004,6 +1021,8 @@ router.post('/:id/report', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'You cannot report your own item' })
     }
 
+    await assertCanInteract(req.dbUser._id, item.userId, 'You cannot report this item')
+
     const reason = String(req.body.reason || '').trim().slice(0, 100)
     if (!reason) {
       return res.status(400).json({ error: 'reason is required' })
@@ -1055,7 +1074,7 @@ router.get('/:id/similar', maybeAuth, async (req, res) => {
     try {
       const response = await fetch(`${AI_SERVER_URL}/similar`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getInternalAiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ embedding: normalizedEmbedding, top_k: topK, exclude_id: req.params.id }),
       })
 
@@ -1141,9 +1160,11 @@ router.put('/:id', requireAuth, async (req, res) => {
     }
 
     if (req.body.images !== undefined) {
-      updates.images = Array.isArray(req.body.images)
-        ? req.body.images.filter((u) => typeof u === 'string').slice(0, 5)
-        : []
+      try {
+        updates.images = filterOwnedItemImageUrls(req.body.images, req.dbUser._id)
+      } catch (error) {
+        return res.status(error.statusCode || 400).json({ error: error.message })
+      }
       updates.imageClean = null
       updates.isDigitized = false
       updates.digitizedAt = null

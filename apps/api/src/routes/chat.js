@@ -5,9 +5,11 @@ const { requireAuth } = require('../middleware/auth')
 const Chat = require('../models/Chat')
 const Message = require('../models/Message')
 const Item = require('../models/Item')
+const User = require('../models/User')
 const { getPrimaryImage } = require('../lib/itemPresentation')
 const { createChatMessage, markChatRead } = require('../lib/chatMessages')
 const { messageLimiter } = require('../middleware/rateLimit')
+const { assertCanInteract } = require('../lib/interactions')
 
 async function enrichTradeImages(messages = []) {
   const itemIds = new Set()
@@ -112,6 +114,13 @@ router.post('/direct/:userId', requireAuth, async (req, res) => {
     if (req.params.userId === req.dbUser._id.toString()) {
       return res.status(400).json({ error: 'Cannot chat with yourself' })
     }
+
+    const targetUser = await User.findById(req.params.userId).select('_id').lean()
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    await assertCanInteract(req.dbUser._id, req.params.userId, 'You cannot chat with this user')
 
     const existing = await Chat.findOne({
       participants: { $all: [req.dbUser._id, req.params.userId], $size: 2 },

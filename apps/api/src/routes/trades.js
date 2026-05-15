@@ -9,6 +9,7 @@ const Message = require('../models/Message')
 const { sendPushToUser } = require('../lib/pushNotifications')
 const { getPrimaryImage } = require('../lib/itemPresentation')
 const { createNotification } = require('../lib/notifications')
+const { assertCanInteract } = require('../lib/interactions')
 
 const TRADE_EXPIRY_HOURS = Math.max(Number(process.env.TRADE_EXPIRY_HOURS) || 72, 1)
 const FINAL_ITEM_STATUSES = new Set(['sold', 'swapped', 'archived', 'traded'])
@@ -355,6 +356,8 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Cannot trade with yourself' })
     }
 
+    await assertCanInteract(req.dbUser._id, requestedItem.userId, 'You cannot trade with this user')
+
     if (requestedItem.status !== 'available') {
       return res.status(400).json({ error: 'Requested item is not currently available' })
     }
@@ -551,12 +554,56 @@ router.put('/:id', requireAuth, async (req, res) => {
       }
     }
 
+    const lockedItemIds = []
+    if (status === 'accepted') {
+      const requestedLock = await Item.updateOne(
+        { _id: trade.requestedItemId, status: 'available', isDeleted: false },
+        { $set: { status: 'pending_trade', unavailableReason: '' } }
+      )
+
+      if (requestedLock.modifiedCount !== 1) {
+        return res.status(409).json({ error: 'Requested item is no longer available' })
+      }
+      lockedItemIds.push(trade.requestedItemId)
+
+      if (offeredItem) {
+        const offeredLock = await Item.updateOne(
+          {
+            _id: trade.offeredItemId,
+            userId: trade.senderId,
+            status: 'available',
+            isDeleted: false,
+          },
+          { $set: { status: 'pending_trade', unavailableReason: '' } }
+        )
+
+        if (offeredLock.modifiedCount !== 1) {
+          await Item.updateOne(
+            { _id: trade.requestedItemId, status: 'pending_trade' },
+            { $set: { status: 'available' } }
+          )
+          return res.status(409).json({ error: 'Offered item is no longer available' })
+        }
+        lockedItemIds.push(trade.offeredItemId)
+      }
+    }
+
     trade.status = status
     trade.respondedAt = new Date()
     if (status === 'accepted') {
       trade.acceptedAt = new Date()
     }
-    await trade.save()
+    try {
+      await trade.save()
+    } catch (error) {
+      if (lockedItemIds.length > 0) {
+        await Item.updateMany(
+          { _id: { $in: lockedItemIds }, status: 'pending_trade' },
+          { $set: { status: 'available' } }
+        )
+      }
+      throw error
+    }
 
     if (status === 'accepted') {
       await syncItemTradeAvailability([trade.requestedItemId, trade.offeredItemId])

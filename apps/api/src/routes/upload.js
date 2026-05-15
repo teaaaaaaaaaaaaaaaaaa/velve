@@ -3,13 +3,17 @@ const { requireAuth } = require('../middleware/auth')
 const { uploadLimiter } = require('../middleware/rateLimit')
 const { imageUpload } = require('../lib/uploadMiddleware')
 const { createUserUploadKey, deleteObject, uploadBuffer } = require('../lib/r2')
+const { validateAndNormalizeImage } = require('../lib/uploadSecurity')
 
 const router = express.Router()
 
 async function moderateImage(imageUrl) {
   if (!process.env.SIGHTENGINE_USER || !process.env.SIGHTENGINE_SECRET) {
-    console.log('[Moderation] Skipping - no Sightengine credentials configured')
-    return { safe: true, details: null }
+    if (process.env.NODE_ENV === 'production') {
+      return { safe: false, details: 'Image moderation is not configured' }
+    }
+    console.log('[Moderation] Skipping in development - no Sightengine credentials configured')
+    return { safe: true, details: 'skipped_development' }
   }
 
   try {
@@ -33,7 +37,10 @@ async function moderateImage(imageUrl) {
     return { safe: isSafe, details: data }
   } catch (err) {
     console.error('[Moderation] Failed:', err.message)
-    return { safe: true, details: null }
+    if (process.env.NODE_ENV === 'production') {
+      return { safe: false, details: 'Image moderation unavailable' }
+    }
+    return { safe: true, details: 'moderation_failed_development' }
   }
 }
 
@@ -43,11 +50,12 @@ router.post('/', uploadLimiter, requireAuth, imageUpload.single('image'), async 
       return res.status(400).json({ error: 'No image file provided' })
     }
 
-    const key = createUserUploadKey(req.dbUser._id, req.file.originalname)
+    const normalizedImage = await validateAndNormalizeImage(req.file, { forceJpeg: true })
+    const key = createUserUploadKey(req.dbUser._id, `upload.${normalizedImage.extension}`)
     const uploadResult = await uploadBuffer({
       key,
-      buffer: req.file.buffer,
-      contentType: req.file.mimetype,
+      buffer: normalizedImage.buffer,
+      contentType: normalizedImage.contentType,
     })
 
     const moderation = await moderateImage(uploadResult.url)

@@ -5,6 +5,7 @@ const { requireAuth } = require('../middleware/auth')
 const Follow = require('../models/Follow')
 const User = require('../models/User')
 const { createNotification } = require('../lib/notifications')
+const { assertCanInteract } = require('../lib/interactions')
 
 // POST /api/users/:id/follow — prati korisnika (idempotent)
 router.post('/:id/follow', requireAuth, async (req, res) => {
@@ -21,6 +22,8 @@ router.post('/:id/follow', requireAuth, async (req, res) => {
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found' })
     }
+
+    await assertCanInteract(req.dbUser._id, req.params.id, 'You cannot follow this user')
 
     const existingFollow = await Follow.exists({
       followerId: req.dbUser._id,

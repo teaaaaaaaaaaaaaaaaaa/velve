@@ -16,7 +16,7 @@ Tab je sakriven (`href: null`) ali fajl `trades.tsx` još uvek postoji sa "Trade
 
 ---
 
-### 3.2 Propozal bez sopstvenih artikala — dead end ❌ NOT DONE
+### 3.2 Propozal bez sopstvenih artikala — dead end ❌ NOT DONE xxx
 Korisnik otvori trade modal, tip je odabran, ali lista artikala je prazna. Nema CTA koji vodi na upload.
 
 **Fix:** "Dodaj artikal" dugme u praznom stanju trade modala → `router.push('/upload-flow')` sa `dismissAll`.
@@ -56,30 +56,31 @@ Skeleton loaderi za Feed, Profile, Chat postoje. Ali Item detalj, Closet, VTO Hu
 
 ---
 
-### 4.2 Error handling - standardizovan DONE
-VelveFeedbackProvider renderuje jedinstvene Velve confirmation modale i 2s toast notifikacije. API client vise ne prikazuje globalne network alertove; ekrani hvataju network/API greske inline gde tok ima Retry.
+### 4.2 Error handling — Alert vs inline vs tiho ⚠️ PARTIAL
+Alerts za destruktivne akcije postoje. Toast notifikacije i granularno rukovanje tipovima grešaka nije konzistentno.
 
 **Standard:**
 
-| Tip greske | Pattern |
+| Tip greške | Pattern |
 |---|---|
-| Destruktivna akcija (brisanje, blokiranje) | Velve confirmation modal sa potvrdom |
+| Destruktivna akcija (brisanje, blokiranje) | Alert.alert() sa potvrdom |
 | Mutacija podataka (edit, status promena) | Toast notifikacija (2s) |
-| Form validacija | Inline greska ispod fielda |
-| Network/API greska | Inline na ekranu sa Retry dugmetom |
-| Kriticna greska (auth) | Full-page error sa logout opcijom |
+| Form validacija | Inline greška ispod fielda |
+| Network/API greška | Inline na ekranu sa Retry dugmetom |
+| Kritična greška (auth) | Full-page error sa logout opcijom |
 
 ---
 
-### 4.3 Confirmations - standardizovane DONE
-**Pokriveno:** Accept trade, Reject trade, Delete draft, Cancel trade, Complete trade, Logout, Block user, Report item, Remove from wishlist, Delete chat, Publish item.
+### 4.3 Confirmations — nedosledni ⚠️ PARTIAL
+**Ima potvrde:** Accept trade, Reject trade, Delete draft, Cancel trade, Complete trade, Logout, Block user, Report item  
+**Nema potvrde:** Remove from wishlist, Delete chat, Publish item
 
-**Fix:** Sve destruktivne ili nepovratne akcije imaju Velve confirmation modal.
+**Fix:** Sve destruktivne ili nepovratne akcije treba da imaju potvrdu.
 
 ---
 
-### 4.4 Disabled stanja - standardizovana DONE
-Disabled CTA elementi koriste `opacity-40` / `0.4` kao jedinstveni standard.
+### 4.4 Disabled stanja — različite opacity vrednosti ❌ NOT DONE
+`opacity-35`, `opacity-45`, `opacity-50` se koriste naizmenično.
 
 **Fix:** Standardizovati na `opacity-40` za sve disabled elemente.
 
