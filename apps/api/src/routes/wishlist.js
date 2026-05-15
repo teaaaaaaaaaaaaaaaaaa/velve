@@ -8,6 +8,7 @@ const { enrichItems } = require('../lib/enrichItems')
 const { getPrimaryImage, withPrimaryImage } = require('../lib/itemPresentation')
 const { sendPushToUser } = require('../lib/pushNotifications')
 const { createNotification } = require('../lib/notifications')
+const { assertCanInteract } = require('../lib/interactions')
 
 // POST /api/wishlist/:itemId — Add item to wishlist (idempotent)
 router.post('/:itemId', requireAuth, async (req, res) => {
@@ -30,6 +31,8 @@ router.post('/:itemId', requireAuth, async (req, res) => {
     if (item.userId.equals(req.dbUser._id)) {
       return res.status(400).json({ error: 'Cannot wishlist your own item' })
     }
+
+    await assertCanInteract(req.dbUser._id, item.userId, 'You cannot wishlist this item')
 
     // Upsert - creates if doesn't exist, does nothing if already exists
     const existingWishlist = await Wishlist.exists({

@@ -1,5 +1,6 @@
 const admin = require('firebase-admin')
 const User = require('../models/User')
+const { hasAdminRole, isBootstrapAdmin } = require('../lib/admin')
 
 // Initialize Firebase Admin SDK once
 if (!admin.apps.length) {
@@ -33,11 +34,13 @@ async function attachUserFromToken(token, req) {
   req.user = decoded
 
   let dbUser = await User.findOne({ firebaseUid: decoded.uid })
+  const bootstrapRole = isBootstrapAdmin(decoded) ? 'admin' : null
   if (!dbUser) {
     const emailPrefix = (decoded.email || '').split('@')[0]
     dbUser = await User.create({
       firebaseUid: decoded.uid,
       email: decoded.email || '',
+      role: bootstrapRole || 'user',
       displayName: decoded.name || emailPrefix || 'Korisnik',
       photoURL: decoded.picture || '',
     })
@@ -50,9 +53,14 @@ async function attachUserFromToken(token, req) {
     const emailPrefix = (dbUser.email || '').split('@')[0]
     dbUser = await User.findByIdAndUpdate(
       dbUser._id,
-      { displayName: emailPrefix || 'Korisnik' },
+      {
+        displayName: emailPrefix || 'Korisnik',
+        ...(bootstrapRole && dbUser.role !== 'admin' ? { role: bootstrapRole } : {}),
+      },
       { new: true }
     )
+  } else if (bootstrapRole && dbUser.role !== 'admin') {
+    dbUser = await User.findByIdAndUpdate(dbUser._id, { role: bootstrapRole }, { new: true })
   }
 
   req.dbUser = dbUser
@@ -73,6 +81,9 @@ async function requireAuth(req, res, next) {
   const token = authHeader.split('Bearer ')[1]
   try {
     await attachUserFromToken(token, req)
+    if (req.dbUser?.accountStatus === 'suspended') {
+      return res.status(403).json({ error: 'Account suspended' })
+    }
     next()
   } catch (err) {
     console.error(`[AuthMiddleware] Invalid token for ${req.method} ${req.originalUrl}:`, {
@@ -81,6 +92,15 @@ async function requireAuth(req, res, next) {
     })
     return res.status(401).json({ error: 'Invalid or expired token' })
   }
+}
+
+async function requireAdmin(req, res, next) {
+  return requireAuth(req, res, () => {
+    if (!hasAdminRole(req.dbUser)) {
+      return res.status(403).json({ error: 'Admin access required' })
+    }
+    next()
+  })
 }
 
 async function maybeAuth(req, _res, next) {
@@ -99,4 +119,4 @@ async function maybeAuth(req, _res, next) {
   next()
 }
 
-module.exports = { requireAuth, maybeAuth }
+module.exports = { requireAdmin, requireAuth, maybeAuth }

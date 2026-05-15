@@ -4,7 +4,9 @@ import io
 import json
 import os
 import pickle
+import ipaddress
 import string
+import socket
 import threading
 import time
 import uuid
@@ -17,9 +19,9 @@ import ftfy
 import numpy as np
 import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from PIL import Image, ImageOps
 from pydantic import BaseModel, Field
 
@@ -33,7 +35,7 @@ app = FastAPI(title="Velve AI Server")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://velveapp.com", "https://www.velveapp.com"],
+    allow_origins=["https://velve.app", "https://velveapp.com", "https://www.velveapp.com"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -55,6 +57,17 @@ VALID_VTO_GARMENT_CATEGORIES = {"tops", "bottoms", "one-pieces"}
 IMAGE_FETCH_HEADERS = {
     "User-Agent": "VelveAI/1.0 (+https://velve.app)",
     "Accept": "image/*,*/*;q=0.8",
+}
+AI_INTERNAL_API_KEY = os.getenv("AI_INTERNAL_API_KEY", "").strip()
+MAX_REMOTE_IMAGE_BYTES = int(os.getenv("MAX_REMOTE_IMAGE_BYTES", str(10 * 1024 * 1024)))
+_allowed_origin_candidates = [
+    os.getenv("R2_PUBLIC_URL", "").strip(),
+    *[entry.strip() for entry in os.getenv("AI_ALLOWED_IMAGE_ORIGINS", "").split(",") if entry.strip()],
+]
+AI_ALLOWED_IMAGE_ORIGINS = {
+    f"{urlparse(origin).scheme}://{urlparse(origin).netloc}".rstrip("/")
+    for origin in _allowed_origin_candidates
+    if urlparse(origin).scheme and urlparse(origin).netloc
 }
 
 FAISS_INDEX_PATH = "data/faiss_index.bin"
@@ -81,6 +94,27 @@ faiss_id_to_pos: dict[str, int] = {}
 faiss_lock = threading.Lock()
 
 
+@app.middleware("http")
+async def require_internal_api_key(request: Request, call_next):
+    public_paths = {"/ping", "/docs", "/redoc", "/openapi.json"}
+    if request.url.path in public_paths:
+        return await call_next(request)
+
+    if not AI_INTERNAL_API_KEY:
+        if os.getenv("NODE_ENV", "development") == "production":
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "AI internal auth is not configured"},
+            )
+        return await call_next(request)
+
+    provided = request.headers.get("x-internal-ai-key", "")
+    if provided != AI_INTERNAL_API_KEY:
+        return JSONResponse(status_code=401, content={"detail": "Invalid internal AI key"})
+
+    return await call_next(request)
+
+
 def _basic_clean(text: str) -> str:
     text = ftfy.fix_text(text)
     text = html.unescape(html.unescape(text))
@@ -97,6 +131,52 @@ def _canonicalize_text(text: str) -> str:
 
 def _clean_embedding_text(text: str) -> str:
     return _canonicalize_text(_basic_clean(text))
+
+
+def _is_public_host(hostname: str) -> bool:
+    if not hostname:
+        return False
+
+    lowered = hostname.lower()
+    if lowered in {"localhost", "metadata.google.internal"} or lowered.endswith(".local"):
+        return False
+
+    try:
+        addresses = socket.getaddrinfo(hostname, None)
+    except Exception:
+        return False
+
+    for address in addresses:
+        ip_value = address[4][0]
+        try:
+            ip_address = ipaddress.ip_address(ip_value)
+        except ValueError:
+            return False
+
+        if (
+            ip_address.is_private
+            or ip_address.is_loopback
+            or ip_address.is_link_local
+            or ip_address.is_multicast
+            or ip_address.is_reserved
+            or ip_address.is_unspecified
+        ):
+            return False
+
+    return True
+
+
+def validate_remote_image_url(image_url: str) -> None:
+    parsed = urlparse(str(image_url or ""))
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise HTTPException(status_code=400, detail="Invalid image URL")
+
+    origin = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+    if AI_ALLOWED_IMAGE_ORIGINS and origin not in AI_ALLOWED_IMAGE_ORIGINS:
+        raise HTTPException(status_code=400, detail="Image URL origin is not allowed")
+
+    if not _is_public_host(parsed.hostname or ""):
+        raise HTTPException(status_code=400, detail="Image URL host is not allowed")
 
 
 def _pick_ollama_model_from_tags() -> str:
@@ -389,10 +469,37 @@ def save_faiss_index():
 
 
 def fetch_image_bytes(image_url: str) -> bytes:
+    validate_remote_image_url(image_url)
     try:
-        response = requests.get(image_url, timeout=20, headers=IMAGE_FETCH_HEADERS)
+        response = requests.get(
+            image_url,
+            timeout=(3, 20),
+            headers=IMAGE_FETCH_HEADERS,
+            stream=True,
+            allow_redirects=False,
+        )
         response.raise_for_status()
-        return response.content
+        content_type = response.headers.get("content-type", "")
+        if not content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Remote URL did not return an image")
+
+        content_length = response.headers.get("content-length")
+        if content_length and int(content_length) > MAX_REMOTE_IMAGE_BYTES:
+            raise HTTPException(status_code=400, detail="Remote image is too large")
+
+        chunks = []
+        total = 0
+        for chunk in response.iter_content(chunk_size=64 * 1024):
+            if not chunk:
+                continue
+            total += len(chunk)
+            if total > MAX_REMOTE_IMAGE_BYTES:
+                raise HTTPException(status_code=400, detail="Remote image is too large")
+            chunks.append(chunk)
+
+        return b"".join(chunks)
+    except HTTPException:
+        raise
     except Exception as error:
         raise HTTPException(status_code=400, detail=f"Cannot fetch image: {str(error)}")
 
@@ -422,6 +529,8 @@ async def load_image_payload(
 ) -> tuple[Image.Image, bytes]:
     if file is not None:
         image_bytes = await file.read()
+        if len(image_bytes) > MAX_REMOTE_IMAGE_BYTES:
+            raise HTTPException(status_code=400, detail="Uploaded image is too large")
     elif image_url:
         image_bytes = fetch_image_bytes(image_url)
     elif image_base64:
@@ -655,6 +764,7 @@ def normalize_clean_cut_output(image_bytes: bytes) -> bytes:
 
 
 def require_clean_garment_url(garment_image_url: str):
+    validate_remote_image_url(garment_image_url)
     path = urlparse(garment_image_url).path
     basename = os.path.basename(path or "")
     if not basename.startswith("clean_") or not basename.lower().endswith(".png"):
@@ -1392,8 +1502,9 @@ def virtual_try_on(req: VirtualTryOnRequest):
                 "garmentCategory": garment_category,
             },
         )
+        validate_remote_image_url(req.personImageUrl)
         require_clean_garment_url(req.garmentImageUrl)
-        print(f"[VTO][AI][{request_id}] Garment URL validated")
+        print(f"[VTO][AI][{request_id}] Image URLs validated")
 
         payload = {
             "personImageUrl": req.personImageUrl,

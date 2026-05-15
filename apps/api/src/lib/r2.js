@@ -67,15 +67,27 @@ async function deleteObject(key) {
 }
 
 async function fetchRemoteBuffer(url) {
-  const response = await fetch(url)
+  const response = await fetch(url, { signal: AbortSignal.timeout(30000) })
   if (!response.ok) {
     throw new Error(`Unable to fetch remote image (${response.status})`)
   }
+  const contentType = response.headers.get('content-type') || 'application/octet-stream'
+  if (!contentType.startsWith('image/')) {
+    throw new Error('Remote URL did not return an image')
+  }
+  const maxBytes = Number(process.env.MAX_REMOTE_IMAGE_BYTES || 10 * 1024 * 1024)
+  const contentLength = Number(response.headers.get('content-length') || 0)
+  if (contentLength > maxBytes) {
+    throw new Error('Remote image is too large')
+  }
 
   const arrayBuffer = await response.arrayBuffer()
+  if (arrayBuffer.byteLength > maxBytes) {
+    throw new Error('Remote image is too large')
+  }
   return {
     buffer: Buffer.from(arrayBuffer),
-    contentType: response.headers.get('content-type') || 'application/octet-stream',
+    contentType,
   }
 }
 
@@ -108,6 +120,7 @@ module.exports = {
   deleteObject,
   fetchRemoteBuffer,
   keyFromUrl,
+  normalizePublicBaseUrl,
   normalizeExtension,
   uploadBuffer,
 }

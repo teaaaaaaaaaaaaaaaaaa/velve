@@ -3,9 +3,11 @@ const http = require('http')
 const os = require('os')
 const express = require('express')
 const cors = require('cors')
+const helmet = require('helmet')
+const hpp = require('hpp')
 const mongoose = require('mongoose')
 const { apiLimiter } = require('./middleware/rateLimit')
-const { requireAuth } = require('./middleware/auth')
+const { requireAdmin } = require('./middleware/auth')
 const { initSentry, Sentry } = require('./config/sentry')
 const { initSocket } = require('./lib/socket')
 const { updateEngagementScores } = require('./lib/updateEngagementScores')
@@ -29,6 +31,7 @@ const wishlistRouter = require('./routes/wishlist')
 const vtoRouter = require('./routes/vto')
 const searchRouter = require('./routes/search')
 const notificationsRouter = require('./routes/notifications')
+const adminRouter = require('./routes/admin')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -53,18 +56,25 @@ app.use(Sentry.Handlers.requestHandler())
 app.use(Sentry.Handlers.tracingHandler())
 
 // Middleware - CORS configuration
+if (process.env.TRUST_PROXY) {
+  app.set('trust proxy', process.env.TRUST_PROXY)
+}
+
+app.use(helmet())
+app.use(hpp())
 app.use(
   cors({
     origin: [
       'exp://localhost:8081',
       'http://localhost:8081',
+      'https://velve.app',
       'https://velveapp.com',
       'https://www.velveapp.com',
     ],
     credentials: true,
   })
 )
-app.use(express.json())
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '1mb' }))
 app.use(apiLimiter)
 
 app.use((req, res, next) => {
@@ -127,7 +137,7 @@ app.get('/health', async (req, res) => {
 })
 
 // Manual trigger for engagement score update (admin only)
-app.post('/api/admin/update-scores', requireAuth, async (req, res) => {
+app.post('/api/admin/update-scores', requireAdmin, async (req, res) => {
   try {
     await updateEngagementScores()
     res.json({ ok: true, message: 'Engagement scores updated' })
@@ -137,7 +147,7 @@ app.post('/api/admin/update-scores', requireAuth, async (req, res) => {
 })
 
 // Manual trigger for embedding retry (admin only)
-app.post('/api/admin/retry-embeddings', requireAuth, async (req, res) => {
+app.post('/api/admin/retry-embeddings', requireAdmin, async (req, res) => {
   try {
     await retryMissingEmbeddings()
     res.json({ ok: true, message: 'Embedding retry completed' })
@@ -162,9 +172,33 @@ app.use('/api/wishlist', wishlistRouter)
 app.use('/api/vto', vtoRouter)
 app.use('/api/search', searchRouter)
 app.use('/api/notifications', notificationsRouter)
+app.use('/api/admin', adminRouter)
 
 // Sentry error handler (must be before other error middleware)
 app.use(Sentry.Handlers.errorHandler())
+
+app.use((err, req, res, _next) => {
+  const statusCode = err.statusCode || err.status || 500
+  const requestId = req.headers['x-request-id'] || ''
+  const isProduction = process.env.NODE_ENV === 'production'
+  const message =
+    statusCode >= 500 && isProduction
+      ? 'Internal server error'
+      : err.message || 'Internal server error'
+
+  console.error('[API] Unhandled error', {
+    method: req.method,
+    url: req.originalUrl,
+    statusCode,
+    requestId,
+    message: err.message,
+  })
+
+  res.status(statusCode).json({
+    error: message,
+    ...(requestId ? { requestId } : {}),
+  })
+})
 
 // Create HTTP server and attach socket.io
 const server = http.createServer(app)

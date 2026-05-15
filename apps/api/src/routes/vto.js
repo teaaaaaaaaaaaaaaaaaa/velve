@@ -5,8 +5,10 @@ const mongoose = require('mongoose')
 const { requireAuth } = require('../middleware/auth')
 const Item = require('../models/Item')
 const Outfit = require('../models/Outfit')
-const { createVtoKey, deleteObject, fetchRemoteBuffer, keyFromUrl, uploadBuffer } = require('../lib/r2')
+const { createVtoKey, deleteObject, fetchRemoteBuffer, uploadBuffer } = require('../lib/r2')
+const { assertR2PublicUrlWithPrefix } = require('../lib/imageSecurity')
 const { getPrimaryImage } = require('../lib/itemPresentation')
+const { getInternalAiHeaders } = require('../lib/aiClient')
 const {
   VALID_VTO_GARMENT_CATEGORIES,
   resolveGarmentCategoryWithFallback,
@@ -119,7 +121,7 @@ async function callAiTryOn({
   try {
     response = await fetch(`${AI_SERVER_URL}/virtual-try-on`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getInternalAiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         requestId,
         personImageUrl,
@@ -409,6 +411,15 @@ router.post('/outfits', requireAuth, async (req, res) => {
     if (!vtoImageUrl) {
       return res.status(400).json({ error: 'vtoImageUrl is required' })
     }
+    try {
+      assertR2PublicUrlWithPrefix(
+        vtoImageUrl,
+        `vto/${req.dbUser._id}`,
+        'vtoImageUrl must belong to the current user'
+      )
+    } catch (error) {
+      return res.status(error.statusCode || 400).json({ error: error.message })
+    }
     if (
       itemIds.length === 0 ||
       itemIds.length > MAX_OUTFIT_ITEMS ||
@@ -500,7 +511,12 @@ router.delete('/outfits/:id', requireAuth, async (req, res) => {
 
     if (outfit.vtoImageUrl) {
       try {
-        await deleteObject(keyFromUrl(outfit.vtoImageUrl))
+        const key = assertR2PublicUrlWithPrefix(
+          outfit.vtoImageUrl,
+          `vto/${req.dbUser._id}`,
+          'Outfit image does not belong to the current user'
+        )
+        await deleteObject(key)
       } catch (error) {
         console.warn('[VTO][API] Failed to delete outfit image from R2', {
           outfitId,

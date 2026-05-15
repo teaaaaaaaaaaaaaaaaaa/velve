@@ -8,6 +8,7 @@ const { enrichItems } = require('../lib/enrichItems')
 const { getPrimaryImage } = require('../lib/itemPresentation')
 const { sendPushToUser } = require('../lib/pushNotifications')
 const { createNotification } = require('../lib/notifications')
+const { assertCanInteract } = require('../lib/interactions')
 
 // GET /api/likes — lajkovani itemi trenutnog korisnika
 router.get('/', requireAuth, async (req, res) => {
@@ -57,6 +58,8 @@ router.post('/:id/like', requireAuth, async (req, res) => {
     if (String(item.userId) === String(req.dbUser._id)) {
       return res.status(400).json({ error: 'Cannot like your own item' })
     }
+
+    await assertCanInteract(req.dbUser._id, item.userId, 'You cannot like this item')
 
     const existingLike = await Like.exists({ userId: req.dbUser._id, itemId: req.params.id })
 

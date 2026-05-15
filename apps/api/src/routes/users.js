@@ -12,7 +12,11 @@ const TradeRequest = require('../models/TradeRequest')
 const ItemView = require('../models/ItemView')
 const { enrichItems } = require('../lib/enrichItems')
 const { imageUpload } = require('../lib/uploadMiddleware')
-const { createBodyScanKey, deleteObject, keyFromUrl, uploadBuffer } = require('../lib/r2')
+const { createBodyScanKey, deleteObject, uploadBuffer } = require('../lib/r2')
+const { getInternalAiHeaders } = require('../lib/aiClient')
+const { validateAndNormalizeImage } = require('../lib/uploadSecurity')
+const { assertCanInteract } = require('../lib/interactions')
+const { assertR2PublicUrlWithPrefix } = require('../lib/imageSecurity')
 const {
   getDiscoverySignals,
   getBehavioralAffinity,
@@ -281,6 +285,7 @@ async function analyzeBodyScanFile(file) {
 
   const response = await fetch(`${AI_SERVER_URL}/analyze-body-scan`, {
     method: 'POST',
+    headers: getInternalAiHeaders(),
     body: formData,
     signal: AbortSignal.timeout(BODY_SCAN_ANALYSIS_TIMEOUT_MS),
   })
@@ -597,9 +602,17 @@ router.post('/body-scan', requireAuth, imageUpload.single('image'), async (req, 
       return res.status(400).json({ error: 'image is required' })
     }
 
+    const normalizedImage = await validateAndNormalizeImage(req.file, { forceJpeg: true })
+    const normalizedFile = {
+      ...req.file,
+      buffer: normalizedImage.buffer,
+      mimetype: normalizedImage.contentType,
+      originalname: `body-scan.${normalizedImage.extension}`,
+    }
+
     let analysis = null
     try {
-      analysis = await analyzeBodyScanFile(req.file)
+      analysis = await analyzeBodyScanFile(normalizedFile)
     } catch (error) {
       console.warn('[Users/body-scan] Body scan analysis skipped', {
         userId: String(req.dbUser?._id || ''),
@@ -610,15 +623,28 @@ router.post('/body-scan', requireAuth, imageUpload.single('image'), async (req, 
     const key = createBodyScanKey(req.dbUser._id)
     const uploadResult = await uploadBuffer({
       key,
-      buffer: req.file.buffer,
-      contentType: req.file.mimetype,
+      buffer: normalizedImage.buffer,
+      contentType: normalizedImage.contentType,
     })
 
     const bodyScanCreatedAt = new Date()
+    const oldBodyScanUrl = req.dbUser.bodyScanUrl || ''
     await User.findByIdAndUpdate(req.dbUser._id, {
       bodyScanUrl: uploadResult.url,
       bodyScanCreatedAt,
     })
+
+    if (oldBodyScanUrl) {
+      try {
+        const oldKey = assertR2PublicUrlWithPrefix(oldBodyScanUrl, `users/${req.dbUser._id}`)
+        await deleteObject(oldKey)
+      } catch (error) {
+        console.warn('[Users/body-scan] Failed to delete replaced body scan file from R2', {
+          userId: String(req.dbUser?._id || ''),
+          message: error.message,
+        })
+      }
+    }
 
     res.status(201).json({
       ok: true,
@@ -642,7 +668,8 @@ router.delete('/body-scan', requireAuth, async (req, res) => {
 
     if (existingUrl) {
       try {
-        await deleteObject(keyFromUrl(existingUrl))
+        const existingKey = assertR2PublicUrlWithPrefix(existingUrl, `users/${req.dbUser._id}`)
+        await deleteObject(existingKey)
       } catch (error) {
         console.warn('[Users/body-scan] Failed to delete body scan file from R2', {
           userId: String(req.dbUser?._id || ''),
@@ -747,6 +774,8 @@ router.post('/:id/report', requireAuth, async (req, res) => {
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found' })
     }
+
+    await assertCanInteract(req.dbUser._id, req.params.id, 'You cannot report this user')
 
     const reason = String(req.body.reason || '').trim().slice(0, 100)
     if (!reason) {

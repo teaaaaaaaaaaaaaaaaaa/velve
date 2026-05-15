@@ -60,7 +60,7 @@ router.get('/visual', maybeAuth, async (req, res) => {
       .filter((id) => mongoose.Types.ObjectId.isValid(id))
       .map((id) => new mongoose.Types.ObjectId(id))
 
-    const currentUserId = req.user?._id
+    const currentUserId = req.dbUser?._id || null
     const [blockedUserIds, hiddenItemIds] = await Promise.all([
       getBlockedUserIds(currentUserId),
       getHiddenItemIds(currentUserId),

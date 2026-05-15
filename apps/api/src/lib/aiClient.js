@@ -24,6 +24,18 @@ function isRetryableError(err, status) {
   )
 }
 
+function getInternalAiHeaders(extraHeaders = {}) {
+  const internalKey = process.env.AI_INTERNAL_API_KEY
+  if (!internalKey && process.env.NODE_ENV === 'production') {
+    throw new Error('AI_INTERNAL_API_KEY is required in production')
+  }
+
+  return {
+    ...extraHeaders,
+    ...(internalKey ? { 'X-Internal-AI-Key': internalKey } : {}),
+  }
+}
+
 async function fetchAi(path, { method = 'POST', body, timeoutMs = DEFAULT_TIMEOUT_MS, retries = MAX_RETRIES } = {}) {
   const url = `${AI_SERVER_URL}${path}`
 
@@ -32,7 +44,7 @@ async function fetchAi(path, { method = 'POST', body, timeoutMs = DEFAULT_TIMEOU
     try {
       const response = await fetch(url, {
         method,
-        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        headers: getInternalAiHeaders(body ? { 'Content-Type': 'application/json' } : {}),
         body: body ? JSON.stringify(body) : undefined,
         signal: AbortSignal.timeout(timeoutMs),
       })
@@ -116,6 +128,7 @@ async function rebuildAiIndex() {
 
 module.exports = {
   AI_SERVER_URL,
+  getInternalAiHeaders,
   fetchAi,
   pingAiServer,
   generateEmbedding,
