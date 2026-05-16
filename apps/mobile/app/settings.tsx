@@ -298,7 +298,7 @@ export default function SettingsScreen() {
             icon="help-circle-outline"
             title={t('settings.support')}
             description={t('settings.supportDescription')}
-            onPress={() => openExternal('mailto:support@velveapp.com?subject=Velve%20support')}
+            onPress={() => openExternal('mailto:info@velveapp.com?subject=Velve%20support')}
           />
           <SettingRow
             icon="document-text-outline"
