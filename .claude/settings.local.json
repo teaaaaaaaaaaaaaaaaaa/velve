@@ -44,7 +44,8 @@
       "Bash(git push *)",
       "Bash(gh auth *)",
       "Bash(git config *)",
-      "WebSearch"
+      "WebSearch",
+      "PowerShell(head *)"
     ]
   }
 }

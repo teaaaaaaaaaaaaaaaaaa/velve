@@ -32,6 +32,7 @@ const vtoRouter = require('./routes/vto')
 const searchRouter = require('./routes/search')
 const notificationsRouter = require('./routes/notifications')
 const adminRouter = require('./routes/admin')
+const waitlistRouter = require('./routes/waitlist')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -67,6 +68,8 @@ app.use(
     origin: [
       'exp://localhost:8081',
       'http://localhost:8081',
+      'http://localhost:5173',
+      'http://localhost:4173',
       'https://velve.app',
       'https://velveapp.com',
       'https://www.velveapp.com',
@@ -173,6 +176,7 @@ app.use('/api/vto', vtoRouter)
 app.use('/api/search', searchRouter)
 app.use('/api/notifications', notificationsRouter)
 app.use('/api/admin', adminRouter)
+app.use('/api/waitlist', waitlistRouter)
 
 // Sentry error handler (must be before other error middleware)
 app.use(Sentry.Handlers.errorHandler())
