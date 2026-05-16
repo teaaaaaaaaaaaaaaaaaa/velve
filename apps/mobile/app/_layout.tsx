@@ -77,9 +77,9 @@ function AuthGate() {
     return (
       <View className="flex-1 items-center justify-center bg-base-canvas px-5">
         <View className="w-full rounded-[28px] bg-surface-panel px-5 py-6">
-          <Text className="font-display text-3xl text-ink-dark">Sesija nije bezbedna</Text>
+          <Text className="font-display text-3xl text-ink-dark">Session needs attention</Text>
           <Text className="mt-3 font-sans text-sm leading-6 text-ink-dark/62">
-            Ne mozemo da potvrdimo tvoj Velve profil. Pokusaj ponovo ili se odjavi pa udji opet.
+            We cannot confirm your Velve profile. Try again or log out and sign in again.
           </Text>
           <Text className="mt-3 font-sans text-xs text-ink-dark/45">{profileError}</Text>
 
@@ -87,14 +87,14 @@ function AuthGate() {
             onPress={refreshDbUser}
             className="mt-6 items-center rounded-full bg-brand-accent-deep px-4 py-4"
           >
-            <Text className="font-sans text-base font-semibold text-base-canvas">Pokusaj ponovo</Text>
+            <Text className="font-sans text-base font-semibold text-base-canvas">{t('common.retry')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={logout}
             className="mt-3 items-center rounded-full border border-ink-dark/10 bg-base-canvas/70 px-4 py-4"
           >
-            <Text className="font-sans text-base font-semibold text-ink-dark">Odjavi se</Text>
+            <Text className="font-sans text-base font-semibold text-ink-dark">{t('profile.logout')}</Text>
           </TouchableOpacity>
         </View>
       </View>

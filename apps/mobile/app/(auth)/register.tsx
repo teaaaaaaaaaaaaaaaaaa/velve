@@ -33,18 +33,18 @@ function getEmailRegisterError(error: any) {
   const code = error?.code || error?.nativeErrorCode || ''
 
   if (code === 'auth/email-already-in-use') {
-    return 'Ovaj email vec ima nalog. Vrati se na prijavu.'
+    return 'This email already has an account. Go back to sign in.'
   }
-  if (code === 'auth/invalid-email') return 'Unesi ispravan email.'
-  if (code === 'auth/weak-password') return 'Lozinka je preslaba. Koristi najmanje 8 karaktera.'
+  if (code === 'auth/invalid-email') return 'Enter a valid email.'
+  if (code === 'auth/weak-password') return 'Password is too weak. Use at least 8 characters.'
   if (code === 'auth/operation-not-allowed') {
-    return 'Email registracija trenutno nije ukljucena za ovu aplikaciju.'
+    return 'Email registration is not enabled for this app right now.'
   }
   if (code === 'auth/network-request-failed' || error?.message?.includes('Network')) {
-    return 'Nema stabilne internet konekcije. Proveri mrezu i pokusaj ponovo.'
+    return 'No stable internet connection. Check your network and try again.'
   }
 
-  return 'Nije moguce napraviti nalog trenutno. Pokusaj ponovo.'
+  return 'Unable to create an account right now. Try again.'
 }
 
 export default function RegisterScreen() {
@@ -70,7 +70,7 @@ export default function RegisterScreen() {
       console.warn('[RegisterScreen] Registration blocked because email is invalid', {
         email: maskEmail(normalizedEmail),
       })
-      setError('Unesi ispravan email.')
+      setError('Enter a valid email.')
       return
     }
 
@@ -79,7 +79,7 @@ export default function RegisterScreen() {
         email: maskEmail(email),
         passwordLength: password.length,
       })
-      setError('Lozinka mora imati najmanje 8 karaktera.')
+      setError('Password must be at least 8 characters.')
       return
     }
 

@@ -38,17 +38,31 @@ const EMPTY_FILTERS: SearchFilters = {
   priceMax: '',
 }
 
-const CATEGORY_FILTERS = ['Majice', 'Haljine', 'Pantalone', 'Jakne', 'Obuca', 'Dodaci']
 const SIZE_FILTERS = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
 const SEARCH_HISTORY_KEY = '@velve:search-history'
-const TRENDING_TAGS = ['kozne jakne', 'vintage denim', 'adidas samba', 'mango kaput', 'crna torba', 'oversized blazer']
 
 export default function SearchScreen() {
   const router = useRouter()
   const params = useLocalSearchParams<{ category?: string; q?: string }>()
   const insets = useSafeAreaInsets()
   const { height: windowHeight } = useWindowDimensions()
-  const { locale } = useI18n()
+  const { locale, t } = useI18n()
+  const categoryFilters = [
+    t('search.categoryTops'),
+    t('search.categoryDresses'),
+    t('search.categoryPants'),
+    t('search.categoryOuterwear'),
+    t('search.categoryShoes'),
+    t('search.categoryAccessories'),
+  ]
+  const trendingTags = [
+    t('search.trendingLeather'),
+    t('search.trendingDenim'),
+    t('search.trendingSamba'),
+    t('search.trendingCoat'),
+    t('search.trendingBlackBag'),
+    t('search.trendingBlazer'),
+  ]
 
   const [query, setQuery] = useState(params.q || '')
   const [items, setItems] = useState<ImmersiveFeedItem[]>([])
@@ -272,15 +286,15 @@ export default function SearchScreen() {
       {loading && items.length === 0 ? (
         <View className="flex-1 items-center justify-center bg-white">
           <ActivityIndicator color={colors.accentDeep} />
-          <Text className="mt-3 font-sans text-sm text-ink-dark/45">Ucitavamo search...</Text>
+          <Text className="mt-3 font-sans text-sm text-ink-dark/45">{t('search.loading')}</Text>
         </View>
       ) : items.length === 0 ? (
         <View className="flex-1 bg-white px-5 pt-24">
           <EditorialEmptyState
             icon="search-outline"
-            title="Nema rezultata za ovaj upit"
-            description="Probaj drugi naziv, brend ili kategoriju i feed ce odmah pokazati novi set komada."
-            actionLabel="Obrisi unos"
+            title={t('feed.searchEmptyTitle')}
+            description={t('feed.searchEmptyDescription')}
+            actionLabel={t('feed.searchClear')}
             onAction={() => setQuery('')}
           />
         </View>
@@ -313,7 +327,7 @@ export default function SearchScreen() {
             loadingMore ? (
               <View className="py-8">
                 <View className="mx-auto rounded-full border border-ink-dark/8 bg-ink-dark/4 px-5 py-3">
-                  <Text className="font-sans text-sm text-ink-dark/62">Loading more...</Text>
+                  <Text className="font-sans text-sm text-ink-dark/62">{t('common.loadingMore')}</Text>
                 </View>
               </View>
             ) : null
@@ -336,7 +350,7 @@ export default function SearchScreen() {
               value={query}
               onChangeText={setQuery}
               onSubmitEditing={() => recordSearchQuery(query)}
-              placeholder="Pretrazi komade, brend ili kategoriju..."
+              placeholder={t('search.placeholder')}
               className="ml-3 flex-1 font-sans text-sm text-ink-dark"
               autoFocus
             />
@@ -361,7 +375,7 @@ export default function SearchScreen() {
         {!loading ? (
           <View className="mt-3 self-start rounded-full border border-ink-dark/8 bg-ink-dark/4 px-3 py-2">
             <Text className="font-sans text-xs font-semibold text-ink-dark/62">
-              {items.length} rezultata
+              {t('feed.resultsCount', { count: items.length })}
             </Text>
           </View>
         ) : null}
@@ -374,16 +388,16 @@ export default function SearchScreen() {
         >
           <View className="flex-row items-center justify-between">
             <Text className="font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/45">
-              Trending
+              {t('search.trending')}
             </Text>
             {searchHistory.length > 0 ? (
               <TouchableOpacity onPress={() => persistSearchHistory([])}>
-                <Text className="font-sans text-xs font-semibold text-brand-accent-deep">Ocisti istoriju</Text>
+                <Text className="font-sans text-xs font-semibold text-brand-accent-deep">{t('search.clearHistory')}</Text>
               </TouchableOpacity>
             ) : null}
           </View>
           <View className="mt-3 flex-row flex-wrap gap-2">
-            {TRENDING_TAGS.map((tag) => (
+            {trendingTags.map((tag) => (
               <TouchableOpacity
                 key={tag}
                 onPress={() => useSuggestion(tag)}
@@ -396,7 +410,7 @@ export default function SearchScreen() {
           {searchHistory.length > 0 ? (
             <View className="mt-4">
               <Text className="font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/45">
-                Prethodne pretrage
+                {t('search.previous')}
               </Text>
               <View className="mt-2 gap-2">
                 {searchHistory.slice(0, 4).map((entry) => (
@@ -420,7 +434,7 @@ export default function SearchScreen() {
         <View className="flex-1 justify-end bg-ink-dark/30">
           <View className="rounded-t-[32px] bg-base-canvas px-5 pb-8 pt-5">
             <View className="mb-5 flex-row items-center justify-between">
-              <Text className="font-display text-3xl text-ink-dark">Filteri</Text>
+              <Text className="font-display text-3xl text-ink-dark">{t('search.filters')}</Text>
               <TouchableOpacity
                 onPress={() => setFilterOpen(false)}
                 className="h-10 w-10 items-center justify-center rounded-full bg-surface-panel"
@@ -430,10 +444,10 @@ export default function SearchScreen() {
             </View>
 
             <Text className="mb-2 font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/45">
-              Kategorija
+              {t('search.category')}
             </Text>
             <View className="flex-row flex-wrap gap-2">
-              {CATEGORY_FILTERS.map((category) => (
+              {categoryFilters.map((category) => (
                 <TouchableOpacity
                   key={category}
                   onPress={() =>
@@ -458,7 +472,7 @@ export default function SearchScreen() {
             </View>
 
             <Text className="mb-2 mt-5 font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/45">
-              Velicina
+              {t('search.size')}
             </Text>
             <View className="flex-row flex-wrap gap-2">
               {SIZE_FILTERS.map((size) => (
@@ -489,20 +503,20 @@ export default function SearchScreen() {
               <VelveTextInput
                 value={draftFilters.city}
                 onChangeText={(city) => setDraftFilters((prev) => ({ ...prev, city }))}
-                placeholder="Grad"
+                placeholder={t('search.cityPlaceholder')}
                 className="flex-1 rounded-[20px] bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
               />
               <VelveTextInput
                 value={draftFilters.priceMin}
                 onChangeText={(priceMin) => setDraftFilters((prev) => ({ ...prev, priceMin }))}
-                placeholder="Cena od"
+                placeholder={t('search.priceMinPlaceholder')}
                 keyboardType="numeric"
                 className="flex-1 rounded-[20px] bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
               />
               <VelveTextInput
                 value={draftFilters.priceMax}
                 onChangeText={(priceMax) => setDraftFilters((prev) => ({ ...prev, priceMax }))}
-                placeholder="Do"
+                placeholder={t('search.priceMaxPlaceholder')}
                 keyboardType="numeric"
                 className="flex-1 rounded-[20px] bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
               />
@@ -513,13 +527,13 @@ export default function SearchScreen() {
                 onPress={clearFilters}
                 className="flex-1 items-center rounded-full bg-surface-panel px-4 py-4"
               >
-                <Text className="font-sans text-sm font-semibold text-ink-dark">Ocisti</Text>
+                <Text className="font-sans text-sm font-semibold text-ink-dark">{t('common.clear')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={applyFilters}
                 className="flex-1 items-center rounded-full bg-brand-accent-deep px-4 py-4"
               >
-                <Text className="font-sans text-sm font-semibold text-base-canvas">Primeni</Text>
+                <Text className="font-sans text-sm font-semibold text-base-canvas">{t('common.apply')}</Text>
               </TouchableOpacity>
             </View>
           </View>

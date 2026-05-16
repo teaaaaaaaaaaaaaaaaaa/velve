@@ -156,9 +156,9 @@ export default function ProfileScreen() {
       profile.location?.city
         ? `${profile.location.city}${profile.location.region ? `, ${profile.location.region}` : ''}`
         : null,
-      profile.emailVerified ? 'Email verifikovan' : null,
+      profile.emailVerified ? t('profile.emailVerified') : null,
     ].filter(Boolean) as string[]
-  }, [profile])
+  }, [profile, t])
 
   const hydrateEditState = useCallback((nextProfile: UserProfile) => {
     setEditDisplayName(nextProfile.displayName || '')
@@ -176,21 +176,21 @@ export default function ProfileScreen() {
       setProfile(nextProfile)
       hydrateEditState(nextProfile)
     } else {
-      throw new Error('Profil trenutno nije moguce ucitati.')
+      throw new Error(t('profile.emptyDescription'))
     }
-  }, [hydrateEditState])
+  }, [hydrateEditState, t])
 
   const loadAll = useCallback(async () => {
     try {
       setLoading(true)
       await loadProfile()
     } catch (error: unknown) {
-      const message = getApiErrorMessage(error, 'Profil trenutno nije moguce ucitati.')
-      Alert.alert('Greska', message)
+      const message = getApiErrorMessage(error, t('profile.emptyDescription'))
+      Alert.alert(t('common.error'), message)
     } finally {
       setLoading(false)
     }
-  }, [loadProfile])
+  }, [loadProfile, t])
 
   useEffect(() => {
     loadAll()
@@ -233,7 +233,7 @@ export default function ProfileScreen() {
   const handlePickImage = useCallback(async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (permission.status !== 'granted') {
-      Alert.alert('Dozvola', 'Potrebna je dozvola za pristup galeriji.')
+      Alert.alert(t('common.permission'), t('profile.galleryPermission'))
       return
     }
 
@@ -262,16 +262,16 @@ export default function ProfileScreen() {
           setEditPhotoURL(response.data.data.url as string)
         }
       } catch (error) {
-        Alert.alert('Greska', getApiErrorMessage(error, 'Avatar trenutno nije moguce uploadovati.'))
+        Alert.alert(t('common.error'), getApiErrorMessage(error, t('profile.avatarUploadError')))
       } finally {
         setUploading(false)
       }
     }
-  }, [])
+  }, [t])
 
   const handleSaveProfile = useCallback(async () => {
     if (!editDisplayName.trim()) {
-      Alert.alert('Greska', 'Ime ne moze biti prazno.')
+      Alert.alert(t('common.error'), t('profile.nameRequired'))
       return
     }
 
@@ -290,11 +290,11 @@ export default function ProfileScreen() {
         setModalVisible(false)
       }
     } catch (error) {
-      Alert.alert('Greska', getApiErrorMessage(error, 'Profil nije sacuvan.'))
+      Alert.alert(t('common.error'), getApiErrorMessage(error, t('profile.saveError')))
     } finally {
       setUploading(false)
     }
-  }, [editBio, editDisplayName, editPhotoURL, hydrateEditState])
+  }, [editBio, editDisplayName, editPhotoURL, hydrateEditState, t])
 
   if (loading) {
     return <ProfileSkeleton />
@@ -390,7 +390,7 @@ export default function ProfileScreen() {
             </View>
 
             <Text className="mt-5 font-sans text-sm leading-6 text-ink-dark/75">
-              {profile.bio || 'Dodaj par reci o svom ukusu da profil deluje zivo i licno.'}
+              {profile.bio || t('profile.defaultBio')}
             </Text>
 
             {identityChips.length > 0 ? (
@@ -432,7 +432,7 @@ export default function ProfileScreen() {
                 <Text className="font-display text-3xl text-ink-dark">
                   {profile.successfulSwaps || profile.completedTrades || 0}
                 </Text>
-                <Text className="font-sans text-xs text-ink-dark/50">Razmene</Text>
+                <Text className="font-sans text-xs text-ink-dark/50">{t('profile.trades')}</Text>
               </View>
             </View>
 
@@ -449,7 +449,7 @@ export default function ProfileScreen() {
                 <View className="flex-row items-center gap-1 rounded-full bg-brand-accent-light/30 px-3 py-1.5">
                   <Ionicons name="repeat-outline" size={12} color={colors.accentDeep} />
                   <Text className="font-sans text-xs text-brand-accent-deep">
-                    {profile.successfulSwaps} razmena
+                    {t('blocked.tradesCount', { count: profile.successfulSwaps })}
                   </Text>
                 </View>
               ) : null}
@@ -466,17 +466,17 @@ export default function ProfileScreen() {
             <View className="mt-6 flex-row rounded-[28px] bg-base-canvas px-3 py-4">
               <ProfileQuickAction
                 icon="create-outline"
-                label="Edit"
+                label={t('profile.edit')}
                 onPress={() => setModalVisible(true)}
               />
               <ProfileQuickAction
                 icon="shirt-outline"
-                label="Closet"
+                label={t('profile.closet')}
                 onPress={() => router.push('/(tabs)/closet')}
               />
               <ProfileQuickAction
                 icon="bookmark-outline"
-                label="Saved"
+                label={t('profile.saved')}
                 onPress={() => {
                   setActiveTab('saved')
                   loadTabContent('saved')
@@ -484,20 +484,20 @@ export default function ProfileScreen() {
               />
               <ProfileQuickAction
                 icon="settings-outline"
-                label="Settings"
+                label={t('settings.title')}
                 onPress={() => router.push('/settings')}
               />
             </View>
 
             <View className="mt-4 flex-row gap-3">
               <View className="flex-1 rounded-[22px] bg-base-canvas px-4 py-4">
-                <Text className="font-sans text-[11px] uppercase text-ink-dark/45">Profil</Text>
+                <Text className="font-sans text-[11px] uppercase text-ink-dark/45">{t('tabs.profile')}</Text>
                 <Text className="mt-1 font-sans text-lg font-bold text-ink-dark">
                   {profile.profileCompleteness || 0}%
                 </Text>
               </View>
               <View className="flex-1 rounded-[22px] bg-base-canvas px-4 py-4">
-                <Text className="font-sans text-[11px] uppercase text-ink-dark/45">Ormar</Text>
+                <Text className="font-sans text-[11px] uppercase text-ink-dark/45">{t('profile.closet')}</Text>
                 <Text className="mt-1 font-sans text-lg font-bold text-ink-dark">
                   {profile.closetCounts.live} live / {profile.closetCounts.drafts} drafts
                 </Text>
@@ -506,19 +506,19 @@ export default function ProfileScreen() {
 
             <View className="mt-4 rounded-[26px] bg-brand-accent-deep px-4 py-4">
               <Text className="font-display text-[28px] text-base-canvas">
-                {hasBodyScan ? 'Virtual Try-On je spreman' : 'Dodaj Virtual Try-On'}
+                {hasBodyScan ? t('profile.vtoReadyTitle') : t('profile.vtoSetupTitle')}
               </Text>
               <Text className="mt-2 font-sans text-sm leading-6 text-base-canvas/80">
                 {hasBodyScan
-                  ? 'Tvoj body scan je sacuvan i mozes odmah da otvoris VTO hub ili da nastavis sa novim renderima.'
-                  : 'Ako si preskocio body scan tokom prvog setup-a, ovde mozes kasnije da ga dodas i ukljucis Virtual Try-On.'}
+                  ? t('profile.vtoReadyDescription')
+                  : t('profile.vtoSetupDescription')}
               </Text>
               <TouchableOpacity
                 onPress={() => router.push(hasBodyScan ? '/vto/hub' : '/vto/body-scan')}
                 className="mt-4 items-center rounded-full bg-base-canvas px-4 py-4"
               >
                 <Text className="font-sans text-sm font-semibold text-brand-accent-deep">
-                  {hasBodyScan ? 'Otvori VTO hub' : 'Napravi body scan'}
+                  {hasBodyScan ? t('profile.openVtoHub') : t('profile.createBodyScan')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -527,8 +527,8 @@ export default function ProfileScreen() {
           <View className="mt-6">
             <View className="mb-4 flex-row rounded-[22px] bg-surface-panel p-1">
               {([
-                { key: 'posts', label: 'Objave' },
-                { key: 'saved', label: 'Sacuvano' },
+                { key: 'posts', label: t('profile.posts') },
+                { key: 'saved', label: t('profile.saved') },
               ] as const).map((tab) => (
                 <TouchableOpacity
                   key={tab.key}
@@ -559,9 +559,9 @@ export default function ProfileScreen() {
               closetItems.length === 0 ? (
                 <EditorialEmptyState
                   icon="shirt-outline"
-                  title="Tvoj ormar je jos prazan"
-                  description="Dodaj prve komade i postavi ih u discovery."
-                  actionLabel="Dodaj komad"
+                  title={t('profile.closetEmptyTitle')}
+                  description={t('profile.closetEmptyDescription')}
+                  actionLabel={t('profile.addItem')}
                   onAction={() => router.push('/(tabs)/upload')}
                 />
               ) : (
@@ -578,9 +578,9 @@ export default function ProfileScreen() {
             ) : wishlistItems.length === 0 ? (
               <EditorialEmptyState
                 icon="bookmark-outline"
-                title="Nema sacuvanih komada"
-                description="Sacuvaj komade iz feeda i nadi ih ovde."
-                actionLabel="Idi na feed"
+                title={t('profile.savedEmptyTitle')}
+                description={t('profile.savedEmptyDescription')}
+                actionLabel={t('profile.goToFeed')}
                 onAction={() => router.push('/(tabs)/feed')}
               />
             ) : (
@@ -607,12 +607,12 @@ export default function ProfileScreen() {
         <View className="flex-1 bg-base-canvas">
           <View className="flex-row items-center justify-between border-b border-ink-dark/4 px-6 pb-4 pt-12">
             <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Text className="font-sans text-base text-ink-dark">Zatvori</Text>
+              <Text className="font-sans text-base text-ink-dark">{t('profile.close')}</Text>
             </TouchableOpacity>
-            <Text className="font-display text-2xl text-ink-dark">Izmeni profil</Text>
+            <Text className="font-display text-2xl text-ink-dark">{t('profile.edit')}</Text>
             <TouchableOpacity disabled={uploading} onPress={handleSaveProfile}>
               <Text className="font-sans text-base font-semibold text-brand-accent-deep">
-                {uploading ? 'Cuvam...' : 'Sacuvaj'}
+                {uploading ? t('common.saving') : t('common.save')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -645,27 +645,27 @@ export default function ProfileScreen() {
                 disabled={uploading}
               >
                 <Text className="font-sans text-sm font-semibold text-base-canvas">
-                  {uploading ? 'Upload...' : 'Promeni avatar'}
+                  {uploading ? t('profile.uploading') : t('profile.changeAvatar')}
                 </Text>
               </TouchableOpacity>
             </View>
 
             <View className="mt-8">
               <Text className="mb-2 font-sans text-xs uppercase tracking-[1.2px] text-ink-dark/45">
-                Ime
+                {t('profile.name')}
               </Text>
               <VelveTextInput
                 value={editDisplayName}
                 onChangeText={setEditDisplayName}
                 maxLength={50}
-                placeholder="Tvoje ime"
+                placeholder={t('profile.namePlaceholder')}
                 className="rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm text-ink-dark"
               />
             </View>
 
             <View className="mt-5">
               <Text className="mb-2 font-sans text-xs uppercase tracking-[1.2px] text-ink-dark/45">
-                Bio
+                {t('profile.bio')}
               </Text>
               <VelveTextInput
                 value={editBio}
@@ -673,7 +673,7 @@ export default function ProfileScreen() {
                 maxLength={200}
                 multiline
                 textAlignVertical="top"
-                placeholder="Par reci o svom ukusu i komadima koje volis."
+                placeholder={t('profile.bioPlaceholder')}
                 className="min-h-[140px] rounded-[22px] border border-ink-dark/10 bg-surface-panel px-4 py-4 font-sans text-sm leading-6 text-ink-dark"
               />
               <Text className="mt-2 font-sans text-xs text-ink-dark/40">{editBio.length}/200</Text>

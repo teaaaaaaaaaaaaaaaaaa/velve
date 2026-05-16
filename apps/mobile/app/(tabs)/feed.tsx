@@ -193,7 +193,7 @@ export default function FeedScreen() {
       } catch (error) {
         if (pageNum === 0 && isCurrentRequest()) {
           setItems([])
-          setFeedError(getApiErrorMessage(error, 'Feed trenutno ne moze da se ucita.'))
+          setFeedError(getApiErrorMessage(error, t('feed.loadedErrorTitle')))
         }
       } finally {
         feedInFlightKeysRef.current.delete(requestKey)
@@ -204,7 +204,7 @@ export default function FeedScreen() {
         }
       }
     },
-    [feedMode]
+    [feedMode, t]
   )
 
   useEffect(() => {
@@ -308,32 +308,32 @@ export default function FeedScreen() {
       setItems((prev) => prev.filter((entry) => entry._id !== item._id))
       setActionItem(null)
     } catch {
-      Alert.alert('Greška', 'Nije moguće sakriti ovu objavu.')
+      Alert.alert(t('common.error'), t('feed.hideError'))
     }
-  }, [])
+  }, [t])
 
   const handleReportItem = useCallback((item: ImmersiveFeedItem) => {
-    Alert.alert('Prijavi objavu?', 'Velve tim ce pregledati ovu objavu i korisnika.', [
+    Alert.alert(t('feed.reportTitle'), t('feed.reportDescription'), [
       {
-        text: 'Prijavi',
+        text: t('feed.reportCta'),
         onPress: async () => {
           try {
             await client.post(`/api/items/${item._id}/report`, { reason: 'community_report' })
             setActionItem(null)
-            Alert.alert('Hvala', 'Prijava je poslata i pregledacemo objavu.')
+            Alert.alert(t('feed.reportSuccessTitle'), t('feed.reportSuccessDescription'))
           } catch {
-            Alert.alert('Greska', 'Nije moguce poslati prijavu trenutno.')
+            Alert.alert(t('common.error'), t('feed.reportError'))
           }
         },
       },
-      { text: 'Odustani', style: 'cancel' },
+      { text: t('common.cancel'), style: 'cancel' },
     ])
-  }, [])
+  }, [t])
 
   const handleBlockSeller = useCallback((item: ImmersiveFeedItem) => {
-    Alert.alert('Blokiraj korisnika?', `@${item.userId.displayName} vise neces vidjati u feedu.`, [
+    Alert.alert(t('feed.blockTitle'), t('feed.blockDescription', { name: item.userId.displayName }), [
       {
-        text: 'Blokiraj',
+        text: t('feed.blockCta'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -341,17 +341,17 @@ export default function FeedScreen() {
             setItems((prev) => prev.filter((entry) => entry.userId._id !== item.userId._id))
             setActionItem(null)
             Alert.alert(
-              'Korisnik blokiran',
-              `Sadrzaj korisnika @${item.userId.displayName} vise ti se nece prikazivati.`
+              t('feed.blockSuccessTitle'),
+              t('feed.blockSuccessDescription', { name: item.userId.displayName })
             )
           } catch {
-            Alert.alert('Greska', 'Nije moguce blokirati korisnika trenutno.')
+            Alert.alert(t('common.error'), t('feed.blockError'))
           }
         },
       },
-      { text: 'Odustani', style: 'cancel' },
+      { text: t('common.cancel'), style: 'cancel' },
     ])
-  }, [])
+  }, [t])
 
   const prefetchedRef = useRef(new Set<string>())
   const itemsRef = useRef(items)
@@ -475,9 +475,9 @@ export default function FeedScreen() {
           <View className="flex-1 bg-surface-panel px-5 pt-24">
             <EditorialEmptyState
               icon="search-outline"
-              title="Nema rezultata za ovaj upit"
-              description="Probaj drugi naziv, brend ili kategoriju i feed ce odmah pokazati novi set komada."
-              actionLabel="Obrisi unos"
+              title={t('feed.searchEmptyTitle')}
+              description={t('feed.searchEmptyDescription')}
+              actionLabel={t('feed.searchClear')}
               onAction={() => setSearchQuery('')}
             />
           </View>
@@ -511,7 +511,7 @@ export default function FeedScreen() {
                 <View className="absolute left-4 z-10" style={{ top: insets.top + 64 }}>
                   <View className="rounded-full border border-ink-dark/8 bg-ink-dark/4 px-3 py-2">
                     <Text className="font-sans text-xs font-semibold text-ink-dark/62">
-                      {searchItems.length} rezultata
+                      {t('feed.resultsCount', { count: searchItems.length })}
                     </Text>
                   </View>
                 </View>
@@ -521,7 +521,7 @@ export default function FeedScreen() {
               searchLoadingMore ? (
                 <View className="py-8">
                   <View className="mx-auto rounded-full border border-ink-dark/8 bg-ink-dark/4 px-5 py-3">
-                    <Text className="font-sans text-sm text-ink-dark/62">Loading more...</Text>
+                    <Text className="font-sans text-sm text-ink-dark/62">{t('common.loadingMore')}</Text>
                   </View>
                 </View>
               ) : null
@@ -532,9 +532,9 @@ export default function FeedScreen() {
         <View className="flex-1 justify-center bg-surface-panel px-4 pt-20">
           <EditorialEmptyState
             icon="cloud-offline-outline"
-            title="Feed nije ucitan"
+            title={t('feed.loadedErrorTitle')}
             description={feedError}
-            actionLabel="Pokusaj ponovo"
+            actionLabel={t('common.retry')}
             onAction={() => fetchFeed(0)}
           />
         </View>
@@ -543,14 +543,14 @@ export default function FeedScreen() {
           <EditorialEmptyState
             icon={feedMode === 'following' ? 'people-outline' : 'sparkles-outline'}
             title={
-              feedMode === 'following' ? 'Following feed je jos prazan' : t('feed.emptyTitle')
+              feedMode === 'following' ? t('feed.followingEmptyTitle') : t('feed.emptyTitle')
             }
             description={
               feedMode === 'following'
-                ? 'Zapratite par profila i ovde ce se pojaviti samo njihovi komadi u istom feed ritmu.'
+                ? t('feed.followingEmptyDescription')
                 : t('feed.emptyDescription')
             }
-            actionLabel={feedMode === 'following' ? 'Predji na For You' : t('common.refresh')}
+            actionLabel={feedMode === 'following' ? t('feed.switchToForYou') : t('common.refresh')}
             onAction={() => {
               if (feedMode === 'following') {
                 setFeedMode('for_you')
@@ -591,7 +591,7 @@ export default function FeedScreen() {
             isLoadingMore ? (
               <View className="py-8">
                 <View className="mx-auto rounded-full border border-ink-dark/8 bg-ink-dark/4 px-5 py-3">
-                  <Text className="font-sans text-sm text-ink-dark/62">Loading more...</Text>
+                  <Text className="font-sans text-sm text-ink-dark/62">{t('common.loadingMore')}</Text>
                 </View>
               </View>
             ) : null
@@ -621,7 +621,7 @@ export default function FeedScreen() {
                 ref={searchInputRef}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
-                placeholder="Pretrazi komade, brend..."
+                placeholder={t('feed.searchPlaceholder')}
                 className="flex-1 py-2 font-sans text-sm text-ink-dark"
                 returnKeyType="search"
               />
@@ -663,7 +663,7 @@ export default function FeedScreen() {
         <Pressable className="flex-1 justify-end bg-black/55 px-4 py-4" onPress={() => setActionItem(null)}>
           <Pressable className="rounded-[34px] bg-surface-panel px-5 py-5">
             <Text className="font-display text-[28px] text-ink-dark">
-              {actionItem ? `@${actionItem.userId.displayName}` : 'Opcije objave'}
+              {actionItem ? `@${actionItem.userId.displayName}` : t('feed.details')}
             </Text>
             <Text className="mt-2 font-sans text-sm leading-6 text-ink-dark/62">
               {t('feed.sheetSubtitle')}

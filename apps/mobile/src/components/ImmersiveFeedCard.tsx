@@ -57,6 +57,7 @@ type Props = {
 export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
   item,
   height,
+  locale,
   topInset,
   bottomInset,
   onLike,
@@ -67,6 +68,20 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
   const imageUri = getPrimaryItemImage(item)
   const floatingTabBarHeight = 92
   const contentBottomOffset = floatingTabBarHeight + 2
+  const labels =
+    locale === 'sr'
+      ? {
+          trade: 'Posalji predlog za razmenu',
+          like: 'Lajkuj objavu',
+          save: 'Sacuvaj objavu',
+          more: 'Otvori opcije objave',
+        }
+      : {
+          trade: 'Send trade proposal',
+          like: 'Like listing',
+          save: 'Save listing',
+          more: 'Open listing options',
+        }
 
   return (
     <View style={{ height }} className="w-full bg-surface-panel">
@@ -109,7 +124,7 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
           router.push({ pathname: '/users/[id]', params: { id: item.userId._id } })
         }
         actionIcon="swap-horizontal"
-        actionAccessibilityLabel="Posalji predlog za razmenu"
+        actionAccessibilityLabel={labels.trade}
         onActionPress={() => router.push(`/items/${item._id}?openTrade=true`)}
         showOwnerArrow
       />
@@ -123,14 +138,14 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
           count={item.likesCount ?? 0}
           active={!!item.isLiked}
           onPress={() => onLike(item._id, !!item.isLiked)}
-          accessibilityLabel="Lajkuj objavu"
+          accessibilityLabel={labels.like}
           tone="dark"
         />
         <GlassCountActionButton
           icon="swap-horizontal"
           count={item.tradeRequestsCount ?? 0}
           onPress={() => router.push(`/items/${item._id}?openTrade=true`)}
-          accessibilityLabel="Posalji predlog za razmenu"
+          accessibilityLabel={labels.trade}
           tone="dark"
         />
         <GlassCountActionButton
@@ -138,14 +153,14 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
           count={item.wishlistCount ?? 0}
           active={!!item.isWishlisted}
           onPress={() => onWishlist(item._id, !!item.isWishlisted)}
-          accessibilityLabel="Sacuvaj objavu"
+          accessibilityLabel={labels.save}
           tone="dark"
         />
         {onMore ? (
           <GlassCountActionButton
             icon="ellipsis-horizontal"
             onPress={() => onMore(item)}
-            accessibilityLabel="Otvori opcije objave"
+            accessibilityLabel={labels.more}
             tone="dark"
           />
         ) : null}

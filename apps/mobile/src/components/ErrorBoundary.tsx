@@ -1,43 +1,41 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React from 'react'
+import { Text, TouchableOpacity, View } from 'react-native'
 
 export class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean }
 > {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false };
+  constructor(props: { children: React.ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
   }
 
   static getDerivedStateFromError() {
-    return { hasError: true };
+    return { hasError: true }
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('[ErrorBoundary] Caught error:', error, errorInfo);
+    console.error('[ErrorBoundary] Caught error:', error, errorInfo)
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <View className="flex-1 justify-center items-center bg-base-canvas p-4">
-          <Text className="text-ink-dark text-xl font-display mb-4">
-            Nešto je pošlo naopako
-          </Text>
-          <Text className="text-ink-dark/60 text-sm font-sans text-center mb-6">
-            Izvinjavamo se zbog problema. Tim je obavešten.
+        <View className="flex-1 items-center justify-center bg-base-canvas p-4">
+          <Text className="mb-4 font-display text-xl text-ink-dark">Something went wrong</Text>
+          <Text className="mb-6 text-center font-sans text-sm text-ink-dark/60">
+            Sorry about that. The team has been notified.
           </Text>
           <TouchableOpacity
             onPress={() => this.setState({ hasError: false })}
-            className="bg-brand-accent-deep px-6 py-3 rounded-lg"
+            className="rounded-lg bg-brand-accent-deep px-6 py-3"
           >
-            <Text className="text-base-canvas font-sans">Pokušaj ponovo</Text>
+            <Text className="font-sans text-base-canvas">Try again</Text>
           </TouchableOpacity>
         </View>
-      );
+      )
     }
 
-    return this.props.children;
+    return this.props.children
   }
 }

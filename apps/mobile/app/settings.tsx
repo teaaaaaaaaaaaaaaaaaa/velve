@@ -42,12 +42,6 @@ type SettingRowProps = {
   right?: ReactNode
 }
 
-const LANGUAGE_NAMES = {
-  sr: 'Srpski',
-  en: 'English',
-  ru: 'Russian',
-} as const
-
 function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View className="mt-5 rounded-[26px] bg-surface-panel px-4 py-4">
@@ -91,7 +85,7 @@ function SettingRow({ icon, title, description, onPress, danger, right }: Settin
 export default function SettingsScreen() {
   const router = useRouter()
   const { dbUser, logout } = useAuth()
-  const { locale, setLocale, t } = useI18n()
+  const { locale, localeLabels, locales, setLocale, t } = useI18n()
   const [preferences, setPreferences] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES)
   const [loadingPreferences, setLoadingPreferences] = useState(true)
   const [savingPreference, setSavingPreference] = useState<keyof NotificationPreferences | null>(null)
@@ -125,7 +119,7 @@ export default function SettingsScreen() {
             await logout()
             router.replace('/(auth)/login')
           } catch {
-            Alert.alert('Greska', 'Odjava trenutno nije uspela.')
+            Alert.alert(t('common.error'), t('settings.logoutError'))
           }
         },
       },
@@ -146,32 +140,32 @@ export default function SettingsScreen() {
         }
       } catch (error) {
         setPreferences(previous)
-        Alert.alert('Greska', getApiErrorMessage(error, 'Podesavanje notifikacija nije sacuvano.'))
+        Alert.alert(t('common.error'), getApiErrorMessage(error, t('settings.preferencesSaveError')))
       } finally {
         setSavingPreference(null)
       }
     },
-    [preferences]
+    [preferences, t]
   )
 
   const openExternal = (url: string) => {
-    Linking.openURL(url).catch(() => Alert.alert('Greska', 'Link trenutno nije dostupan.'))
+    Linking.openURL(url).catch(() => Alert.alert(t('common.error'), t('settings.linkError')))
   }
 
   const changeLocale = useCallback(
-    async (language: keyof typeof LANGUAGE_NAMES) => {
+    async (language: typeof locales[number]) => {
       if (locale === language || savingLocale) return
 
       try {
         setSavingLocale(true)
         await setLocale(language)
       } catch {
-        Alert.alert('Greska', 'Jezik trenutno nije moguce sacuvati.')
+        Alert.alert(t('common.error'), t('settings.languageSaveError'))
       } finally {
         setSavingLocale(false)
       }
     },
-    [locale, savingLocale, setLocale]
+    [locale, savingLocale, setLocale, t]
   )
 
   const switchProps = (key: keyof NotificationPreferences) => ({
@@ -196,11 +190,11 @@ export default function SettingsScreen() {
         </View>
 
         <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
-          Velve account
+          {t('settings.accountEyebrow')}
         </Text>
-        <Text className="mt-1 font-display text-4xl text-ink-dark">Podesavanja</Text>
+        <Text className="mt-1 font-display text-4xl text-ink-dark">{t('settings.title')}</Text>
 
-        <SettingsSection title="Nalog">
+        <SettingsSection title={t('settings.account')}>
           <View className="mt-3 flex-row items-center rounded-[22px] bg-base-canvas px-3 py-3">
             {dbUser?.photoURL ? (
               <RemoteImage uri={dbUser.photoURL} className="h-14 w-14 rounded-full" />
@@ -213,33 +207,33 @@ export default function SettingsScreen() {
             )}
             <View className="ml-3 flex-1">
               <Text className="font-sans text-sm font-semibold text-ink-dark">
-                {dbUser?.displayName || 'Velve korisnik'}
+                {dbUser?.displayName || t('settings.defaultUser')}
               </Text>
               <Text className="mt-1 font-sans text-xs text-ink-dark/50">
-                {dbUser?.email || 'Profil i poverenje'}
+                {dbUser?.email || t('settings.profileTrust')}
               </Text>
             </View>
           </View>
           <SettingRow
             icon="person-circle-outline"
-            title="Otvori profil"
-            description="Pregled javnog profila, ocena i ormara."
+            title={t('settings.openProfile')}
+            description={t('settings.openProfileDescription')}
             onPress={() => router.push('/(tabs)/profile')}
           />
           <SettingRow
             icon="archive-outline"
-            title="Arhiva tradeova"
-            description="Zavrsene razmene, istorija i ocenjivanje."
+            title={t('settings.tradeArchive')}
+            description={t('settings.tradeArchiveDescription')}
             onPress={() => router.push('/trade-archive')}
           />
         </SettingsSection>
 
-        <SettingsSection title="Jezik">
+        <SettingsSection title={t('settings.language')}>
           <Text className="mt-3 font-sans text-sm leading-6 text-ink-dark/60">
-            Trenutni jezik: {LANGUAGE_NAMES[locale]}
+            {t('settings.currentLanguage', { language: localeLabels[locale] })}
           </Text>
           <View className="mt-4 flex-row gap-3">
-            {(['sr', 'en', 'ru'] as const).map((language) => {
+            {locales.map((language) => {
               const isActive = locale === language
               return (
                 <TouchableOpacity
@@ -251,7 +245,7 @@ export default function SettingsScreen() {
                   onPress={() => changeLocale(language)}
                 >
                   <Text className={`font-sans text-sm font-semibold ${isActive ? 'text-base-canvas' : 'text-ink-dark'}`}>
-                    {LANGUAGE_NAMES[language]}
+                    {localeLabels[language]}
                   </Text>
                 </TouchableOpacity>
               )
@@ -259,26 +253,26 @@ export default function SettingsScreen() {
           </View>
         </SettingsSection>
 
-        <SettingsSection title="Push notifikacije">
+        <SettingsSection title={t('settings.pushNotifications')}>
           {loadingPreferences ? (
             <View className="items-center py-5">
               <ActivityIndicator size="small" color={colors.accentDeep} />
             </View>
           ) : null}
-          <SettingRow icon="notifications-outline" title="Sve push notifikacije" right={<Switch {...switchProps('allPush')} />} />
-          <SettingRow icon="chatbubble-outline" title="Poruke" description="Direktne poruke i chat odgovori." right={<Switch {...switchProps('messages')} />} />
-          <SettingRow icon="swap-horizontal-outline" title="Trade tokovi" description="Novi predlozi, prihvatanja, odbijanja i zavrsetak." right={<Switch {...switchProps('trades')} />} />
-          <SettingRow icon="heart-outline" title="Lajkovi i wishlist" description="Reakcije na tvoje artikle." right={<Switch {...switchProps('likes')} />} />
-          <SettingRow icon="person-add-outline" title="Novi pratioci" right={<Switch {...switchProps('follows')} />} />
-          <SettingRow icon="star-outline" title="Ocene" description="Nova ocena posle razmene." right={<Switch {...switchProps('ratings')} />} />
-          <SettingRow icon="sparkles-outline" title="Velve novosti" description="Produkt novosti i retke preporuke." right={<Switch {...switchProps('marketing')} />} />
+          <SettingRow icon="notifications-outline" title={t('settings.allPush')} right={<Switch {...switchProps('allPush')} />} />
+          <SettingRow icon="chatbubble-outline" title={t('settings.messages')} description={t('settings.messagesDescription')} right={<Switch {...switchProps('messages')} />} />
+          <SettingRow icon="swap-horizontal-outline" title={t('settings.trades')} description={t('settings.tradesDescription')} right={<Switch {...switchProps('trades')} />} />
+          <SettingRow icon="heart-outline" title={t('settings.likes')} description={t('settings.likesDescription')} right={<Switch {...switchProps('likes')} />} />
+          <SettingRow icon="person-add-outline" title={t('settings.follows')} right={<Switch {...switchProps('follows')} />} />
+          <SettingRow icon="star-outline" title={t('settings.ratings')} description={t('settings.ratingsDescription')} right={<Switch {...switchProps('ratings')} />} />
+          <SettingRow icon="sparkles-outline" title={t('settings.marketing')} description={t('settings.marketingDescription')} right={<Switch {...switchProps('marketing')} />} />
         </SettingsSection>
 
-        <SettingsSection title="Privatnost i sigurnost">
+        <SettingsSection title={t('settings.privacy')}>
           <SettingRow
             icon="people-outline"
-            title="Pratioci i pracenje"
-            description="Upravljaj listom ljudi koje pratis i ukloni pratioce."
+            title={t('settings.connections')}
+            description={t('settings.connectionsDescription')}
             onPress={() =>
               router.push({
                 pathname: '/connections',
@@ -288,32 +282,32 @@ export default function SettingsScreen() {
           />
           <SettingRow
             icon="ban-outline"
-            title="Blokirani korisnici"
-            description="Pregledaj i deblokiraj korisnike."
+            title={t('settings.blockedUsers')}
+            description={t('settings.blockedUsersDescription')}
             onPress={() => router.push('/blocked-users')}
           />
           <SettingRow
             icon="shield-checkmark-outline"
-            title="Sakrij i prijavi"
-            description="Na profilu ili artiklu koristi meni sa tri tacke za blokiranje i prijavu."
+            title={t('settings.hideReport')}
+            description={t('settings.hideReportDescription')}
           />
         </SettingsSection>
 
-        <SettingsSection title="Podrska i pravila">
+        <SettingsSection title={t('settings.supportRules')}>
           <SettingRow
             icon="help-circle-outline"
-            title="Kontakt podrske"
-            description="Prijavi problem sa nalogom, trade-om ili uploudom."
+            title={t('settings.support')}
+            description={t('settings.supportDescription')}
             onPress={() => openExternal('mailto:support@velveapp.com?subject=Velve%20support')}
           />
           <SettingRow
             icon="document-text-outline"
-            title="Uslovi koriscenja"
+            title={t('settings.terms')}
             onPress={() => openExternal('https://velve.app/terms')}
           />
           <SettingRow
             icon="lock-closed-outline"
-            title="Politika privatnosti"
+            title={t('settings.privacyPolicy')}
             onPress={() => openExternal('https://velve.app/privacy')}
           />
         </SettingsSection>
@@ -322,7 +316,7 @@ export default function SettingsScreen() {
           className="mt-6 items-center rounded-[24px] border border-signal-danger/20 bg-signal-danger/10 px-5 py-4"
           onPress={handleLogout}
         >
-          <Text className="font-sans text-sm font-semibold text-signal-danger">Odjavi se</Text>
+          <Text className="font-sans text-sm font-semibold text-signal-danger">{t('profile.logout')}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

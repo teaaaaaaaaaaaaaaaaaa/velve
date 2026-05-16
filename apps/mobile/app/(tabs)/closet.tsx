@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons'
+﻿import { Ionicons } from '@expo/vector-icons'
 import { Alert } from '@/lib/velveAlert'
 import { useRouter } from 'expo-router'
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
@@ -14,6 +14,7 @@ import client from '@/api/client'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { RemoteImage } from '@/components/RemoteImage'
 import { colors } from '@/design/tokens'
+import { useI18n } from '@/i18n'
 import { getPrimaryItemImage, hasDigitizedImage } from '@/lib/itemImages'
 
 type ClosetBucket = 'live' | 'drafts' | 'archive'
@@ -36,21 +37,6 @@ type ClosetPayload = {
   live: ClosetItem[]
   drafts: ClosetItem[]
   archive: ClosetItem[]
-}
-
-const BUCKET_META: Record<ClosetBucket, { title: string; description: string }> = {
-  live: {
-    title: 'Live closet',
-    description: 'Aktivne objave koje su trenutno vidljive u discovery feedu.',
-  },
-  drafts: {
-    title: 'Drafts',
-    description: 'Komadi koje jos doterujes pre objave.',
-  },
-  archive: {
-    title: 'Archive',
-    description: 'Prodati, zamenjeni i arhivirani komadi za pregled istorije.',
-  },
 }
 
 function getStatusLabel(item: ClosetItem) {
@@ -83,6 +69,8 @@ const ClosetCard = memo(function ClosetCard({
   onOpen,
   onQuickAction,
   quickActionLabel,
+  noDetailsLabel,
+  openLabel,
   onDigitize,
   onDelete,
 }: {
@@ -90,6 +78,8 @@ const ClosetCard = memo(function ClosetCard({
   onOpen: () => void
   onQuickAction?: () => void
   quickActionLabel?: string | null
+  noDetailsLabel: string
+  openLabel: string
   onDigitize?: () => void
   onDelete?: () => void
 }) {
@@ -136,7 +126,7 @@ const ClosetCard = memo(function ClosetCard({
               <Text className="mt-1 font-sans text-xs text-ink-dark/55">
                 {[item.brand, item.size ? item.size.toUpperCase() : null]
                   .filter(Boolean)
-                  .join(' / ') || 'Bez dodatnih detalja'}
+                  .join(' / ') || noDetailsLabel}
               </Text>
             </View>
 
@@ -172,7 +162,7 @@ const ClosetCard = memo(function ClosetCard({
               onPress={onOpen}
               className="rounded-full border border-ink-dark/10 bg-base-canvas px-3 py-2"
             >
-              <Text className="font-sans text-xs font-semibold text-ink-dark">Otvori</Text>
+              <Text className="font-sans text-xs font-semibold text-ink-dark">{openLabel}</Text>
             </TouchableOpacity>
 
             {onQuickAction && quickActionLabel ? (
@@ -247,6 +237,7 @@ function ClosetSkeleton() {
 
 export default function ClosetScreen() {
   const router = useRouter()
+  const { t } = useI18n()
 
   const [closet, setCloset] = useState<ClosetPayload>({
     live: [],
@@ -275,10 +266,10 @@ export default function ClosetScreen() {
   useEffect(() => {
     loadCloset()
       .catch(() => {
-        Alert.alert('Greska', 'Closet trenutno nije moguce ucitati.')
+        Alert.alert(t('common.error'), t('closet.loadError'))
       })
       .finally(() => setLoading(false))
-  }, [loadCloset])
+  }, [loadCloset, t])
 
   const onRefresh = useCallback(async () => {
     try {
@@ -296,13 +287,13 @@ export default function ClosetScreen() {
         await callback()
         await loadCloset()
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Promena nije uspela.'
-        Alert.alert('Greska', message)
+        const message = error instanceof Error ? error.message : t('closet.mutationError')
+        Alert.alert(t('common.error'), message)
       } finally {
         setSubmitting(false)
       }
     },
-    [loadCloset]
+    [loadCloset, t]
   )
 
   const bucketCounts = useMemo(
@@ -315,11 +306,11 @@ export default function ClosetScreen() {
   )
 
   const quickActionLabel = useCallback((item: ClosetItem) => {
-    if (item.status === 'draft') return 'Objavi'
-    if (item.status === 'available') return 'Pauziraj'
-    if (item.status === 'unavailable' || item.status === 'archived') return 'Vrati live'
+    if (item.status === 'draft') return t('closet.publish')
+    if (item.status === 'available') return t('closet.pause')
+    if (item.status === 'unavailable' || item.status === 'archived') return t('closet.restoreLive')
     return null
-  }, [])
+  }, [t])
 
   const handleQuickAction = useCallback(
     async (item: ClosetItem) => {
@@ -345,22 +336,22 @@ export default function ClosetScreen() {
         await loadCloset()
       } catch (error: any) {
         Alert.alert(
-          'Clean Cut nije uspeo',
-          error?.response?.data?.error || error?.message || 'Pokusaj ponovo za nekoliko trenutaka.'
+          t('closet.cleanCutFailedTitle'),
+          error?.response?.data?.error || error?.message || t('closet.cleanCutRetry')
         )
       } finally {
         setDigitizingItemId(null)
       }
     },
-    [loadCloset]
+    [loadCloset, t]
   )
 
   const handleDelete = useCallback(
     (item: ClosetItem) => {
-      Alert.alert('Obrisi komad', `Da li si siguran/na da zelis da obrises "${item.title}"?`, [
-        { text: 'Odustani', style: 'cancel' },
+      Alert.alert(t('closet.deleteTitle'), t('closet.deleteDescription', { title: item.title }), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Obrisi',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () =>
             withMutation(async () => {
@@ -369,7 +360,7 @@ export default function ClosetScreen() {
         },
       ])
     },
-    [withMutation]
+    [t, withMutation]
   )
 
   const renderClosetItem = useCallback(
@@ -384,12 +375,14 @@ export default function ClosetScreen() {
               : undefined
           }
           quickActionLabel={quickActionLabel(item)}
+          noDetailsLabel={t('closet.noDetails')}
+          openLabel={t('closet.open')}
           onDigitize={!item.isDigitized && !digitizingItemId ? () => handleDigitize(item) : undefined}
           onDelete={item.status === 'draft' ? () => handleDelete(item) : undefined}
         />
       </View>
     ),
-    [digitizingItemId, handleDelete, handleDigitize, handleQuickAction, quickActionLabel, router]
+    [digitizingItemId, handleDelete, handleDigitize, handleQuickAction, quickActionLabel, router, t]
   )
 
   const closetHeader = useMemo(
@@ -398,9 +391,9 @@ export default function ClosetScreen() {
         <View className="mb-5 flex-row items-center justify-between">
           <View className="flex-1 pr-4">
             <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
-              Closet
+              {t('closet.eyebrow')}
             </Text>
-            <Text className="font-display text-4xl text-ink-dark">Moj closet</Text>
+            <Text className="font-display text-4xl text-ink-dark">{t('closet.title')}</Text>
           </View>
           <TouchableOpacity
             className="h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
@@ -421,7 +414,7 @@ export default function ClosetScreen() {
           }}
         >
           <Text className="font-sans text-sm leading-6 text-ink-dark/70">
-            Sve objave su sada na jednom jednostavnom mestu: live, drafts i archive.
+            {t('closet.headerDescription')}
           </Text>
 
           <View className="mt-4 flex-row gap-3">
@@ -429,7 +422,7 @@ export default function ClosetScreen() {
               className="flex-1 items-center rounded-full bg-brand-accent-deep px-4 py-3"
               onPress={() => router.push('/(tabs)/upload')}
             >
-              <Text className="font-sans text-sm font-semibold text-base-canvas">Nova objava</Text>
+              <Text className="font-sans text-sm font-semibold text-base-canvas">{t('closet.newListing')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               className={`flex-1 items-center rounded-full bg-brand-highlight px-4 py-3 ${hasReadyForVto ? '' : 'opacity-40'}`}
@@ -437,7 +430,7 @@ export default function ClosetScreen() {
               onPress={() => router.push('/vto/archive')}
             >
               <Text className="font-sans text-sm font-semibold text-ink-dark">
-                Magično Isprobaj
+                {t('closet.magicTryOn')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -466,14 +459,24 @@ export default function ClosetScreen() {
         </View>
 
         <View className="mb-5 px-0">
-          <Text className="font-display text-3xl text-ink-dark">{BUCKET_META[activeBucket].title}</Text>
+          <Text className="font-display text-3xl text-ink-dark">
+            {activeBucket === 'live'
+              ? t('closet.liveTitle')
+              : activeBucket === 'drafts'
+                ? t('closet.draftsTitle')
+                : t('closet.archiveTitle')}
+          </Text>
           <Text className="mt-1 font-sans text-sm leading-6 text-ink-dark/60">
-            {BUCKET_META[activeBucket].description}
+            {activeBucket === 'live'
+              ? t('closet.liveDescription')
+              : activeBucket === 'drafts'
+                ? t('closet.draftsDescription')
+                : t('closet.archiveDescription')}
           </Text>
         </View>
       </View>
     ),
-    [activeBucket, bucketCounts, hasReadyForVto, router]
+    [activeBucket, bucketCounts, hasReadyForVto, router, t]
   )
 
   if (loading) {
@@ -493,19 +496,19 @@ export default function ClosetScreen() {
             icon={activeBucket === 'drafts' ? 'document-text-outline' : 'shirt-outline'}
             title={
               activeBucket === 'live'
-                ? 'Live closet je prazan'
+                ? t('closet.liveEmptyTitle')
                 : activeBucket === 'drafts'
-                  ? 'Nema draft komada'
-                  : 'Archive jos nema komade'
+                  ? t('closet.draftsEmptyTitle')
+                  : t('closet.archiveEmptyTitle')
             }
             description={
               activeBucket === 'live'
-                ? 'Objavi komad ili vrati arhivirani item nazad u aktivni closet.'
+                ? t('closet.liveEmptyDescription')
                 : activeBucket === 'drafts'
-                  ? 'Sacuvaj nedovrsenu objavu kao draft i vrati joj se kasnije.'
-                  : 'Kada prodas, zamenis ili arhiviras komad, ovde ostaje pregled.'
+                  ? t('closet.draftsEmptyDescription')
+                  : t('closet.archiveEmptyDescription')
             }
-            actionLabel={activeBucket === 'archive' ? undefined : 'Dodaj objavu'}
+            actionLabel={activeBucket === 'archive' ? undefined : t('closet.addListing')}
             onAction={activeBucket === 'archive' ? undefined : () => router.push('/(tabs)/upload')}
           />
         </View>
@@ -514,7 +517,7 @@ export default function ClosetScreen() {
         submitting || digitizingItemId ? (
           <View className="py-2">
             <Text className="text-center font-sans text-sm text-ink-dark/55">
-              {digitizingItemId ? 'Clean Cut digitalizuje komad...' : 'Azuriram closet...'}
+              {digitizingItemId ? t('closet.digitizing') : t('closet.updating')}
             </Text>
           </View>
         ) : null
@@ -528,3 +531,4 @@ export default function ClosetScreen() {
     />
   )
 }
+

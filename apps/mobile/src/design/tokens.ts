@@ -1,6 +1,14 @@
 import { ImageSourcePropType, ViewStyle } from 'react-native'
 
-export type SupportedLocale = 'sr' | 'en' | 'ru'
+export const defaultLocale = 'en'
+export const supportedLocales = ['en', 'sr', 'ru'] as const
+export type SupportedLocale = (typeof supportedLocales)[number]
+
+export const localeLabels: Record<SupportedLocale, string> = {
+  en: 'English',
+  sr: 'Srpski',
+  ru: 'Russian',
+}
 
 export const colors = {
   accentDeep: '#431A43',
@@ -30,8 +38,8 @@ export const fonts = {
 } as const
 
 export const localeTags: Record<SupportedLocale, string> = {
-  sr: 'sr-Latn-RS',
   en: 'en-US',
+  sr: 'sr-Latn-RS',
   ru: 'ru-RU',
 }
 

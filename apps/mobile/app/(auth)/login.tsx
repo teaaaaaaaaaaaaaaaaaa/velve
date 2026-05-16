@@ -39,19 +39,19 @@ function getEmailLoginError(error: any) {
     code === 'auth/invalid-credential' ||
     code === 'auth/invalid-login-credentials'
   ) {
-    return 'Pogresan email ili lozinka.'
+    return 'Wrong email or password.'
   }
 
-  if (code === 'auth/invalid-email') return 'Unesi ispravan email.'
-  if (code === 'auth/user-disabled') return 'Ovaj nalog je deaktiviran.'
+  if (code === 'auth/invalid-email') return 'Enter a valid email.'
+  if (code === 'auth/user-disabled') return 'This account has been disabled.'
   if (code === 'auth/too-many-requests') {
-    return 'Previse pokusaja. Sacekaj malo pa probaj ponovo.'
+    return 'Too many attempts. Wait a bit and try again.'
   }
   if (code === 'auth/network-request-failed' || error?.message?.includes('Network')) {
-    return 'Nema stabilne internet konekcije. Proveri mrezu i pokusaj ponovo.'
+    return 'No stable internet connection. Check your network and try again.'
   }
 
-  return 'Nije moguce prijaviti se trenutno. Pokusaj ponovo.'
+  return 'Unable to sign in right now. Try again.'
 }
 
 export default function LoginScreen() {
@@ -81,12 +81,12 @@ export default function LoginScreen() {
 
     if (!normalizedEmail || !password) {
       console.warn('[LoginScreen] Email login blocked because fields are empty')
-      setError('Unesi email i lozinku.')
+      setError('Enter your email and password.')
       return
     }
 
     if (!validateEmail(normalizedEmail)) {
-      setError('Unesi ispravan email.')
+      setError('Enter a valid email.')
       return
     }
 
@@ -124,19 +124,19 @@ export default function LoginScreen() {
         return
       }
 
-      let title = 'Google prijava'
-      let message = 'Doslo je do greske. Pokusaj ponovo.'
+      let title = 'Google sign-in'
+      let message = 'Something went wrong. Try again.'
 
       if (e.message === 'GOOGLE_SIGNIN_UNAVAILABLE') {
         message =
           googleSignInUnavailableReason ||
-          'Google prijava zahteva development build ili novu native instalaciju aplikacije.'
+          'Google sign-in requires a development build or a fresh native app install.'
       } else if (e.message?.includes('CLIENT_ID')) {
-        message = 'Aplikacija nije pravilno konfigurisana. Kontaktiraj podrsku.'
+        message = 'The app is not configured correctly. Contact support.'
       } else if (e.message === 'NETWORK_ERROR') {
-        message = 'Proveri internet konekciju i pokusaj ponovo.'
+        message = 'Check your internet connection and try again.'
       } else if (e.message === 'OAUTH_FAILED') {
-        message = 'Google prijava nije uspela. Pokusaj ponovo.'
+        message = 'Google sign-in failed. Try again.'
       }
 
       Alert.alert(title, message)

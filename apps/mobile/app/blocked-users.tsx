@@ -9,6 +9,7 @@ import { BrandBackground } from '@/components/BrandBackground'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { RemoteImage } from '@/components/RemoteImage'
 import { colors } from '@/design/tokens'
+import { useI18n } from '@/i18n'
 import { getApiErrorMessage } from '@/lib/apiErrors'
 
 type BlockedUserEntry = {
@@ -27,6 +28,7 @@ type BlockedUserEntry = {
 
 export default function BlockedUsersScreen() {
   const router = useRouter()
+  const { t } = useI18n()
   const [entries, setEntries] = useState<BlockedUserEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -41,9 +43,9 @@ export default function BlockedUsersScreen() {
         setErrorMessage('')
       }
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Lista blokiranih korisnika trenutno nije dostupna.'))
+      setErrorMessage(getApiErrorMessage(error, t('blocked.loadError')))
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     loadBlockedUsers().finally(() => setLoading(false))
@@ -57,17 +59,18 @@ export default function BlockedUsersScreen() {
 
   const unblockUser = useCallback(
     (entry: BlockedUserEntry) => {
-      Alert.alert('Deblokiraj korisnika', `${entry.user.displayName || 'Korisnik'} ce ponovo moci da vidi tvoj profil i objave.`, [
-        { text: 'Odustani', style: 'cancel' },
+      const name = entry.user.displayName || t('common.user')
+      Alert.alert(t('blocked.unblockTitle'), t('blocked.unblockDescription', { name }), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Deblokiraj',
+          text: t('blocked.unblockCta'),
           onPress: async () => {
             try {
               setBusyId(entry.user._id)
               setEntries((prev) => prev.filter((item) => item.user._id !== entry.user._id))
               await client.delete(`/api/users/${entry.user._id}/block`)
             } catch (error) {
-              Alert.alert('Greska', getApiErrorMessage(error, 'Deblokiranje trenutno nije uspelo.'))
+              Alert.alert(t('common.error'), getApiErrorMessage(error, t('blocked.unblockError')))
               await loadBlockedUsers()
             } finally {
               setBusyId(null)
@@ -76,7 +79,7 @@ export default function BlockedUsersScreen() {
         },
       ])
     },
-    [loadBlockedUsers]
+    [loadBlockedUsers, t]
   )
 
   if (loading) {
@@ -105,20 +108,20 @@ export default function BlockedUsersScreen() {
         </View>
 
         <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
-          Privacy
+          {t('blocked.eyebrow')}
         </Text>
-        <Text className="mt-1 font-display text-4xl text-ink-dark">Blokirani korisnici</Text>
+        <Text className="mt-1 font-display text-4xl text-ink-dark">{t('blocked.title')}</Text>
         <Text className="mt-3 font-sans text-sm leading-6 text-ink-dark/60">
-          Ljudi koje blokiras ne ulaze u tvoj feed, search i trade tokove.
+          {t('blocked.description')}
         </Text>
 
         {errorMessage ? (
           <View className="mt-8">
             <EditorialEmptyState
               icon="cloud-offline-outline"
-              title="Lista nije ucitana"
+              title={t('blocked.errorTitle')}
               description={errorMessage}
-              actionLabel="Pokusaj ponovo"
+              actionLabel={t('common.retry')}
               onAction={loadBlockedUsers}
             />
           </View>
@@ -126,14 +129,14 @@ export default function BlockedUsersScreen() {
           <View className="mt-8">
             <EditorialEmptyState
               icon="shield-checkmark-outline"
-              title="Nema blokiranih korisnika"
-              description="Ako nekoga blokiras iz profila ili feeda, pojaviće se ovde."
+              title={t('blocked.emptyTitle')}
+              description={t('blocked.emptyDescription')}
             />
           </View>
         ) : (
           <View className="mt-6 gap-3">
             {entries.map((entry) => {
-              const name = entry.user.displayName || 'Korisnik'
+              const name = entry.user.displayName || t('common.user')
               return (
                 <View key={entry._id} className="flex-row items-center rounded-[24px] bg-surface-panel px-4 py-4">
                   {entry.user.photoURL ? (
@@ -148,7 +151,7 @@ export default function BlockedUsersScreen() {
                   <View className="ml-3 flex-1">
                     <Text className="font-sans text-sm font-semibold text-ink-dark">{name}</Text>
                     <Text className="mt-1 font-sans text-xs text-ink-dark/50">
-                      {entry.user.completedTrades || 0} razmena
+                      {t('blocked.tradesCount', { count: entry.user.completedTrades || 0 })}
                     </Text>
                   </View>
                   <TouchableOpacity
@@ -157,7 +160,7 @@ export default function BlockedUsersScreen() {
                     className="rounded-full bg-base-canvas px-4 py-2.5"
                   >
                     <Text className="font-sans text-xs font-semibold text-ink-dark">
-                      {busyId === entry.user._id ? '...' : 'Deblokiraj'}
+                      {busyId === entry.user._id ? '...' : t('blocked.unblockCta')}
                     </Text>
                   </TouchableOpacity>
                 </View>

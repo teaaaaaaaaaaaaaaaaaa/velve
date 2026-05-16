@@ -8,6 +8,7 @@ import { BrandBackground } from '@/components/BrandBackground'
 import { EditorialEmptyState } from '@/components/EditorialEmptyState'
 import { RemoteImage } from '@/components/RemoteImage'
 import { colors } from '@/design/tokens'
+import { useI18n } from '@/i18n'
 import { getApiErrorMessage } from '@/lib/apiErrors'
 
 type NotificationRecord = {
@@ -24,10 +25,10 @@ type NotificationRecord = {
   data?: Record<string, string>
 }
 
-function formatTime(dateStr: string) {
+function formatTime(dateStr: string, nowLabel: string) {
   const diffMs = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diffMs / 60000)
-  if (mins < 1) return 'Sad'
+  if (mins < 1) return nowLabel
   if (mins < 60) return `${mins}m`
   const hours = Math.floor(mins / 60)
   if (hours < 24) return `${hours}h`
@@ -51,6 +52,7 @@ function getIcon(type: string): keyof typeof Ionicons.glyphMap {
 
 export default function NotificationsScreen() {
   const router = useRouter()
+  const { t } = useI18n()
   const [notifications, setNotifications] = useState<NotificationRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -72,9 +74,9 @@ export default function NotificationsScreen() {
         setErrorMessage('')
       }
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Notifikacije trenutno nisu dostupne.'))
+      setErrorMessage(getApiErrorMessage(error, t('notifications.loadError')))
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     loadNotifications().finally(() => setLoading(false))
@@ -158,7 +160,7 @@ export default function NotificationsScreen() {
                       {notification.title}
                     </Text>
                     <Text className="ml-2 font-sans text-xs text-ink-dark/35">
-                      {formatTime(notification.createdAt)}
+                      {formatTime(notification.createdAt, t('notifications.now'))}
                     </Text>
                   </View>
                   {notification.body ? (
@@ -199,22 +201,22 @@ export default function NotificationsScreen() {
             <Ionicons name="arrow-back" size={20} color={colors.inkDark} />
           </TouchableOpacity>
           <TouchableOpacity onPress={markAllRead} className="rounded-full bg-surface-panel px-4 py-3">
-            <Text className="font-sans text-sm font-semibold text-brand-accent-deep">Procitano</Text>
+            <Text className="font-sans text-sm font-semibold text-brand-accent-deep">{t('notifications.markRead')}</Text>
           </TouchableOpacity>
         </View>
 
         <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
-          Velve pulse
+          {t('notifications.eyebrow')}
         </Text>
-        <Text className="mt-1 font-display text-4xl text-ink-dark">Notifikacije</Text>
+        <Text className="mt-1 font-display text-4xl text-ink-dark">{t('notifications.title')}</Text>
 
         {errorMessage ? (
           <View className="mt-8">
             <EditorialEmptyState
               icon="cloud-offline-outline"
-              title="Ne mogu da ucitam notifikacije"
+              title={t('notifications.errorTitle')}
               description={errorMessage}
-              actionLabel="Pokusaj ponovo"
+              actionLabel={t('common.retry')}
               onAction={loadNotifications}
             />
           </View>
@@ -222,14 +224,14 @@ export default function NotificationsScreen() {
           <View className="mt-8">
             <EditorialEmptyState
               icon="notifications-outline"
-              title="Jos nema notifikacija"
-              description="Kada neko lajkuje komad, zaprati te ili promeni trade tok, sve ce stizati ovde."
+              title={t('notifications.emptyTitle')}
+              description={t('notifications.emptyDescription')}
             />
           </View>
         ) : (
           <>
-            {renderGroup('Danas', grouped.today)}
-            {renderGroup('Ranije', grouped.earlier)}
+            {renderGroup(t('notifications.today'), grouped.today)}
+            {renderGroup(t('notifications.earlier'), grouped.earlier)}
           </>
         )}
       </View>
