@@ -1,65 +1,78 @@
-import { Ionicons } from '@expo/vector-icons'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useState } from 'react'
-import {
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BrandBackground } from '@/components/BrandBackground'
-import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen'
-import { VelveTextInput } from '@/components/VelveTextInput'
-import { colors } from '@/design/tokens'
+import { BrandBackground } from '@/components/BrandBackground';
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen';
+import { VelveTextInput } from '@/components/VelveTextInput';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
 
-type ListingType = 'trade' | 'sell' | 'both'
+type ListingType = 'trade' | 'sell' | 'both';
 
 const LISTING_OPTIONS: {
-  value: ListingType
-  label: string
-  desc: string
-  icon: keyof typeof Ionicons.glyphMap
+  value: ListingType;
+  label: string;
+  desc: string;
+  icon: keyof typeof Ionicons.glyphMap;
 }[] = [
-  { value: 'trade', label: 'Razmeni', desc: 'Zameni za drugi komad', icon: 'swap-horizontal-outline' },
+  {
+    value: 'trade',
+    label: 'Razmeni',
+    desc: 'Zameni za drugi komad',
+    icon: 'swap-horizontal-outline',
+  },
   { value: 'sell', label: 'Prodaj', desc: 'Postavi cenu', icon: 'pricetag-outline' },
   { value: 'both', label: 'Oboje', desc: 'Razmena ili prodaja', icon: 'options-outline' },
-]
+];
 
 const POPULAR_BRANDS = [
-  'Zara', 'H&M', 'Nike', 'Adidas', 'Stradivarius', 'Bershka',
-  'Pull&Bear', 'Mango', 'Massimo Dutti', 'Reserved', 'C&A',
-  'Levi\'s', 'Tommy Hilfiger', 'Calvin Klein', 'Guess', 'New Balance',
-]
+  'Zara',
+  'H&M',
+  'Nike',
+  'Adidas',
+  'Stradivarius',
+  'Bershka',
+  'Pull&Bear',
+  'Mango',
+  'Massimo Dutti',
+  'Reserved',
+  'C&A',
+  "Levi's",
+  'Tommy Hilfiger',
+  'Calvin Klein',
+  'Guess',
+  'New Balance',
+];
 
-const SIZES = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL']
+const SIZES = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
 
 export default function ListingScreen() {
-  const router = useRouter()
-  const insets = useSafeAreaInsets()
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const { itemId, category, condition } = useLocalSearchParams<{
-    itemId: string
-    category: string
-    condition: string
-  }>()
+    itemId: string;
+    category: string;
+    condition: string;
+  }>();
 
-  const [listingType, setListingType] = useState<ListingType | ''>('')
-  const [price, setPrice] = useState('')
-  const [tradeFor, setTradeFor] = useState('')
-  const [brand, setBrand] = useState('')
-  const [customBrand, setCustomBrand] = useState('')
-  const [showCustomBrand, setShowCustomBrand] = useState(false)
-  const [size, setSize] = useState('')
-  const [customSize, setCustomSize] = useState('')
-  const [showCustomSize, setShowCustomSize] = useState(false)
+  const [listingType, setListingType] = useState<ListingType | ''>('');
+  const [price, setPrice] = useState('');
+  const [tradeFor, setTradeFor] = useState('');
+  const [brand, setBrand] = useState('');
+  const [customBrand, setCustomBrand] = useState('');
+  const [showCustomBrand, setShowCustomBrand] = useState(false);
+  const [size, setSize] = useState('');
+  const [customSize, setCustomSize] = useState('');
+  const [showCustomSize, setShowCustomSize] = useState(false);
 
-  const showPrice = listingType === 'sell' || listingType === 'both'
-  const showTrade = listingType === 'trade' || listingType === 'both'
+  const showPrice = listingType === 'sell' || listingType === 'both';
+  const showTrade = listingType === 'trade' || listingType === 'both';
 
-  const canContinue =
-    listingType !== '' &&
-    (!showPrice || price.trim() !== '')
+  const canContinue = listingType !== '' && (!showPrice || price.trim() !== '');
 
   return (
     <KeyboardAwareScreen className="bg-base-canvas">
@@ -89,10 +102,10 @@ export default function ListingScreen() {
 
         <View className="px-5 pt-8">
           <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
-            Ponuda
+            {t('upload.listingEyebrow')}
           </Text>
           <Text className="mt-1 font-display text-4xl text-ink-dark">
-            Kako zelis da ponudis?
+            {t('upload.listingTitle')}
           </Text>
 
           {/* Listing type cards */}
@@ -109,9 +122,7 @@ export default function ListingScreen() {
               >
                 <View
                   className={`mr-4 h-12 w-12 items-center justify-center rounded-2xl ${
-                    listingType === opt.value
-                      ? 'bg-base-canvas/20'
-                      : 'bg-brand-accent-light/25'
+                    listingType === opt.value ? 'bg-base-canvas/20' : 'bg-brand-accent-light/25'
                   }`}
                 >
                   <Ionicons
@@ -126,14 +137,22 @@ export default function ListingScreen() {
                       listingType === opt.value ? 'text-base-canvas' : 'text-ink-dark'
                     }`}
                   >
-                    {opt.label}
+                    {opt.value === 'trade'
+                      ? t('upload.listingTrade')
+                      : opt.value === 'sell'
+                        ? t('upload.listingSell')
+                        : t('upload.listingBoth')}
                   </Text>
                   <Text
                     className={`mt-0.5 font-sans text-xs ${
                       listingType === opt.value ? 'text-base-canvas/70' : 'text-ink-dark/50'
                     }`}
                   >
-                    {opt.desc}
+                    {opt.value === 'trade'
+                      ? t('upload.listingTradeDesc')
+                      : opt.value === 'sell'
+                        ? t('upload.listingSellDesc')
+                        : t('upload.listingBothDesc')}
                   </Text>
                 </View>
                 {listingType === opt.value ? (
@@ -147,7 +166,7 @@ export default function ListingScreen() {
           {showPrice ? (
             <View className="mt-6">
               <Text className="mb-2 font-sans text-sm font-semibold text-ink-dark">
-                Cena (EUR)
+                {t('upload.priceLabel')}
               </Text>
               <View className="flex-row items-center rounded-[20px] border border-ink-dark/8 bg-surface-panel px-5">
                 <Ionicons name="logo-euro" size={18} color={colors.mutedText} />
@@ -166,12 +185,12 @@ export default function ListingScreen() {
           {showTrade ? (
             <View className="mt-6">
               <Text className="mb-2 font-sans text-sm font-semibold text-ink-dark">
-                Sta trazis za razmenu?
+                {t('upload.tradeForLabel')}
               </Text>
               <VelveTextInput
                 value={tradeFor}
                 onChangeText={setTradeFor}
-                placeholder="Npr. oversized jakna, Nike patike..."
+                placeholder={t('upload.tradeForPlaceholder')}
                 className="rounded-[20px] border border-ink-dark/8 bg-surface-panel px-5 py-4 font-sans text-sm text-ink-dark"
               />
             </View>
@@ -180,9 +199,11 @@ export default function ListingScreen() {
           {/* Brand */}
           <View className="mt-8">
             <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
-              Detalji
+              {t('upload.detailsEyebrow')}
             </Text>
-            <Text className="mt-3 font-sans text-sm font-semibold text-ink-dark">Brand</Text>
+            <Text className="mt-3 font-sans text-sm font-semibold text-ink-dark">
+              {t('upload.brandLabel')}
+            </Text>
           </View>
 
           <ScrollView
@@ -192,38 +213,55 @@ export default function ListingScreen() {
             contentContainerStyle={{ paddingRight: 20, gap: 8 }}
           >
             <TouchableOpacity
-              onPress={() => { setBrand(''); setShowCustomBrand(false); setCustomBrand('') }}
+              onPress={() => {
+                setBrand('');
+                setShowCustomBrand(false);
+                setCustomBrand('');
+              }}
               className={`rounded-full px-4 py-2.5 ${
                 brand === '' && !showCustomBrand
                   ? 'bg-brand-accent-deep'
                   : 'border border-ink-dark/10 bg-surface-panel'
               }`}
             >
-              <Text className={`font-sans text-sm ${
-                brand === '' && !showCustomBrand ? 'font-semibold text-base-canvas' : 'text-ink-dark/60'
-              }`}>
-                Ne znam
+              <Text
+                className={`font-sans text-sm ${
+                  brand === '' && !showCustomBrand
+                    ? 'font-semibold text-base-canvas'
+                    : 'text-ink-dark/60'
+                }`}
+              >
+                {t('upload.brandUnknown')}
               </Text>
             </TouchableOpacity>
             {POPULAR_BRANDS.map((b) => (
               <TouchableOpacity
                 key={b}
-                onPress={() => { setBrand(b); setShowCustomBrand(false); setCustomBrand('') }}
+                onPress={() => {
+                  setBrand(b);
+                  setShowCustomBrand(false);
+                  setCustomBrand('');
+                }}
                 className={`rounded-full px-4 py-2.5 ${
                   brand === b
                     ? 'bg-brand-accent-deep'
                     : 'border border-ink-dark/10 bg-surface-panel'
                 }`}
               >
-                <Text className={`font-sans text-sm ${
-                  brand === b ? 'font-semibold text-base-canvas' : 'text-ink-dark'
-                }`}>
+                <Text
+                  className={`font-sans text-sm ${
+                    brand === b ? 'font-semibold text-base-canvas' : 'text-ink-dark'
+                  }`}
+                >
                   {b}
                 </Text>
               </TouchableOpacity>
             ))}
             <TouchableOpacity
-              onPress={() => { setShowCustomBrand(true); setBrand('') }}
+              onPress={() => {
+                setShowCustomBrand(true);
+                setBrand('');
+              }}
               className={`flex-row items-center rounded-full px-4 py-2.5 ${
                 showCustomBrand
                   ? 'bg-brand-accent-deep'
@@ -235,10 +273,12 @@ export default function ListingScreen() {
                 size={16}
                 color={showCustomBrand ? colors.baseCanvas : colors.inkDark}
               />
-              <Text className={`ml-1 font-sans text-sm ${
-                showCustomBrand ? 'font-semibold text-base-canvas' : 'text-ink-dark'
-              }`}>
-                Drugi
+              <Text
+                className={`ml-1 font-sans text-sm ${
+                  showCustomBrand ? 'font-semibold text-base-canvas' : 'text-ink-dark'
+                }`}
+              >
+                {t('upload.brandOther')}
               </Text>
             </TouchableOpacity>
           </ScrollView>
@@ -246,8 +286,11 @@ export default function ListingScreen() {
           {showCustomBrand ? (
             <VelveTextInput
               value={customBrand}
-              onChangeText={(text) => { setCustomBrand(text); setBrand(text) }}
-              placeholder="Upisi brend..."
+              onChangeText={(text) => {
+                setCustomBrand(text);
+                setBrand(text);
+              }}
+              placeholder={t('upload.brandPlaceholder')}
               autoFocus
               className="mt-3 rounded-[20px] border border-brand-accent-deep/20 bg-surface-panel px-5 py-4 font-sans text-sm text-ink-dark"
             />
@@ -255,29 +298,38 @@ export default function ListingScreen() {
 
           {/* Size */}
           <View className="mt-6">
-            <Text className="font-sans text-sm font-semibold text-ink-dark">Velicina</Text>
+            <Text className="font-sans text-sm font-semibold text-ink-dark">
+              {t('upload.sizeLabel')}
+            </Text>
           </View>
 
           <View className="mt-3 flex-row flex-wrap gap-2">
             {SIZES.map((s) => (
               <TouchableOpacity
                 key={s}
-                onPress={() => { setSize(s); setShowCustomSize(false); setCustomSize('') }}
+                onPress={() => {
+                  setSize(s);
+                  setShowCustomSize(false);
+                  setCustomSize('');
+                }}
                 className={`min-w-[52px] items-center rounded-full px-4 py-2.5 ${
-                  size === s
-                    ? 'bg-brand-accent-deep'
-                    : 'border border-ink-dark/10 bg-surface-panel'
+                  size === s ? 'bg-brand-accent-deep' : 'border border-ink-dark/10 bg-surface-panel'
                 }`}
               >
-                <Text className={`font-sans text-sm ${
-                  size === s ? 'font-semibold text-base-canvas' : 'text-ink-dark'
-                }`}>
+                <Text
+                  className={`font-sans text-sm ${
+                    size === s ? 'font-semibold text-base-canvas' : 'text-ink-dark'
+                  }`}
+                >
                   {s}
                 </Text>
               </TouchableOpacity>
             ))}
             <TouchableOpacity
-              onPress={() => { setShowCustomSize(true); setSize('') }}
+              onPress={() => {
+                setShowCustomSize(true);
+                setSize('');
+              }}
               className={`flex-row items-center rounded-full px-4 py-2.5 ${
                 showCustomSize
                   ? 'bg-brand-accent-deep'
@@ -289,10 +341,12 @@ export default function ListingScreen() {
                 size={16}
                 color={showCustomSize ? colors.baseCanvas : colors.inkDark}
               />
-              <Text className={`ml-1 font-sans text-sm ${
-                showCustomSize ? 'font-semibold text-base-canvas' : 'text-ink-dark'
-              }`}>
-                Druga
+              <Text
+                className={`ml-1 font-sans text-sm ${
+                  showCustomSize ? 'font-semibold text-base-canvas' : 'text-ink-dark'
+                }`}
+              >
+                {t('upload.sizeOther')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -300,8 +354,11 @@ export default function ListingScreen() {
           {showCustomSize ? (
             <VelveTextInput
               value={customSize}
-              onChangeText={(text) => { setCustomSize(text); setSize(text) }}
-              placeholder="Upisi velicinu (npr. 42, EU 38...)"
+              onChangeText={(text) => {
+                setCustomSize(text);
+                setSize(text);
+              }}
+              placeholder={t('upload.sizePlaceholder')}
               autoFocus
               className="mt-3 rounded-[20px] border border-brand-accent-deep/20 bg-surface-panel px-5 py-4 font-sans text-sm text-ink-dark"
             />
@@ -343,10 +400,10 @@ export default function ListingScreen() {
           }`}
         >
           <Text className="font-sans text-base font-semibold text-base-canvas">
-            Nastavi
+            {t('upload.continue')}
           </Text>
         </TouchableOpacity>
       </View>
     </KeyboardAwareScreen>
-  )
+  );
 }

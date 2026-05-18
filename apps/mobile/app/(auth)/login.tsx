@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { Alert } from '@/lib/velveAlert'
+import { useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import {
   Platform,
   ScrollView,
@@ -7,139 +7,149 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
-} from 'react-native'
-import { useRouter } from 'expo-router'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BrandBackground } from '@/components/BrandBackground'
-import { BrandWordmark } from '@/components/BrandWordmark'
-import { GlassSurface } from '@/components/GlassSurface'
-import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen'
-import { VelveTextInput, type VelveTextInputRef } from '@/components/VelveTextInput'
-import { colors } from '@/design/tokens'
-import { useAuth } from '@/hooks/useAuth'
-import { useI18n } from '@/i18n'
+import { BrandBackground } from '@/components/BrandBackground';
+import { BrandWordmark } from '@/components/BrandWordmark';
+import { GlassSurface } from '@/components/GlassSurface';
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen';
+import { VelveTextInput, type VelveTextInputRef } from '@/components/VelveTextInput';
+import { colors } from '@/design/tokens';
+import { useAuth } from '@/hooks/useAuth';
+import { useI18n } from '@/i18n';
+import {
+  getAuthInlineFeedback,
+  getAuthValidationFeedback,
+  getGoogleSignInFeedback,
+  isExpectedAuthError,
+  type InlineAuthFeedback,
+} from '@/lib/authFeedback';
+import { Alert } from '@/lib/velveAlert';
 
 function maskEmail(email: string) {
-  const [localPart = '', domain = ''] = email.trim().split('@')
-  if (!domain) return `${localPart.slice(0, 2)}***`
-  return `${localPart.slice(0, 2)}***@${domain}`
+  const [localPart = '', domain = ''] = email.trim().split('@');
+  if (!domain) return `${localPart.slice(0, 2)}***`;
+  return `${localPart.slice(0, 2)}***@${domain}`;
 }
 
 function validateEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
-}
-
-function getEmailLoginError(error: any) {
-  const code = error?.code || error?.nativeErrorCode || ''
-
-  if (
-    code === 'auth/user-not-found' ||
-    code === 'auth/wrong-password' ||
-    code === 'auth/invalid-credential' ||
-    code === 'auth/invalid-login-credentials'
-  ) {
-    return 'Wrong email or password.'
-  }
-
-  if (code === 'auth/invalid-email') return 'Enter a valid email.'
-  if (code === 'auth/user-disabled') return 'This account has been disabled.'
-  if (code === 'auth/too-many-requests') {
-    return 'Too many attempts. Wait a bit and try again.'
-  }
-  if (code === 'auth/network-request-failed' || error?.message?.includes('Network')) {
-    return 'No stable internet connection. Check your network and try again.'
-  }
-
-  return 'Unable to sign in right now. Try again.'
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
 export default function LoginScreen() {
-  const router = useRouter()
-  const insets = useSafeAreaInsets()
-  const { height } = useWindowDimensions()
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const {
     signInWithGoogle,
     signInWithEmail,
     googleSignInAvailable,
     googleSignInUnavailableReason,
-  } = useAuth()
-  const { t } = useI18n()
+  } = useAuth();
+  const { t } = useI18n();
 
-  const [showEmailLogin, setShowEmailLogin] = useState(false)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [showEmailLogin, setShowEmailLogin] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [feedback, setFeedback] = useState<InlineAuthFeedback | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [blockedUntil, setBlockedUntil] = useState<number | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
 
-  const passwordRef = useRef<VelveTextInputRef>(null)
-  const scrollRef = useRef<ScrollView>(null)
+  const passwordRef = useRef<VelveTextInputRef>(null);
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    if (!blockedUntil) {
+      setRemainingSeconds(0);
+      return;
+    }
+
+    const tick = () => {
+      const seconds = Math.max(0, Math.ceil((blockedUntil - Date.now()) / 1000));
+      setRemainingSeconds(seconds);
+      if (seconds === 0) {
+        setBlockedUntil(null);
+      }
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [blockedUntil]);
 
   async function handleEmailLogin() {
-    setError('')
-    const normalizedEmail = email.trim()
+    setFeedback(null);
+    const normalizedEmail = email.trim();
 
     if (!normalizedEmail || !password) {
-      console.warn('[LoginScreen] Email login blocked because fields are empty')
-      setError('Enter your email and password.')
-      return
+      console.warn('[LoginScreen] Email login blocked because fields are empty');
+      setFeedback(getAuthValidationFeedback('empty', t));
+      return;
     }
 
     if (!validateEmail(normalizedEmail)) {
-      setError('Enter a valid email.')
-      return
+      setFeedback(getAuthValidationFeedback('invalidEmail', t));
+      return;
+    }
+
+    if (blockedUntil && blockedUntil > Date.now()) {
+      setFeedback(
+        getAuthInlineFeedback({ code: 'auth/too-many-requests' }, t, 'login', remainingSeconds)
+      );
+      return;
     }
 
     console.log('[LoginScreen] Email login pressed', {
       email: maskEmail(normalizedEmail),
       passwordLength: password.length,
-    })
-    setLoading(true)
+    });
+    setLoading(true);
     try {
-      await signInWithEmail(normalizedEmail, password)
-      console.log('[LoginScreen] Email login request resolved successfully')
+      await signInWithEmail(normalizedEmail, password);
+      setBlockedUntil(null);
+      console.log('[LoginScreen] Email login request resolved successfully');
     } catch (e: any) {
-      console.error('[LoginScreen] Email login failed', {
+      const logger = isExpectedAuthError(e) ? console.warn : console.error;
+      logger('[LoginScreen] Email login failed', {
         code: e?.code,
         message: e?.message,
         nativeErrorCode: e?.nativeErrorCode,
-      })
-      setError(getEmailLoginError(e))
+      });
+
+      const nextBlockedUntil =
+        e?.code === 'auth/too-many-requests' ? Date.now() + 60000 : blockedUntil;
+      if (nextBlockedUntil) {
+        setBlockedUntil(nextBlockedUntil);
+      }
+
+      const retryAfterSeconds = nextBlockedUntil
+        ? Math.max(1, Math.ceil((nextBlockedUntil - Date.now()) / 1000))
+        : undefined;
+      setFeedback(getAuthInlineFeedback(e, t, 'login', retryAfterSeconds));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   async function handleGoogleLogin() {
     try {
-      console.log('[LoginScreen] Google login pressed')
-      await signInWithGoogle()
-      console.log('[LoginScreen] Google login request resolved successfully')
+      console.log('[LoginScreen] Google login pressed');
+      await signInWithGoogle();
+      console.log('[LoginScreen] Google login request resolved successfully');
     } catch (e: any) {
-      console.error('[LoginScreen] Google login failed', {
+      const logger = e?.message === 'USER_CANCELLED' ? console.warn : console.error;
+      logger('[LoginScreen] Google login failed', {
         code: e?.code,
         message: e?.message,
-      })
+      });
       if (e.message === 'USER_CANCELLED') {
-        return
+        return;
       }
 
-      let title = 'Google sign-in'
-      let message = 'Something went wrong. Try again.'
-
-      if (e.message === 'GOOGLE_SIGNIN_UNAVAILABLE') {
-        message =
-          googleSignInUnavailableReason ||
-          'Google sign-in requires a development build or a fresh native app install.'
-      } else if (e.message?.includes('CLIENT_ID')) {
-        message = 'The app is not configured correctly. Contact support.'
-      } else if (e.message === 'NETWORK_ERROR') {
-        message = 'Check your internet connection and try again.'
-      } else if (e.message === 'OAUTH_FAILED') {
-        message = 'Google sign-in failed. Try again.'
-      }
-
-      Alert.alert(title, message)
+      const { title, message } = getGoogleSignInFeedback(e, t, googleSignInUnavailableReason);
+      Alert.alert(title, message);
     }
   }
 
@@ -179,6 +189,7 @@ export default function LoginScreen() {
                 autoCorrect={false}
                 value={email}
                 onChangeText={setEmail}
+                onFocus={() => setFeedback(null)}
                 returnKeyType="next"
                 onSubmitEditing={() => passwordRef.current?.focus()}
                 blurOnSubmit={false}
@@ -191,23 +202,38 @@ export default function LoginScreen() {
                 secureTextEntry
                 value={password}
                 onChangeText={setPassword}
+                onFocus={() => setFeedback(null)}
                 returnKeyType="done"
                 onSubmitEditing={handleEmailLogin}
               />
 
-              {error ? (
-                <Text className="mt-4 font-sans text-sm leading-6" style={{ color: colors.danger }}>
-                  {error}
-                </Text>
+              {feedback ? (
+                <View className="mt-4 rounded-[18px] bg-signal-danger/8 px-4 py-3">
+                  <Text
+                    className="font-sans text-sm font-semibold leading-6"
+                    style={{ color: colors.danger }}
+                  >
+                    {t('auth.inlineErrorPrefix')}: {feedback.message}
+                  </Text>
+                  {feedback.recovery ? (
+                    <Text className="mt-1 font-sans text-xs leading-5 text-ink-dark/62">
+                      {feedback.recovery}
+                    </Text>
+                  ) : null}
+                </View>
               ) : null}
 
               <TouchableOpacity
                 className="mt-5 items-center rounded-pill bg-brand-accent-deep px-4 py-4"
                 onPress={handleEmailLogin}
-                disabled={loading}
+                disabled={loading || remainingSeconds > 0}
               >
                 <Text className="font-sans text-base font-semibold text-base-canvas">
-                  {loading ? `${t('auth.signIn')}...` : t('auth.signIn')}
+                  {loading
+                    ? `${t('auth.signIn')}...`
+                    : remainingSeconds > 0
+                      ? `${t('auth.signIn')} (${remainingSeconds})`
+                      : t('auth.signIn')}
                 </Text>
               </TouchableOpacity>
 
@@ -255,8 +281,8 @@ export default function LoginScreen() {
                     : 'mt-3 items-center rounded-pill bg-brand-accent-deep px-4 py-4'
                 }
                 onPress={() => {
-                  console.log('[LoginScreen] Switching to email login form')
-                  setShowEmailLogin(true)
+                  console.log('[LoginScreen] Switching to email login form');
+                  setShowEmailLogin(true);
                 }}
               >
                 <Text
@@ -285,5 +311,5 @@ export default function LoginScreen() {
         </GlassSurface>
       </ScrollView>
     </KeyboardAwareScreen>
-  )
+  );
 }

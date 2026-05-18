@@ -19,6 +19,7 @@ import { DiscoveryCardItem, DiscoveryItemCard } from '@/components/DiscoveryItem
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
 import { getApiErrorMessage } from '@/lib/apiErrors'
+import { showVelveToast } from '@/lib/velveAlert'
 
 type WishlistItem = DiscoveryCardItem & {
   isWishlisted?: boolean
@@ -99,8 +100,13 @@ export default function WishlistScreen() {
         try {
           await client.delete(`/api/wishlist/${itemId}`)
           setItems((prev) => prev.filter((item) => item._id !== itemId))
-        } catch {
-          Alert.alert(t('common.error'), t('wishlist.removeError'))
+          showVelveToast({
+            title: t('wishlist.removeSuccessTitle'),
+            message: t('wishlist.removeSuccessDescription'),
+            tone: 'success',
+          })
+        } catch (error) {
+          Alert.alert(t('common.error'), getApiErrorMessage(error, t('wishlist.removeError')))
         }
       } },
       { text: t('common.cancel'), style: 'cancel' },

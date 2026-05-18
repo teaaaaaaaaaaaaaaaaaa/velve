@@ -1,59 +1,61 @@
-import { Ionicons } from '@expo/vector-icons'
-import { Alert } from '@/lib/velveAlert'
-import * as ImagePicker from 'expo-image-picker'
-import { useRouter } from 'expo-router'
-import { Text, TouchableOpacity, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons';
+import { Alert } from '@/lib/velveAlert';
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
+import { Text, TouchableOpacity, View } from 'react-native';
 
-import { BrandBackground } from '@/components/BrandBackground'
-import { GlassSurface } from '@/components/GlassSurface'
-import { colors } from '@/design/tokens'
+import { BrandBackground } from '@/components/BrandBackground';
+import { GlassSurface } from '@/components/GlassSurface';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
 
 export default function CleanCutStartScreen() {
-  const router = useRouter()
+  const router = useRouter();
+  const { t } = useI18n();
 
   function openPreview(imageUri: string) {
     router.push({
       pathname: '/upload-flow/preview',
       params: { imageUri },
-    })
+    });
   }
 
   async function openPicker(source: 'camera' | 'gallery') {
     try {
       if (source === 'camera') {
-        const permission = await ImagePicker.requestCameraPermissionsAsync()
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
         if (!permission.granted) {
-          Alert.alert('Dozvola', 'Potrebna je dozvola za kameru.')
-          return
+          Alert.alert(t('common.permission'), t('upload.cameraPermission'));
+          return;
         }
 
         const result = await ImagePicker.launchCameraAsync({
           mediaTypes: ['images'],
           quality: 0.9,
-        })
+        });
 
         if (!result.canceled && result.assets[0]?.uri) {
-          openPreview(result.assets[0].uri)
+          openPreview(result.assets[0].uri);
         }
-        return
+        return;
       }
 
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Dozvola', 'Potrebna je dozvola za galeriju.')
-        return
+        Alert.alert(t('common.permission'), t('upload.galleryPermission'));
+        return;
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         quality: 0.9,
-      })
+      });
 
       if (!result.canceled && result.assets[0]?.uri) {
-        openPreview(result.assets[0].uri)
+        openPreview(result.assets[0].uri);
       }
     } catch (error) {
-      Alert.alert('Greska', 'Ne mogu da otvorim izbor slike.')
+      Alert.alert(t('common.error'), t('upload.pickerError'));
     }
   }
 
@@ -70,13 +72,11 @@ export default function CleanCutStartScreen() {
         </TouchableOpacity>
 
         <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
-          Clean Cut
+          {t('upload.startEyebrow')}
         </Text>
-        <Text className="mt-2 font-display text-4xl text-ink-dark">
-          Unos artikla
-        </Text>
+        <Text className="mt-2 font-display text-4xl text-ink-dark">{t('upload.startTitle')}</Text>
         <Text className="mt-3 font-sans text-sm leading-6 text-ink-dark/65">
-          Prvo stvaramo cist digitalni duplikat, pa tek onda ulazimo u listing detalje.
+          {t('upload.startDescription')}
         </Text>
 
         <GlassSurface className="mt-8 flex-1 items-center justify-center border-dashed border-brand-accent-deep/20 bg-surface-panel/90 px-6 py-8">
@@ -85,10 +85,10 @@ export default function CleanCutStartScreen() {
           </View>
 
           <Text className="mt-6 font-display text-3xl text-ink-dark">
-            Digitalizuj komad
+            {t('upload.digitizeTitle')}
           </Text>
           <Text className="mt-3 text-center font-sans text-sm leading-6 text-ink-dark/60">
-            Za najbolji digitalni duplikat, postavi artikal na ravnu povrsinu pod dobrim svetlom.
+            {t('upload.digitizeDescription')}
           </Text>
 
           <View className="mt-8 w-full gap-3">
@@ -97,7 +97,7 @@ export default function CleanCutStartScreen() {
               className="items-center rounded-full bg-brand-accent-deep px-4 py-4"
             >
               <Text className="font-sans text-base font-semibold text-base-canvas">
-                Izaberi iz galerije
+                {t('upload.chooseFromGallery')}
               </Text>
             </TouchableOpacity>
 
@@ -106,12 +106,12 @@ export default function CleanCutStartScreen() {
               className="items-center rounded-full border border-brand-accent-deep/15 bg-base-canvas px-4 py-4"
             >
               <Text className="font-sans text-base font-semibold text-ink-dark">
-                Slikaj kamerom
+                {t('upload.takePhoto')}
               </Text>
             </TouchableOpacity>
           </View>
         </GlassSurface>
       </View>
     </View>
-  )
+  );
 }

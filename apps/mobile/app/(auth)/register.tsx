@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react'
+import { useRouter } from 'expo-router';
+import { useRef, useState } from 'react';
 import {
   Platform,
   ScrollView,
@@ -6,100 +7,88 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
-} from 'react-native'
-import { useRouter } from 'expo-router'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BrandBackground } from '@/components/BrandBackground'
-import { BrandWordmark } from '@/components/BrandWordmark'
-import { GlassSurface } from '@/components/GlassSurface'
-import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen'
-import { VelveTextInput, type VelveTextInputRef } from '@/components/VelveTextInput'
-import { colors } from '@/design/tokens'
-import { useAuth } from '@/hooks/useAuth'
-import { useI18n } from '@/i18n'
+import { BrandBackground } from '@/components/BrandBackground';
+import { BrandWordmark } from '@/components/BrandWordmark';
+import { GlassSurface } from '@/components/GlassSurface';
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen';
+import { VelveTextInput, type VelveTextInputRef } from '@/components/VelveTextInput';
+import { colors } from '@/design/tokens';
+import { useAuth } from '@/hooks/useAuth';
+import { useI18n } from '@/i18n';
+import {
+  getAuthInlineFeedback,
+  getAuthValidationFeedback,
+  isExpectedAuthError,
+  type InlineAuthFeedback,
+} from '@/lib/authFeedback';
 
 function validateEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function maskEmail(email: string) {
-  const [localPart = '', domain = ''] = email.trim().split('@')
-  if (!domain) return `${localPart.slice(0, 2)}***`
-  return `${localPart.slice(0, 2)}***@${domain}`
-}
-
-function getEmailRegisterError(error: any) {
-  const code = error?.code || error?.nativeErrorCode || ''
-
-  if (code === 'auth/email-already-in-use') {
-    return 'This email already has an account. Go back to sign in.'
-  }
-  if (code === 'auth/invalid-email') return 'Enter a valid email.'
-  if (code === 'auth/weak-password') return 'Password is too weak. Use at least 8 characters.'
-  if (code === 'auth/operation-not-allowed') {
-    return 'Email registration is not enabled for this app right now.'
-  }
-  if (code === 'auth/network-request-failed' || error?.message?.includes('Network')) {
-    return 'No stable internet connection. Check your network and try again.'
-  }
-
-  return 'Unable to create an account right now. Try again.'
+  const [localPart = '', domain = ''] = email.trim().split('@');
+  if (!domain) return `${localPart.slice(0, 2)}***`;
+  return `${localPart.slice(0, 2)}***@${domain}`;
 }
 
 export default function RegisterScreen() {
-  const router = useRouter()
-  const insets = useSafeAreaInsets()
-  const { height } = useWindowDimensions()
-  const { registerWithEmail } = useAuth()
-  const { t } = useI18n()
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
+  const { registerWithEmail } = useAuth();
+  const { t } = useI18n();
 
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [feedback, setFeedback] = useState<InlineAuthFeedback | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const passwordRef = useRef<VelveTextInputRef>(null)
-  const scrollRef = useRef<ScrollView>(null)
+  const passwordRef = useRef<VelveTextInputRef>(null);
+  const scrollRef = useRef<ScrollView>(null);
 
   async function handleRegister() {
-    setError('')
-    const normalizedEmail = email.trim()
+    setFeedback(null);
+    const normalizedEmail = email.trim();
 
     if (!validateEmail(normalizedEmail)) {
       console.warn('[RegisterScreen] Registration blocked because email is invalid', {
         email: maskEmail(normalizedEmail),
-      })
-      setError('Enter a valid email.')
-      return
+      });
+      setFeedback(getAuthValidationFeedback('invalidEmail', t));
+      return;
     }
 
     if (password.length < 8) {
       console.warn('[RegisterScreen] Registration blocked because password is too short', {
         email: maskEmail(email),
         passwordLength: password.length,
-      })
-      setError('Password must be at least 8 characters.')
-      return
+      });
+      setFeedback(getAuthValidationFeedback('shortPassword', t));
+      return;
     }
 
     console.log('[RegisterScreen] Register pressed', {
       email: maskEmail(normalizedEmail),
       passwordLength: password.length,
-    })
-    setLoading(true)
+    });
+    setLoading(true);
     try {
-      await registerWithEmail(normalizedEmail, password)
-      console.log('[RegisterScreen] Registration request resolved successfully')
+      await registerWithEmail(normalizedEmail, password);
+      console.log('[RegisterScreen] Registration request resolved successfully');
     } catch (e: any) {
-      console.error('[RegisterScreen] Registration failed', {
+      const logger = isExpectedAuthError(e) ? console.warn : console.error;
+      logger('[RegisterScreen] Registration failed', {
         code: e?.code,
         message: e?.message,
         nativeErrorCode: e?.nativeErrorCode,
-      })
-      setError(getEmailRegisterError(e))
+      });
+      setFeedback(getAuthInlineFeedback(e, t, 'register'));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -137,6 +126,7 @@ export default function RegisterScreen() {
             autoCorrect={false}
             value={email}
             onChangeText={setEmail}
+            onFocus={() => setFeedback(null)}
             returnKeyType="next"
             onSubmitEditing={() => passwordRef.current?.focus()}
             blurOnSubmit={false}
@@ -149,14 +139,25 @@ export default function RegisterScreen() {
             secureTextEntry
             value={password}
             onChangeText={setPassword}
+            onFocus={() => setFeedback(null)}
             returnKeyType="done"
             onSubmitEditing={handleRegister}
           />
 
-          {error ? (
-            <Text className="mt-4 font-sans text-sm leading-6" style={{ color: colors.danger }}>
-              {error}
-            </Text>
+          {feedback ? (
+            <View className="mt-4 rounded-[18px] bg-signal-danger/8 px-4 py-3">
+              <Text
+                className="font-sans text-sm font-semibold leading-6"
+                style={{ color: colors.danger }}
+              >
+                {t('auth.inlineErrorPrefix')}: {feedback.message}
+              </Text>
+              {feedback.recovery ? (
+                <Text className="mt-1 font-sans text-xs leading-5 text-ink-dark/62">
+                  {feedback.recovery}
+                </Text>
+              ) : null}
+            </View>
           ) : null}
 
           <TouchableOpacity
@@ -180,5 +181,5 @@ export default function RegisterScreen() {
         </GlassSurface>
       </ScrollView>
     </KeyboardAwareScreen>
-  )
+  );
 }

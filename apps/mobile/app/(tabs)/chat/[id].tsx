@@ -1,98 +1,93 @@
-import { Ionicons } from '@expo/vector-icons'
-import { Alert } from '@/lib/velveAlert'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
-import {
-  ActivityIndicator,
-  FlatList,
-  Platform,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { io, Socket } from 'socket.io-client'
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Platform, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { io, Socket } from 'socket.io-client';
 
-import client from '@/api/client'
-import { BrandBackground } from '@/components/BrandBackground'
-import { ChatSkeleton } from '@/components/BrandedLoader'
-import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen'
-import { RemoteImage } from '@/components/RemoteImage'
-import { VelveTextInput } from '@/components/VelveTextInput'
-import { colors } from '@/design/tokens'
-import { API_URL } from '@/config/api'
-import { auth as firebaseAuth, getAuthToken } from '@/config/firebase'
-import { useAuth } from '@/hooks/useAuth'
-import { useI18n } from '@/i18n'
+import client from '@/api/client';
+import { BrandBackground } from '@/components/BrandBackground';
+import { ChatSkeleton } from '@/components/BrandedLoader';
+import { EditorialEmptyState } from '@/components/EditorialEmptyState';
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen';
+import { RemoteImage } from '@/components/RemoteImage';
+import { VelveTextInput } from '@/components/VelveTextInput';
+import { API_URL } from '@/config/api';
+import { auth as firebaseAuth, getAuthToken } from '@/config/firebase';
+import { colors } from '@/design/tokens';
+import { useAuth } from '@/hooks/useAuth';
+import { useI18n } from '@/i18n';
+import { getApiErrorMessage } from '@/lib/apiErrors';
+import { Alert } from '@/lib/velveAlert';
 
 type Participant = {
-  _id: string
-  displayName: string
-  photoURL?: string
-  email?: string
-}
+  _id: string;
+  displayName: string;
+  photoURL?: string;
+  email?: string;
+};
 
 type TradeData = {
-  tradeRequestId?: string
-  offeredItemId: string
-  offeredItemTitle: string
-  offeredItemImage?: string
-  requestedItemId: string
-  requestedItemTitle: string
-  requestedItemImage?: string
-}
+  tradeRequestId?: string;
+  offeredItemId: string;
+  offeredItemTitle: string;
+  offeredItemImage?: string;
+  requestedItemId: string;
+  requestedItemTitle: string;
+  requestedItemImage?: string;
+};
 
 type BuyData = {
-  tradeRequestId?: string
-  requestedItemId: string
-  requestedItemTitle: string
-  requestedItemImage?: string
-  offeredPrice?: number
-}
+  tradeRequestId?: string;
+  requestedItemId: string;
+  requestedItemTitle: string;
+  requestedItemImage?: string;
+  offeredPrice?: number;
+};
 
 type StatusData = {
-  tradeRequestId: string
-  status: string
-  label: string
-}
+  tradeRequestId: string;
+  status: string;
+  label: string;
+};
 
 type MessageRecord = {
-  _id: string
-  clientId?: string
-  chatId: string
-  senderId: { _id: string; displayName: string; photoURL?: string } | string
-  text: string
-  type?: 'text' | 'trade' | 'buy' | 'trade_update'
-  tradeData?: TradeData
-  buyData?: BuyData
-  statusData?: StatusData
-  createdAt: string
-  deliveryStatus?: 'pending' | 'sent' | 'failed'
-}
+  _id: string;
+  clientId?: string;
+  chatId: string;
+  senderId: { _id: string; displayName: string; photoURL?: string } | string;
+  text: string;
+  type?: 'text' | 'trade' | 'buy' | 'trade_update';
+  tradeData?: TradeData;
+  buyData?: BuyData;
+  statusData?: StatusData;
+  createdAt: string;
+  deliveryStatus?: 'pending' | 'sent' | 'failed';
+};
 
 type TradeState = {
-  _id: string
-  status: string
-  senderId: { _id: string } | string
-  receiverId: { _id: string } | string
-  type?: 'trade' | 'buy'
-  offeredPrice?: number | null
-}
+  _id: string;
+  status: string;
+  senderId: { _id: string } | string;
+  receiverId: { _id: string } | string;
+  type?: 'trade' | 'buy';
+  offeredPrice?: number | null;
+};
 
 type ChatPayload = {
-  participants: Participant[]
-  tradeRequestId?: TradeState | null
-  messages: MessageRecord[]
-}
+  participants: Participant[];
+  tradeRequestId?: TradeState | null;
+  messages: MessageRecord[];
+};
 
 function resolveId(value?: { _id: string } | string | null) {
-  if (!value) return null
-  return typeof value === 'string' ? value : value._id
+  if (!value) return null;
+  return typeof value === 'string' ? value : value._id;
 }
 
 function getDisplayName(participant: Participant | null) {
-  if (!participant) return 'Korisnik'
-  return participant.displayName || participant.email?.split('@')[0] || 'Korisnik'
+  if (!participant) return 'Korisnik';
+  return participant.displayName || participant.email?.split('@')[0] || 'Korisnik';
 }
 
 function getSenderDisplayName(
@@ -101,51 +96,51 @@ function getSenderDisplayName(
   otherUser: Participant | null
 ) {
   if (typeof message.senderId === 'object' && message.senderId?.displayName) {
-    return isMine ? 'Ti' : message.senderId.displayName
+    return isMine ? 'Ti' : message.senderId.displayName;
   }
 
-  return isMine ? 'Ti' : getDisplayName(otherUser)
+  return isMine ? 'Ti' : getDisplayName(otherUser);
 }
 
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleTimeString('sr-Latn', {
     hour: '2-digit',
     minute: '2-digit',
-  })
+  });
 }
 
 function formatDate(dateStr: string) {
-  const date = new Date(dateStr)
-  const diffDays = Math.floor((Date.now() - date.getTime()) / 86400000)
-  if (diffDays === 0) return 'Danas'
-  if (diffDays === 1) return 'Juce'
-  return date.toLocaleDateString('sr-Latn', { day: 'numeric', month: 'long' })
+  const date = new Date(dateStr);
+  const diffDays = Math.floor((Date.now() - date.getTime()) / 86400000);
+  if (diffDays === 0) return 'Danas';
+  if (diffDays === 1) return 'Juce';
+  return date.toLocaleDateString('sr-Latn', { day: 'numeric', month: 'long' });
 }
 
 function isSameDay(a?: string, b?: string) {
-  if (!a || !b) return false
-  return new Date(a).toDateString() === new Date(b).toDateString()
+  if (!a || !b) return false;
+  return new Date(a).toDateString() === new Date(b).toDateString();
 }
 
 function createClientMessageId() {
-  return `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+  return `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
 function mergeIncomingMessage(prev: MessageRecord[], incoming: MessageRecord): MessageRecord[] {
   if (incoming.clientId) {
-    const hasClientMatch = prev.some((message) => message.clientId === incoming.clientId)
+    const hasClientMatch = prev.some((message) => message.clientId === incoming.clientId);
     if (hasClientMatch) {
       return prev.map((message) =>
         message.clientId === incoming.clientId ? { ...incoming, deliveryStatus: 'sent' } : message
-      )
+      );
     }
   }
 
   if (prev.some((message) => message._id === incoming._id)) {
-    return prev
+    return prev;
   }
 
-  return [...prev, { ...incoming, deliveryStatus: 'sent' }]
+  return [...prev, { ...incoming, deliveryStatus: 'sent' }];
 }
 
 const ProposalItemCard = memo(function ProposalItemCard({
@@ -155,11 +150,11 @@ const ProposalItemCard = memo(function ProposalItemCard({
   eyebrow,
   onPress,
 }: {
-  title: string
-  imageUri?: string
-  label: string
-  eyebrow: string
-  onPress: () => void
+  title: string;
+  imageUri?: string;
+  label: string;
+  eyebrow: string;
+  onPress: () => void;
 }) {
   return (
     <View className="flex-1">
@@ -190,12 +185,15 @@ const ProposalItemCard = memo(function ProposalItemCard({
         </View>
       </TouchableOpacity>
 
-      <Text className="mt-3 font-sans text-sm font-semibold leading-5 text-ink-dark" numberOfLines={2}>
+      <Text
+        className="mt-3 font-sans text-sm font-semibold leading-5 text-ink-dark"
+        numberOfLines={2}
+      >
         {title}
       </Text>
     </View>
-  )
-})
+  );
+});
 
 const ProposalMessageCard = memo(function ProposalMessageCard({
   title,
@@ -210,17 +208,17 @@ const ProposalMessageCard = memo(function ProposalMessageCard({
   onAccept,
   onReject,
 }: {
-  title: string
-  tradeData?: TradeData
-  buyData?: BuyData
-  offeredLabel?: string
-  requestedLabel?: string
-  showDecisionActions?: boolean
-  submittingDecision?: boolean
-  onOpenOfferedItem?: () => void
-  onOpenRequestedItem: () => void
-  onAccept?: () => void
-  onReject?: () => void
+  title: string;
+  tradeData?: TradeData;
+  buyData?: BuyData;
+  offeredLabel?: string;
+  requestedLabel?: string;
+  showDecisionActions?: boolean;
+  submittingDecision?: boolean;
+  onOpenOfferedItem?: () => void;
+  onOpenRequestedItem: () => void;
+  onAccept?: () => void;
+  onReject?: () => void;
 }) {
   return (
     <View
@@ -297,10 +295,14 @@ const ProposalMessageCard = memo(function ProposalMessageCard({
         </View>
       ) : null}
     </View>
-  )
-})
+  );
+});
 
-const TradeStatusTicket = memo(function TradeStatusTicket({ statusData }: { statusData: StatusData }) {
+const TradeStatusTicket = memo(function TradeStatusTicket({
+  statusData,
+}: {
+  statusData: StatusData;
+}) {
   return (
     <View
       className="mx-4 my-2 overflow-hidden rounded-[22px] bg-surface-panel px-4 py-4"
@@ -324,124 +326,154 @@ const TradeStatusTicket = memo(function TradeStatusTicket({ statusData }: { stat
         </View>
       </View>
     </View>
-  )
-})
+  );
+});
 
 export default function ChatScreen() {
-  const { id: chatId } = useLocalSearchParams<{ id: string }>()
-  const router = useRouter()
-  const insets = useSafeAreaInsets()
-  const { dbUser } = useAuth()
-  const { t } = useI18n()
+  const { id: chatId } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { currentUser, dbUser } = useAuth();
+  const { t } = useI18n();
 
-  const [messages, setMessages] = useState<MessageRecord[]>([])
-  const [inputText, setInputText] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [sending, setSending] = useState(false)
-  const [submittingDecision, setSubmittingDecision] = useState(false)
-  const [otherUser, setOtherUser] = useState<Participant | null>(null)
-  const [typingUser, setTypingUser] = useState<string | null>(null)
-  const [tradeRequest, setTradeRequest] = useState<TradeState | null>(null)
-  const [composerHeight, setComposerHeight] = useState(86)
-  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null)
+  const [messages, setMessages] = useState<MessageRecord[]>([]);
+  const [inputText, setInputText] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [submittingDecision, setSubmittingDecision] = useState(false);
+  const [otherUser, setOtherUser] = useState<Participant | null>(null);
+  const [typingUser, setTypingUser] = useState<string | null>(null);
+  const [tradeRequest, setTradeRequest] = useState<TradeState | null>(null);
+  const [composerHeight, setComposerHeight] = useState(86);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const socketRef = useRef<Socket | null>(null)
-  const flatListRef = useRef<FlatList<MessageRecord>>(null)
-  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const messagesRef = useRef(messages)
-  messagesRef.current = messages
+  const socketRef = useRef<Socket | null>(null);
+  const flatListRef = useRef<FlatList<MessageRecord>>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
   const fetchChat = useCallback(async () => {
-    const response = await client.get(`/api/chat/${chatId}`)
+    if (!currentUser?.uid || !chatId) {
+      setLoadError('Sesija je zavrsena. Prijavi se ponovo.');
+      setMessages([]);
+      return;
+    }
+
+    setLoadError(null);
+    const response = await client.get(`/api/chat/${chatId}`);
     if (response.data.ok) {
-      const data = response.data.data as ChatPayload
-      setMessages(data.messages || [])
-      setTradeRequest(data.tradeRequestId || null)
-      client.post(`/api/chat/${chatId}/read`).catch(() => undefined)
+      const data = response.data.data as ChatPayload;
+      setMessages(data.messages || []);
+      setTradeRequest(data.tradeRequestId || null);
+      client.post(`/api/chat/${chatId}/read`).catch(() => undefined);
 
       if (data.participants && dbUser) {
         const participant =
-          data.participants.find((entry) => entry._id !== dbUser._id) || data.participants[0] || null
-        setOtherUser(participant)
+          data.participants.find((entry) => entry._id !== dbUser._id) ||
+          data.participants[0] ||
+          null;
+        setOtherUser(participant);
       }
     }
-  }, [chatId, dbUser])
+  }, [chatId, currentUser?.uid, dbUser]);
 
   useEffect(() => {
-    fetchChat()
-      .catch(() => undefined)
-      .finally(() => setLoading(false))
-  }, [fetchChat])
-
-  useEffect(() => {
-    let socket: Socket | null = null
-
-    async function connectSocket() {
-      const user = firebaseAuth.currentUser
-      if (!user) return
-
-      const token = await getAuthToken(user)
-      socket = io(API_URL, {
-        auth: { token },
-        transports: ['websocket'],
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 2000,
-      })
-
-      socket.on('connect', () => {
-        socket?.emit('join_chat', chatId)
-        socket?.emit('mark_read', chatId)
-      })
-
-      socket.on('new_message', (payload: { chatId: string; message: MessageRecord }) => {
-        if (payload.chatId !== chatId) return
-
-        setMessages((prev) => mergeIncomingMessage(prev, payload.message))
-
-        socket?.emit('mark_read', chatId)
-      })
-
-      socket.on('messages_read', (payload: { chatId: string; userId: string; readAt: string }) => {
-        if (payload.chatId !== chatId) return
-      })
-
-      socket.on('user_typing', (payload: { chatId: string; displayName: string }) => {
-        if (payload.chatId !== chatId) return
-
-        setTypingUser(payload.displayName)
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-        typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 3000)
-      })
-
-      socket.on('message_deleted', (payload: { chatId: string; messageId: string }) => {
-        if (payload.chatId !== chatId) return
-        setMessages((prev) => prev.filter((message) => message._id !== payload.messageId))
-      })
-
-      socketRef.current = socket
+    if (!currentUser?.uid || !chatId) {
+      setLoading(false);
+      return;
     }
 
-    connectSocket().catch(() => undefined)
+    fetchChat()
+      .catch((error) => {
+        setLoadError(getApiErrorMessage(error, 'Razgovor trenutno nije dostupan.'));
+      })
+      .finally(() => setLoading(false));
+  }, [chatId, currentUser?.uid, fetchChat]);
+
+  useEffect(() => {
+    let socket: Socket | null = null;
+
+    async function connectSocket() {
+      const user = firebaseAuth.currentUser;
+      if (!user || !currentUser?.uid || !chatId) return;
+
+      try {
+        const token = await getAuthToken(user);
+        socket = io(API_URL, {
+          auth: { token },
+          transports: ['websocket'],
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 2000,
+        });
+
+        socket.on('connect', () => {
+          socket?.emit('join_chat', chatId);
+          socket?.emit('mark_read', chatId);
+        });
+
+        socket.on('new_message', (payload: { chatId: string; message: MessageRecord }) => {
+          if (payload.chatId !== chatId) return;
+
+          setMessages((prev) => mergeIncomingMessage(prev, payload.message));
+
+          socket?.emit('mark_read', chatId);
+        });
+
+        socket.on(
+          'messages_read',
+          (payload: { chatId: string; userId: string; readAt: string }) => {
+            if (payload.chatId !== chatId) return;
+          }
+        );
+
+        socket.on('user_typing', (payload: { chatId: string; displayName: string }) => {
+          if (payload.chatId !== chatId) return;
+
+          setTypingUser(payload.displayName);
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+          typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 3000);
+        });
+
+        socket.on('message_deleted', (payload: { chatId: string; messageId: string }) => {
+          if (payload.chatId !== chatId) return;
+          setMessages((prev) => prev.filter((message) => message._id !== payload.messageId));
+        });
+
+        socketRef.current = socket;
+      } catch (error: any) {
+        console.warn('[ChatScreen] Socket connection skipped', {
+          chatId,
+          message: error?.message,
+          currentUserUid: firebaseAuth.currentUser?.uid ?? null,
+        });
+      }
+    }
+
+    if (!currentUser?.uid || !chatId) return;
+
+    connectSocket().catch(() => undefined);
 
     return () => {
       if (socket) {
-        socket.emit('leave_chat', chatId)
-        socket.disconnect()
+        socket.emit('leave_chat', chatId);
+        socket.disconnect();
       }
-      socketRef.current = null
+      socketRef.current = null;
 
       if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current)
+        clearTimeout(typingTimeoutRef.current);
       }
-    }
-  }, [chatId])
+    };
+  }, [chatId, currentUser?.uid]);
 
   const handleSend = useCallback(async () => {
-    const text = inputText.trim()
-    if (!text || sending) return
+    const text = inputText.trim();
+    if (!text || sending) return;
 
-    const clientId = createClientMessageId()
+    const clientId = createClientMessageId();
     const optimisticMessage: MessageRecord = {
       _id: clientId,
       clientId,
@@ -455,36 +487,39 @@ export default function ChatScreen() {
       type: 'text',
       createdAt: new Date().toISOString(),
       deliveryStatus: 'pending',
-    }
+    };
 
-    setInputText('')
-    setMessages((prev) => [...prev, optimisticMessage])
-    setSending(true)
+    setInputText('');
+    setMessages((prev) => [...prev, optimisticMessage]);
+    setSending(true);
 
     try {
-      let nextMessage: MessageRecord | null = null
+      let nextMessage: MessageRecord | null = null;
 
       if (socketRef.current?.connected) {
         nextMessage = await new Promise<MessageRecord>((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Message acknowledgement timed out')), 10000)
+          const timeout = setTimeout(
+            () => reject(new Error('Message acknowledgement timed out')),
+            10000
+          );
 
           socketRef.current?.emit(
             'send_message',
             { chatId, text, clientId },
             (ack: { ok: boolean; data?: MessageRecord; error?: string }) => {
-              clearTimeout(timeout)
+              clearTimeout(timeout);
               if (ack.ok && ack.data) {
-                resolve(ack.data)
-                return
+                resolve(ack.data);
+                return;
               }
-              reject(new Error(ack.error || 'Message send failed'))
+              reject(new Error(ack.error || 'Message send failed'));
             }
-          )
-        })
+          );
+        });
       } else {
-        const response = await client.post(`/api/chat/${chatId}/message`, { text, clientId })
+        const response = await client.post(`/api/chat/${chatId}/message`, { text, clientId });
         if (response.data.ok) {
-          nextMessage = response.data.data as MessageRecord
+          nextMessage = response.data.data as MessageRecord;
         }
       }
 
@@ -493,162 +528,166 @@ export default function ChatScreen() {
           prev.map((message) =>
             message.clientId === clientId ? { ...nextMessage, deliveryStatus: 'sent' } : message
           )
-        )
+        );
       }
     } catch {
       setMessages((prev) =>
         prev.map((message) =>
           message.clientId === clientId ? { ...message, deliveryStatus: 'failed' } : message
         )
-      )
-      setInputText(text)
+      );
+      setInputText(text);
     } finally {
-      setSending(false)
+      setSending(false);
     }
-  }, [chatId, dbUser?._id, dbUser?.displayName, dbUser?.photoURL, inputText, sending])
+  }, [chatId, dbUser?._id, dbUser?.displayName, dbUser?.photoURL, inputText, sending]);
 
   const handleTyping = useCallback(() => {
     if (socketRef.current?.connected) {
-      socketRef.current.emit('typing', chatId)
+      socketRef.current.emit('typing', chatId);
     }
-  }, [chatId])
+  }, [chatId]);
 
   const getSenderId = useCallback((message: MessageRecord) => {
     if (typeof message.senderId === 'object' && message.senderId?._id) {
-      return message.senderId._id
+      return message.senderId._id;
     }
-    return message.senderId
-  }, [])
+    return message.senderId;
+  }, []);
 
-  const activeTradeId = tradeRequest?._id ? String(tradeRequest._id) : null
+  const activeTradeId = tradeRequest?._id ? String(tradeRequest._id) : null;
   const canRespondToTrade =
-    tradeRequest?.status === 'pending' &&
-    resolveId(tradeRequest.receiverId) === dbUser?._id
+    tradeRequest?.status === 'pending' && resolveId(tradeRequest.receiverId) === dbUser?._id;
 
   const handleTradeDecision = useCallback(
     async (status: 'accepted' | 'rejected') => {
-      if (!tradeRequest?._id || !canRespondToTrade || submittingDecision) return
+      if (!tradeRequest?._id || !canRespondToTrade || submittingDecision) return;
 
       try {
-        setSubmittingDecision(true)
-        const response = await client.put(`/api/trades/${tradeRequest._id}`, { status })
+        setSubmittingDecision(true);
+        const response = await client.put(`/api/trades/${tradeRequest._id}`, { status });
         if (response.data.ok) {
-          setTradeRequest(response.data.data as TradeState)
-          await fetchChat()
+          setTradeRequest(response.data.data as TradeState);
+          await fetchChat();
         }
       } catch {
         // Keep failure quiet inside the thread and let the user retry.
       } finally {
-        setSubmittingDecision(false)
+        setSubmittingDecision(false);
       }
     },
     [canRespondToTrade, fetchChat, submittingDecision, tradeRequest?._id]
-  )
+  );
 
   const handleRetry = useCallback(
     async (failedMessage: MessageRecord) => {
-      const text = failedMessage.text
-      if (!text) return
+      const text = failedMessage.text;
+      if (!text) return;
 
-      const clientId = createClientMessageId()
+      const clientId = createClientMessageId();
       setMessages((prev) =>
         prev.map((m) =>
-          m._id === failedMessage._id ? { ...m, _id: clientId, clientId, deliveryStatus: 'pending' } : m
+          m._id === failedMessage._id
+            ? { ...m, _id: clientId, clientId, deliveryStatus: 'pending' }
+            : m
         )
-      )
+      );
 
       try {
-        let nextMessage: MessageRecord | null = null
+        let nextMessage: MessageRecord | null = null;
         if (socketRef.current?.connected) {
           nextMessage = await new Promise<MessageRecord>((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('timeout')), 10000)
+            const timeout = setTimeout(() => reject(new Error('timeout')), 10000);
             socketRef.current?.emit(
               'send_message',
               { chatId, text, clientId },
               (ack: { ok: boolean; data?: MessageRecord; error?: string }) => {
-                clearTimeout(timeout)
-                if (ack.ok && ack.data) { resolve(ack.data); return }
-                reject(new Error(ack.error || 'failed'))
+                clearTimeout(timeout);
+                if (ack.ok && ack.data) {
+                  resolve(ack.data);
+                  return;
+                }
+                reject(new Error(ack.error || 'failed'));
               }
-            )
-          })
+            );
+          });
         } else {
-          const response = await client.post(`/api/chat/${chatId}/message`, { text, clientId })
-          if (response.data.ok) nextMessage = response.data.data as MessageRecord
+          const response = await client.post(`/api/chat/${chatId}/message`, { text, clientId });
+          if (response.data.ok) nextMessage = response.data.data as MessageRecord;
         }
         if (nextMessage) {
           setMessages((prev) =>
-            prev.map((m) => (m.clientId === clientId ? { ...nextMessage!, deliveryStatus: 'sent' } : m))
-          )
+            prev.map((m) =>
+              m.clientId === clientId ? { ...nextMessage!, deliveryStatus: 'sent' } : m
+            )
+          );
         }
       } catch {
         setMessages((prev) =>
           prev.map((m) => (m.clientId === clientId ? { ...m, deliveryStatus: 'failed' } : m))
-        )
+        );
       }
     },
     [chatId]
-  )
+  );
 
   const deleteMessage = useCallback(
     async (message: MessageRecord) => {
-      if (deletingMessageId || message.deliveryStatus === 'pending') return
+      if (deletingMessageId || message.deliveryStatus === 'pending') return;
 
       if (message.deliveryStatus === 'failed') {
-        setMessages((prev) => prev.filter((entry) => entry._id !== message._id))
-        return
+        setMessages((prev) => prev.filter((entry) => entry._id !== message._id));
+        return;
       }
 
       try {
-        setDeletingMessageId(message._id)
-        await client.delete(`/api/chat/${chatId}/messages/${message._id}`)
-        setMessages((prev) => prev.filter((entry) => entry._id !== message._id))
+        setDeletingMessageId(message._id);
+        await client.delete(`/api/chat/${chatId}/messages/${message._id}`);
+        setMessages((prev) => prev.filter((entry) => entry._id !== message._id));
       } catch (error: any) {
         Alert.alert(
           'Poruka nije obrisana',
           error?.response?.data?.error || error?.message || 'Pokusaj ponovo.'
-        )
+        );
       } finally {
-        setDeletingMessageId(null)
+        setDeletingMessageId(null);
       }
     },
     [chatId, deletingMessageId]
-  )
+  );
 
   const showMessageOptions = useCallback(
     (message: MessageRecord, isMine: boolean) => {
-      if (!isMine || message.type !== 'text') return
-      if (message.deliveryStatus === 'pending') return
+      if (!isMine || message.type !== 'text') return;
+      if (message.deliveryStatus === 'pending') return;
 
       if (message.deliveryStatus === 'failed') {
         Alert.alert('Poruka nije poslata', 'Sta zelis da uradis?', [
           { text: 'Pokusaj ponovo', onPress: () => handleRetry(message) },
           { text: 'Obrisi', style: 'destructive', onPress: () => deleteMessage(message) },
           { text: 'Odustani', style: 'cancel' },
-        ])
-        return
+        ]);
+        return;
       }
 
       Alert.alert('Poruka', 'Sta zelis da uradis?', [
         { text: 'Obrisi poruku', style: 'destructive', onPress: () => deleteMessage(message) },
         { text: 'Odustani', style: 'cancel' },
-      ])
+      ]);
     },
     [deleteMessage, handleRetry]
-  )
+  );
 
   const renderMessage = useCallback(
     ({ item, index }: { item: MessageRecord; index: number }) => {
-      const isMine = getSenderId(item) === dbUser?._id
-      const showDate = index === 0 || !isSameDay(item.createdAt, messagesRef.current[index - 1]?.createdAt)
-      const proposalId = item.tradeData?.tradeRequestId || item.buyData?.tradeRequestId
+      const isMine = getSenderId(item) === dbUser?._id;
+      const showDate =
+        index === 0 || !isSameDay(item.createdAt, messagesRef.current[index - 1]?.createdAt);
+      const proposalId = item.tradeData?.tradeRequestId || item.buyData?.tradeRequestId;
       const showDecisionActions =
-        canRespondToTrade &&
-        !!activeTradeId &&
-        proposalId === activeTradeId &&
-        !isMine
-      const senderDisplayName = getSenderDisplayName(item, isMine, otherUser)
-      const requestedLabel = isMine ? getDisplayName(otherUser) : 'Ti'
+        canRespondToTrade && !!activeTradeId && proposalId === activeTradeId && !isMine;
+      const senderDisplayName = getSenderDisplayName(item, isMine, otherUser);
+      const requestedLabel = isMine ? getDisplayName(otherUser) : 'Ti';
 
       return (
         <View>
@@ -676,7 +715,11 @@ export default function ChatScreen() {
               }
               onReject={() =>
                 Alert.alert('Odbij predlog', 'Jesi li siguran/na da odbijаš ovaj predlog?', [
-                  { text: 'Odbij', style: 'destructive', onPress: () => handleTradeDecision('rejected') },
+                  {
+                    text: 'Odbij',
+                    style: 'destructive',
+                    onPress: () => handleTradeDecision('rejected'),
+                  },
                   { text: 'Odustani', style: 'cancel' },
                 ])
               }
@@ -697,7 +740,11 @@ export default function ChatScreen() {
               }
               onReject={() =>
                 Alert.alert('Odbij ponudu', 'Jesi li siguran/na da odbijаš ovu ponudu?', [
-                  { text: 'Odbij', style: 'destructive', onPress: () => handleTradeDecision('rejected') },
+                  {
+                    text: 'Odbij',
+                    style: 'destructive',
+                    onPress: () => handleTradeDecision('rejected'),
+                  },
                   { text: 'Odustani', style: 'cancel' },
                 ])
               }
@@ -710,54 +757,54 @@ export default function ChatScreen() {
                 activeOpacity={item.deliveryStatus === 'failed' ? 0.7 : 1}
                 onLongPress={() => showMessageOptions(item, isMine)}
               >
-              <View
-                className={`max-w-[82%] rounded-[22px] px-4 py-3 ${
-                  isMine ? 'bg-brand-accent-deep' : 'bg-surface-panel'
-                }`}
-                style={
-                  isMine
-                    ? {
-                        shadowColor: colors.accentDeep,
-                        shadowOpacity: 0.2,
-                        shadowRadius: 12,
-                        shadowOffset: { width: 0, height: 4 },
-                        elevation: 4,
-                      }
-                    : {
-                        shadowColor: colors.inkDark,
-                        shadowOpacity: 0.05,
-                        shadowRadius: 8,
-                        shadowOffset: { width: 0, height: 2 },
-                        elevation: 2,
-                      }
-                }
-              >
+                <View
+                  className={`max-w-[82%] rounded-[22px] px-4 py-3 ${
+                    isMine ? 'bg-brand-accent-deep' : 'bg-surface-panel'
+                  }`}
+                  style={
+                    isMine
+                      ? {
+                          shadowColor: colors.accentDeep,
+                          shadowOpacity: 0.2,
+                          shadowRadius: 12,
+                          shadowOffset: { width: 0, height: 4 },
+                          elevation: 4,
+                        }
+                      : {
+                          shadowColor: colors.inkDark,
+                          shadowOpacity: 0.05,
+                          shadowRadius: 8,
+                          shadowOffset: { width: 0, height: 2 },
+                          elevation: 2,
+                        }
+                  }
+                >
+                  <Text
+                    className={`font-sans text-[15px] leading-6 ${
+                      isMine ? 'text-base-canvas' : 'text-ink-dark'
+                    }`}
+                  >
+                    {item.text}
+                  </Text>
+                </View>
                 <Text
-                  className={`font-sans text-[15px] leading-6 ${
-                    isMine ? 'text-base-canvas' : 'text-ink-dark'
+                  className={`mt-1 px-1 font-sans text-[10px] ${
+                    item.deliveryStatus === 'failed' ? 'text-red-600' : 'text-ink-dark/30'
                   }`}
                 >
-                  {item.text}
+                  {item.deliveryStatus === 'pending'
+                    ? 'Slanje...'
+                    : item.deliveryStatus === 'failed'
+                      ? 'Nije poslato - drzi za opcije'
+                      : deletingMessageId === item._id
+                        ? 'Brisanje...'
+                        : formatTime(item.createdAt)}
                 </Text>
-              </View>
-              <Text
-                className={`mt-1 px-1 font-sans text-[10px] ${
-                  item.deliveryStatus === 'failed' ? 'text-red-600' : 'text-ink-dark/30'
-                }`}
-              >
-                {item.deliveryStatus === 'pending'
-                  ? 'Slanje...'
-                  : item.deliveryStatus === 'failed'
-                    ? 'Nije poslato - drzi za opcije'
-                  : deletingMessageId === item._id
-                    ? 'Brisanje...'
-                    : formatTime(item.createdAt)}
-              </Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
-      )
+      );
     },
     [
       activeTradeId,
@@ -772,10 +819,40 @@ export default function ChatScreen() {
       submittingDecision,
       deletingMessageId,
     ]
-  )
+  );
 
   if (loading) {
-    return <ChatSkeleton />
+    return <ChatSkeleton />;
+  }
+
+  if (loadError) {
+    return (
+      <KeyboardAwareScreen className="bg-base-canvas" offset={insets.top}>
+        <BrandBackground />
+        <View className="flex-1 items-center justify-center px-6">
+          <EditorialEmptyState
+            icon="alert-circle-outline"
+            title="Razgovor trenutno nije dostupan"
+            description={loadError}
+          />
+          <TouchableOpacity
+            onPress={() => {
+              setLoading(true);
+              fetchChat()
+                .catch((error) => {
+                  setLoadError(getApiErrorMessage(error, 'Razgovor trenutno nije dostupan.'));
+                })
+                .finally(() => setLoading(false));
+            }}
+            className="mt-4 items-center rounded-full bg-brand-accent-deep px-5 py-4"
+          >
+            <Text className="font-sans text-sm font-semibold text-base-canvas">
+              {t('common.retry')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAwareScreen>
+    );
   }
 
   return (
@@ -842,7 +919,11 @@ export default function ChatScreen() {
           data={messages}
           keyExtractor={(item) => item._id}
           renderItem={renderMessage}
-          contentContainerStyle={{ paddingTop: 16, paddingBottom: composerHeight + 24, flexGrow: 1 }}
+          contentContainerStyle={{
+            paddingTop: 16,
+            paddingBottom: composerHeight + 24,
+            flexGrow: 1,
+          }}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
           onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
           keyboardShouldPersistTaps="handled"
@@ -869,7 +950,7 @@ export default function ChatScreen() {
         <View
           className="absolute left-0 right-0 px-4"
           onLayout={(event) => {
-            setComposerHeight(event.nativeEvent.layout.height)
+            setComposerHeight(event.nativeEvent.layout.height);
           }}
           style={{
             bottom: 0,
@@ -889,8 +970,8 @@ export default function ChatScreen() {
             <VelveTextInput
               value={inputText}
               onChangeText={(text) => {
-                setInputText(text)
-                handleTyping()
+                setInputText(text);
+                handleTyping();
               }}
               placeholder={t('chat.placeholder')}
               multiline
@@ -916,5 +997,5 @@ export default function ChatScreen() {
         </View>
       </View>
     </KeyboardAwareScreen>
-  )
+  );
 }

@@ -21,6 +21,7 @@ import { colors } from '@/design/tokens'
 import { useAuth } from '@/hooks/useAuth'
 import { useSocket } from '@/hooks/useSocket'
 import { useI18n } from '@/i18n'
+import { getApiErrorMessage } from '@/lib/apiErrors'
 
 type Participant = {
   _id: string
@@ -352,7 +353,7 @@ const TradeRow = memo(function TradeRow({
 
 export default function ChatListScreen() {
   const router = useRouter()
-  const { dbUser } = useAuth()
+  const { currentUser, dbUser } = useAuth()
   const { socket } = useSocket()
   const { t } = useI18n()
 
@@ -362,15 +363,34 @@ export default function ChatListScreen() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [tradeActionId, setTradeActionId] = useState<string | null>(null)
+  const [deletingChatId, setDeletingChatId] = useState<string | null>(null)
+  const [messagesError, setMessagesError] = useState<string | null>(null)
+  const [tradesError, setTradesError] = useState<string | null>(null)
 
   const fetchChats = useCallback(async () => {
+    if (!currentUser?.uid) {
+      setChats([])
+      setMessagesError('Sesija je zavrsena. Prijavi se ponovo.')
+      return
+    }
+
     const response = await client.get('/api/chat')
     if (response.data.ok) {
       setChats(response.data.data as ChatRoom[])
+      setMessagesError(null)
+      return
     }
-  }, [])
+
+    throw new Error('INVALID_CHAT_RESPONSE')
+  }, [currentUser?.uid])
 
   const fetchTrades = useCallback(async () => {
+    if (!currentUser?.uid) {
+      setTrades([])
+      setTradesError('Sesija je zavrsena. Prijavi se ponovo.')
+      return
+    }
+
     const response = await client.get('/api/trades')
     if (response.data.ok) {
       const nextTrades = (response.data.data as TradeRecord[])
@@ -383,24 +403,42 @@ export default function ChatListScreen() {
         })
 
       setTrades(nextTrades)
+      setTradesError(null)
+      return
     }
-  }, [])
+
+    throw new Error('INVALID_TRADES_RESPONSE')
+  }, [currentUser?.uid])
 
   const loadAll = useCallback(async () => {
-    await Promise.all([fetchChats(), fetchTrades()])
+    const [chatsResult, tradesResult] = await Promise.allSettled([fetchChats(), fetchTrades()])
+
+    if (chatsResult.status === 'rejected') {
+      setMessagesError(getApiErrorMessage(chatsResult.reason, 'Inbox trenutno nije dostupan.'))
+    }
+
+    if (tradesResult.status === 'rejected') {
+      setTradesError(getApiErrorMessage(tradesResult.reason, 'Tradeovi trenutno nisu dostupni.'))
+    }
   }, [fetchChats, fetchTrades])
 
   useEffect(() => {
+    if (!currentUser?.uid) {
+      setLoading(false)
+      return
+    }
+
     loadAll()
-      .catch(() => undefined)
       .finally(() => setLoading(false))
-  }, [loadAll])
+  }, [currentUser?.uid, loadAll])
 
   useEffect(() => {
     if (!socket) return
 
     const refreshChats = () => {
-      fetchChats().catch(() => undefined)
+      fetchChats().catch((error) => {
+        setMessagesError(getApiErrorMessage(error, 'Inbox trenutno nije dostupan.'))
+      })
     }
     const removeDeletedChat = ({ chatId }: { chatId: string }) => {
       setChats((prev) => prev.filter((chat) => chat._id !== chatId))
@@ -457,6 +495,11 @@ export default function ChatListScreen() {
         if (action === 'complete' && response?.data?.data?.canRate) {
           router.push({ pathname: '/rate-trade', params: { tradeId } })
         }
+      } catch (error) {
+        Alert.alert(
+          'Trade nije azuriran',
+          getApiErrorMessage(error, 'Pokusaj ponovo za nekoliko trenutaka.')
+        )
       } finally {
         setTradeActionId(null)
       }
@@ -483,8 +526,21 @@ export default function ChatListScreen() {
                   text: 'Obrisi',
                   style: 'destructive',
                   onPress: async () => {
+                    const previousChats = chats
+                    setDeletingChatId(chat._id)
                     setChats((prev) => prev.filter((entry) => entry._id !== chat._id))
-                    await client.delete(`/api/chat/${chat._id}`).catch(() => fetchChats())
+
+                    try {
+                      await client.delete(`/api/chat/${chat._id}`)
+                    } catch (error) {
+                      setChats(previousChats)
+                      Alert.alert(
+                        'Razgovor nije obrisan',
+                        getApiErrorMessage(error, 'Pokusaj ponovo za nekoliko trenutaka.')
+                      )
+                    } finally {
+                      setDeletingChatId(null)
+                    }
                   },
                 },
               ])
@@ -494,7 +550,7 @@ export default function ChatListScreen() {
         </View>
       )
     },
-    [chats.length, getOtherParticipant, router]
+    [chats, getOtherParticipant, router]
   )
 
   const messageCount = chats.length
@@ -552,6 +608,34 @@ export default function ChatListScreen() {
   }
 
   if (activeTab === 'messages') {
+    if (messagesError && chats.length === 0) {
+      return (
+        <ScrollView
+          className="flex-1 bg-base-canvas"
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 120 }}
+        >
+          {topHeader}
+          <View className="flex-1 px-5">
+            <EditorialEmptyState
+              icon="alert-circle-outline"
+              title="Inbox trenutno nije dostupan"
+              description={messagesError}
+              actionLabel="Pokusaj ponovo"
+              onAction={() => {
+                setLoading(true)
+                fetchChats()
+                  .catch((error) => {
+                    setMessagesError(getApiErrorMessage(error, 'Inbox trenutno nije dostupan.'))
+                  })
+                  .finally(() => setLoading(false))
+              }}
+            />
+          </View>
+        </ScrollView>
+      )
+    }
+
     return (
       <FlatList
         className="flex-1 bg-base-canvas"
@@ -562,9 +646,24 @@ export default function ChatListScreen() {
         ListEmptyComponent={
           <View className="px-5">
             <EditorialEmptyState
-              icon="chatbubbles-outline"
-              title={t('chat.emptyTitle')}
-              description={t('chat.emptyDescription')}
+              icon={messagesError ? 'alert-circle-outline' : 'chatbubbles-outline'}
+              title={messagesError ? 'Inbox trazi osvezavanje' : t('chat.emptyTitle')}
+              description={messagesError ? messagesError : t('chat.emptyDescription')}
+              actionLabel={messagesError ? 'Pokusaj ponovo' : undefined}
+              onAction={
+                messagesError
+                  ? () => {
+                      setRefreshing(true)
+                      fetchChats()
+                        .catch((error) => {
+                          setMessagesError(
+                            getApiErrorMessage(error, 'Inbox trenutno nije dostupan.')
+                          )
+                        })
+                        .finally(() => setRefreshing(false))
+                    }
+                  : undefined
+              }
             />
           </View>
         }
@@ -589,7 +688,22 @@ export default function ChatListScreen() {
       {topHeader}
 
       <View className="px-5">
-        {trades.length === 0 ? (
+        {tradesError && trades.length === 0 ? (
+          <EditorialEmptyState
+            icon="alert-circle-outline"
+            title="Tradeovi trenutno nisu dostupni"
+            description={tradesError}
+            actionLabel="Pokusaj ponovo"
+            onAction={() => {
+              setRefreshing(true)
+              fetchTrades()
+                .catch((error) => {
+                  setTradesError(getApiErrorMessage(error, 'Tradeovi trenutno nisu dostupni.'))
+                })
+                .finally(() => setRefreshing(false))
+            }}
+          />
+        ) : trades.length === 0 ? (
           <EditorialEmptyState
             icon="swap-horizontal-outline"
             title="Nema aktivnih tradeova"
@@ -630,6 +744,10 @@ export default function ChatListScreen() {
         )}
 
         {tradeActionId ? (
+          <View className="pt-2">
+            <ActivityIndicator color={colors.accentDeep} />
+          </View>
+        ) : deletingChatId ? (
           <View className="pt-2">
             <ActivityIndicator color={colors.accentDeep} />
           </View>

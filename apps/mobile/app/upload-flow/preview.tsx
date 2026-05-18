@@ -1,25 +1,27 @@
-import { Ionicons } from '@expo/vector-icons'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect } from 'react'
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect } from 'react';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { RemoteImage } from '@/components/RemoteImage'
-import { colors } from '@/design/tokens'
+import { RemoteImage } from '@/components/RemoteImage';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
 
 export default function CleanCutPreviewScreen() {
-  const router = useRouter()
-  const insets = useSafeAreaInsets()
-  const { imageUri } = useLocalSearchParams<{ imageUri: string }>()
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { imageUri } = useLocalSearchParams<{ imageUri: string }>();
+  const { t } = useI18n();
 
   useEffect(() => {
     if (!imageUri) {
-      router.replace('/upload-flow')
+      router.replace('/upload-flow');
     }
-  }, [imageUri, router])
+  }, [imageUri, router]);
 
   if (!imageUri) {
-    return null
+    return null;
   }
 
   return (
@@ -33,7 +35,7 @@ export default function CleanCutPreviewScreen() {
             <Ionicons name="arrow-back" size={20} color={colors.inkDark} />
           </TouchableOpacity>
           <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
-            Clean Cut
+            {t('upload.startEyebrow')}
           </Text>
           <View className="h-11 w-11" />
         </View>
@@ -43,10 +45,9 @@ export default function CleanCutPreviewScreen() {
           contentContainerStyle={{ paddingBottom: 24 }}
           showsVerticalScrollIndicator={false}
         >
-          <Text className="font-display text-4xl text-ink-dark">Pregled fotografije</Text>
+          <Text className="font-display text-4xl text-ink-dark">{t('upload.previewTitle')}</Text>
           <Text className="mt-3 font-sans text-sm leading-6 text-ink-dark/65">
-            Proveri kadar, pa nastavi kada ti fotografija izgleda dobro. Ako nije idealna,
-            vrati se i izaberi drugu.
+            {t('upload.previewDescription')}
           </Text>
 
           <View className="mt-6 overflow-hidden rounded-[32px] bg-surface-panel px-3 py-3">
@@ -68,7 +69,9 @@ export default function CleanCutPreviewScreen() {
             }
             className="items-center rounded-full bg-brand-accent-deep px-4 py-4"
           >
-            <Text className="font-sans text-base font-semibold text-base-canvas">Dalje</Text>
+            <Text className="font-sans text-base font-semibold text-base-canvas">
+              {t('upload.next')}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -76,11 +79,11 @@ export default function CleanCutPreviewScreen() {
             className="mt-3 items-center rounded-full border border-brand-accent-deep/15 bg-base-canvas px-4 py-4"
           >
             <Text className="font-sans text-base font-semibold text-ink-dark">
-              Izaberi drugu sliku
+              {t('upload.chooseAnotherPhoto')}
             </Text>
           </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>
-  )
+  );
 }

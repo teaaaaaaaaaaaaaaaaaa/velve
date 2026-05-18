@@ -1,8 +1,8 @@
-import { Ionicons } from '@expo/vector-icons'
-import { Alert } from '@/lib/velveAlert'
-import * as ImagePicker from 'expo-image-picker'
-import { useRouter } from 'expo-router'
-import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { Ionicons } from '@expo/vector-icons';
+import { Alert } from '@/lib/velveAlert';
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -11,60 +11,67 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native'
+} from 'react-native';
 
-import client from '@/api/client'
-import { BrandBackground } from '@/components/BrandBackground'
-import { BrandWordmark } from '@/components/BrandWordmark'
-import { ProfileSkeleton } from '@/components/BrandedLoader'
-import { DiscoveryCardItem } from '@/components/DiscoveryItemCard'
-import { EditorialEmptyState } from '@/components/EditorialEmptyState'
-import { RemoteImage } from '@/components/RemoteImage'
-import { VelveStoryHighlights } from '@/components/VelveStoryHighlights'
-import { VelveTextInput } from '@/components/VelveTextInput'
-import { colors } from '@/design/tokens'
-import { useI18n } from '@/i18n'
-import { getApiErrorMessage } from '@/lib/apiErrors'
-import { getPrimaryItemImage } from '@/lib/itemImages'
+import client from '@/api/client';
+import { BrandBackground } from '@/components/BrandBackground';
+import { BrandWordmark } from '@/components/BrandWordmark';
+import { ProfileSkeleton } from '@/components/BrandedLoader';
+import { DiscoveryCardItem } from '@/components/DiscoveryItemCard';
+import { EditorialEmptyState } from '@/components/EditorialEmptyState';
+import { RemoteImage } from '@/components/RemoteImage';
+import { VelveTextInput } from '@/components/VelveTextInput';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
+import { getApiErrorMessage } from '@/lib/apiErrors';
+import { getPrimaryItemImage } from '@/lib/itemImages';
 
 type ClosetCounts = {
-  live: number
-  drafts: number
-  archive: number
-}
+  live: number;
+  drafts: number;
+  archive: number;
+};
 
 type UserProfile = {
-  _id: string
-  email: string
-  displayName: string
-  photoURL: string
-  bio: string
-  emailVerified: boolean
-  averageRating: number
-  completedTrades: number
-  followersCount: number
-  followingCount: number
-  itemsCount: number
-  joinedAt?: string
-  responseRate: number | null
-  successfulSwaps: number
-  profileCompleteness: number
-  closetCounts: ClosetCounts
-  bodyScanUrl?: string | null
-  bodyScanCreatedAt?: string | null
-  stylePreferences?: string[]
-  favoriteBrands?: string[]
-  location?: { city?: string; region?: string }
-}
+  _id: string;
+  email: string;
+  displayName: string;
+  photoURL: string;
+  bio: string;
+  emailVerified: boolean;
+  averageRating: number;
+  completedTrades: number;
+  followersCount: number;
+  followingCount: number;
+  itemsCount: number;
+  joinedAt?: string;
+  responseRate: number | null;
+  successfulSwaps: number;
+  profileCompleteness: number;
+  closetCounts: ClosetCounts;
+  bodyScanUrl?: string | null;
+  bodyScanCreatedAt?: string | null;
+  stylePreferences?: string[];
+  favoriteBrands?: string[];
+  location?: { city?: string; region?: string };
+};
 
 const ProfileGridItem = memo(function ProfileGridItem({
   item,
   onPress,
 }: {
-  item: { _id: string; title: string; images?: string[]; imageClean?: string | null; primaryImage?: string | null; isDigitized?: boolean; brand?: string }
-  onPress: () => void
+  item: {
+    _id: string;
+    title: string;
+    images?: string[];
+    imageClean?: string | null;
+    primaryImage?: string | null;
+    isDigitized?: boolean;
+    brand?: string;
+  };
+  onPress: () => void;
 }) {
-  const imageUri = getPrimaryItemImage(item)
+  const imageUri = getPrimaryItemImage(item);
 
   return (
     <TouchableOpacity
@@ -91,8 +98,8 @@ const ProfileGridItem = memo(function ProfileGridItem({
         </Text>
       ) : null}
     </TouchableOpacity>
-  )
-})
+  );
+});
 
 function formatJoinedDate(
   date: string | undefined,
@@ -100,7 +107,7 @@ function formatJoinedDate(
   joinedLabel: string,
   newMemberLabel: string
 ) {
-  if (!date) return newMemberLabel
+  if (!date) return newMemberLabel;
 
   return joinedLabel.replace(
     '{{date}}',
@@ -108,7 +115,7 @@ function formatJoinedDate(
       month: 'long',
       year: 'numeric',
     })
-  )
+  );
 }
 
 function ProfileQuickAction({
@@ -116,9 +123,9 @@ function ProfileQuickAction({
   label,
   onPress,
 }: {
-  icon: keyof typeof Ionicons.glyphMap
-  label: string
-  onPress: () => void
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
 }) {
   return (
     <TouchableOpacity className="flex-1 items-center" activeOpacity={0.86} onPress={onPress}>
@@ -129,112 +136,112 @@ function ProfileQuickAction({
         {label}
       </Text>
     </TouchableOpacity>
-  )
+  );
 }
 
 export default function ProfileScreen() {
-  const router = useRouter()
-  const { t, formatDate } = useI18n()
+  const router = useRouter();
+  const { t, formatDate } = useI18n();
 
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [modalVisible, setModalVisible] = useState(false)
-  const [activeTab, setActiveTab] = useState<'posts' | 'saved'>('posts')
-  const [closetItems, setClosetItems] = useState<any[]>([])
-  const [wishlistItems, setWishlistItems] = useState<DiscoveryCardItem[]>([])
-  const [tabLoading, setTabLoading] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [editDisplayName, setEditDisplayName] = useState('')
-  const [editBio, setEditBio] = useState('')
-  const [editPhotoURL, setEditPhotoURL] = useState('')
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<'posts' | 'saved'>('posts');
+  const [closetItems, setClosetItems] = useState<any[]>([]);
+  const [wishlistItems, setWishlistItems] = useState<DiscoveryCardItem[]>([]);
+  const [tabLoading, setTabLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [editDisplayName, setEditDisplayName] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [editPhotoURL, setEditPhotoURL] = useState('');
 
   const identityChips = useMemo(() => {
-    if (!profile) return []
+    if (!profile) return [];
 
     return [
       profile.location?.city
         ? `${profile.location.city}${profile.location.region ? `, ${profile.location.region}` : ''}`
         : null,
       profile.emailVerified ? t('profile.emailVerified') : null,
-    ].filter(Boolean) as string[]
-  }, [profile, t])
+    ].filter(Boolean) as string[];
+  }, [profile, t]);
 
   const hydrateEditState = useCallback((nextProfile: UserProfile) => {
-    setEditDisplayName(nextProfile.displayName || '')
-    setEditBio(nextProfile.bio || '')
-    setEditPhotoURL(nextProfile.photoURL || '')
-  }, [])
+    setEditDisplayName(nextProfile.displayName || '');
+    setEditBio(nextProfile.bio || '');
+    setEditPhotoURL(nextProfile.photoURL || '');
+  }, []);
 
   const loadProfile = useCallback(async () => {
     const profileResponse = await client
       .get('/api/users/me')
-      .catch((error) => ({ status: 'rejected' as const, reason: error }))
+      .catch((error) => ({ status: 'rejected' as const, reason: error }));
 
     if ('data' in profileResponse && profileResponse.data.ok) {
-      const nextProfile = profileResponse.data.data as UserProfile
-      setProfile(nextProfile)
-      hydrateEditState(nextProfile)
+      const nextProfile = profileResponse.data.data as UserProfile;
+      setProfile(nextProfile);
+      hydrateEditState(nextProfile);
     } else {
-      throw new Error(t('profile.emptyDescription'))
+      throw new Error(t('profile.emptyDescription'));
     }
-  }, [hydrateEditState, t])
+  }, [hydrateEditState, t]);
 
   const loadAll = useCallback(async () => {
     try {
-      setLoading(true)
-      await loadProfile()
+      setLoading(true);
+      await loadProfile();
     } catch (error: unknown) {
-      const message = getApiErrorMessage(error, t('profile.emptyDescription'))
-      Alert.alert(t('common.error'), message)
+      const message = getApiErrorMessage(error, t('profile.emptyDescription'));
+      Alert.alert(t('common.error'), message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [loadProfile, t])
+  }, [loadProfile, t]);
 
   useEffect(() => {
-    loadAll()
-  }, [loadAll])
+    loadAll();
+  }, [loadAll]);
 
   const loadTabContent = useCallback(async (tab: 'posts' | 'saved') => {
-    setTabLoading(true)
+    setTabLoading(true);
     try {
       if (tab === 'posts') {
-        const response = await client.get('/api/items/closet')
+        const response = await client.get('/api/items/closet');
         if (response.data.ok) {
-          setClosetItems(response.data.data.live || [])
+          setClosetItems(response.data.data.live || []);
         }
       } else {
-        const response = await client.get('/api/wishlist')
+        const response = await client.get('/api/wishlist');
         if (response.data.ok) {
-          setWishlistItems(response.data.data || [])
+          setWishlistItems(response.data.data || []);
         }
       }
     } catch (error) {
-      console.warn('[Profile] Tab content unavailable', getApiErrorMessage(error, ''))
+      console.warn('[Profile] Tab content unavailable', getApiErrorMessage(error, ''));
     } finally {
-      setTabLoading(false)
+      setTabLoading(false);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    loadTabContent('posts')
-  }, [loadTabContent])
+    loadTabContent('posts');
+  }, [loadTabContent]);
 
   const onRefresh = useCallback(async () => {
     try {
-      setRefreshing(true)
-      await Promise.all([loadProfile(), loadTabContent(activeTab)])
+      setRefreshing(true);
+      await Promise.all([loadProfile(), loadTabContent(activeTab)]);
     } finally {
-      setRefreshing(false)
+      setRefreshing(false);
     }
-  }, [activeTab, loadProfile, loadTabContent])
+  }, [activeTab, loadProfile, loadTabContent]);
 
   const handlePickImage = useCallback(async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (permission.status !== 'granted') {
-      Alert.alert(t('common.permission'), t('profile.galleryPermission'))
-      return
+      Alert.alert(t('common.permission'), t('profile.galleryPermission'));
+      return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -242,62 +249,62 @@ export default function ProfileScreen() {
       quality: 0.8,
       allowsEditing: true,
       aspect: [1, 1],
-    })
+    });
 
     if (!result.canceled && result.assets[0]) {
       try {
-        setUploading(true)
-        const uri = result.assets[0].uri
-        const filename = uri.split('/').pop() || 'avatar.jpg'
-        const match = /\.(\w+)$/.exec(filename)
-        const type = match ? `image/${match[1]}` : 'image/jpeg'
-        const formData = new FormData()
-        formData.append('image', { uri, name: filename, type } as never)
+        setUploading(true);
+        const uri = result.assets[0].uri;
+        const filename = uri.split('/').pop() || 'avatar.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+        const formData = new FormData();
+        formData.append('image', { uri, name: filename, type } as never);
 
         const response = await client.post('/api/upload', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
-        })
+        });
 
         if (response.data.ok) {
-          setEditPhotoURL(response.data.data.url as string)
+          setEditPhotoURL(response.data.data.url as string);
         }
       } catch (error) {
-        Alert.alert(t('common.error'), getApiErrorMessage(error, t('profile.avatarUploadError')))
+        Alert.alert(t('common.error'), getApiErrorMessage(error, t('profile.avatarUploadError')));
       } finally {
-        setUploading(false)
+        setUploading(false);
       }
     }
-  }, [t])
+  }, [t]);
 
   const handleSaveProfile = useCallback(async () => {
     if (!editDisplayName.trim()) {
-      Alert.alert(t('common.error'), t('profile.nameRequired'))
-      return
+      Alert.alert(t('common.error'), t('profile.nameRequired'));
+      return;
     }
 
     try {
-      setUploading(true)
+      setUploading(true);
       const response = await client.put('/api/users/me', {
         displayName: editDisplayName.trim(),
         bio: editBio.trim(),
         photoURL: editPhotoURL,
-      })
+      });
 
       if (response.data.ok) {
-        const nextProfile = response.data.data as UserProfile
-        setProfile(nextProfile)
-        hydrateEditState(nextProfile)
-        setModalVisible(false)
+        const nextProfile = response.data.data as UserProfile;
+        setProfile(nextProfile);
+        hydrateEditState(nextProfile);
+        setModalVisible(false);
       }
     } catch (error) {
-      Alert.alert(t('common.error'), getApiErrorMessage(error, t('profile.saveError')))
+      Alert.alert(t('common.error'), getApiErrorMessage(error, t('profile.saveError')));
     } finally {
-      setUploading(false)
+      setUploading(false);
     }
-  }, [editBio, editDisplayName, editPhotoURL, hydrateEditState, t])
+  }, [editBio, editDisplayName, editPhotoURL, hydrateEditState, t]);
 
   if (loading) {
-    return <ProfileSkeleton />
+    return <ProfileSkeleton />;
   }
 
   if (!profile) {
@@ -311,10 +318,10 @@ export default function ProfileScreen() {
           onAction={loadAll}
         />
       </View>
-    )
+    );
   }
 
-  const hasBodyScan = Boolean(profile.bodyScanUrl)
+  const hasBodyScan = Boolean(profile.bodyScanUrl);
 
   return (
     <>
@@ -403,29 +410,39 @@ export default function ProfileScreen() {
               </View>
             ) : null}
 
-            <VelveStoryHighlights profile={profile} />
-
             <View className="mt-5 flex-row items-center justify-between">
               <TouchableOpacity
                 className="items-center"
                 onPress={() =>
-                  router.push({ pathname: '/connections', params: { userId: profile._id, tab: 'followers' } })
+                  router.push({
+                    pathname: '/connections',
+                    params: { userId: profile._id, tab: 'followers' },
+                  })
                 }
               >
-                <Text className="font-display text-3xl text-ink-dark">{profile.followersCount}</Text>
+                <Text className="font-display text-3xl text-ink-dark">
+                  {profile.followersCount}
+                </Text>
                 <Text className="font-sans text-xs text-ink-dark/50">{t('profile.followers')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 className="items-center"
                 onPress={() =>
-                  router.push({ pathname: '/connections', params: { userId: profile._id, tab: 'following' } })
+                  router.push({
+                    pathname: '/connections',
+                    params: { userId: profile._id, tab: 'following' },
+                  })
                 }
               >
-                <Text className="font-display text-3xl text-ink-dark">{profile.followingCount}</Text>
+                <Text className="font-display text-3xl text-ink-dark">
+                  {profile.followingCount}
+                </Text>
                 <Text className="font-sans text-xs text-ink-dark/50">{t('profile.following')}</Text>
               </TouchableOpacity>
               <View className="items-center">
-                <Text className="font-display text-3xl text-ink-dark">{profile.closetCounts.live}</Text>
+                <Text className="font-display text-3xl text-ink-dark">
+                  {profile.closetCounts.live}
+                </Text>
                 <Text className="font-sans text-xs text-ink-dark/50">{t('profile.active')}</Text>
               </View>
               <View className="items-center">
@@ -457,7 +474,7 @@ export default function ProfileScreen() {
                 <View className="flex-row items-center gap-1 rounded-full bg-surface-soft px-3 py-1.5">
                   <Ionicons name="time-outline" size={12} color={colors.inkDark} />
                   <Text className="font-sans text-xs text-ink-dark/70">
-                    {profile.responseRate}% response
+                    {t('profile.responseRate', { value: profile.responseRate })}
                   </Text>
                 </View>
               ) : null}
@@ -478,8 +495,8 @@ export default function ProfileScreen() {
                 icon="bookmark-outline"
                 label={t('profile.saved')}
                 onPress={() => {
-                  setActiveTab('saved')
-                  loadTabContent('saved')
+                  setActiveTab('saved');
+                  loadTabContent('saved');
                 }}
               />
               <ProfileQuickAction
@@ -491,15 +508,22 @@ export default function ProfileScreen() {
 
             <View className="mt-4 flex-row gap-3">
               <View className="flex-1 rounded-[22px] bg-base-canvas px-4 py-4">
-                <Text className="font-sans text-[11px] uppercase text-ink-dark/45">{t('tabs.profile')}</Text>
+                <Text className="font-sans text-[11px] uppercase text-ink-dark/45">
+                  {t('profile.completeness')}
+                </Text>
                 <Text className="mt-1 font-sans text-lg font-bold text-ink-dark">
                   {profile.profileCompleteness || 0}%
                 </Text>
               </View>
               <View className="flex-1 rounded-[22px] bg-base-canvas px-4 py-4">
-                <Text className="font-sans text-[11px] uppercase text-ink-dark/45">{t('profile.closet')}</Text>
+                <Text className="font-sans text-[11px] uppercase text-ink-dark/45">
+                  {t('profile.closet')}
+                </Text>
                 <Text className="mt-1 font-sans text-lg font-bold text-ink-dark">
-                  {profile.closetCounts.live} live / {profile.closetCounts.drafts} drafts
+                  {t('profile.closetSummary', {
+                    live: profile.closetCounts.live,
+                    drafts: profile.closetCounts.drafts,
+                  })}
                 </Text>
               </View>
             </View>
@@ -509,9 +533,7 @@ export default function ProfileScreen() {
                 {hasBodyScan ? t('profile.vtoReadyTitle') : t('profile.vtoSetupTitle')}
               </Text>
               <Text className="mt-2 font-sans text-sm leading-6 text-base-canvas/80">
-                {hasBodyScan
-                  ? t('profile.vtoReadyDescription')
-                  : t('profile.vtoSetupDescription')}
+                {hasBodyScan ? t('profile.vtoReadyDescription') : t('profile.vtoSetupDescription')}
               </Text>
               <TouchableOpacity
                 onPress={() => router.push(hasBodyScan ? '/vto/hub' : '/vto/body-scan')}
@@ -526,18 +548,20 @@ export default function ProfileScreen() {
 
           <View className="mt-6">
             <View className="mb-4 flex-row rounded-[22px] bg-surface-panel p-1">
-              {([
-                { key: 'posts', label: t('profile.posts') },
-                { key: 'saved', label: t('profile.saved') },
-              ] as const).map((tab) => (
+              {(
+                [
+                  { key: 'posts', label: t('profile.posts') },
+                  { key: 'saved', label: t('profile.saved') },
+                ] as const
+              ).map((tab) => (
                 <TouchableOpacity
                   key={tab.key}
                   className={`flex-1 rounded-[18px] px-4 py-3 ${
                     activeTab === tab.key ? 'bg-brand-accent-deep' : ''
                   }`}
                   onPress={() => {
-                    setActiveTab(tab.key)
-                    loadTabContent(tab.key)
+                    setActiveTab(tab.key);
+                    loadTabContent(tab.key);
                   }}
                 >
                   <Text
@@ -682,5 +706,5 @@ export default function ProfileScreen() {
         </View>
       </Modal>
     </>
-  )
+  );
 }

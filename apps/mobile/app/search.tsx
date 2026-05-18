@@ -20,7 +20,9 @@ import { ImmersiveFeedCard, ImmersiveFeedItem } from '@/components/ImmersiveFeed
 import { VelveTextInput } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
+import { getApiErrorMessage } from '@/lib/apiErrors'
 import { getStorage } from '@/lib/storage'
+import { showVelveToast } from '@/lib/velveAlert'
 
 type SearchFilters = {
   category: string
@@ -69,6 +71,7 @@ export default function SearchScreen() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const initialFilters = { ...EMPTY_FILTERS, category: params.category || '' }
@@ -149,10 +152,21 @@ export default function SearchScreen() {
           setItems((prev) => (mode === 'append' ? [...prev, ...nextItems] : nextItems))
           setNextCursor(response.data.nextCursor ? String(response.data.nextCursor) : null)
           setHasMore(Boolean(response.data.hasMore))
+          setErrorMessage('')
+          return
         }
-      } catch {
+
+        throw new Error('INVALID_SEARCH_RESPONSE')
+      } catch (error) {
         if (mode === 'replace') {
           setItems([])
+          setErrorMessage(getApiErrorMessage(error, t('search.loadError')))
+        } else {
+          showVelveToast({
+            title: t('search.loadMoreErrorTitle'),
+            message: getApiErrorMessage(error, t('search.loadMoreErrorDescription')),
+            tone: 'error',
+          })
         }
       } finally {
         setLoading(false)
@@ -160,7 +174,7 @@ export default function SearchScreen() {
         setRefreshing(false)
       }
     },
-    [filters, nextCursor, query]
+    [filters, nextCursor, query, t]
   )
 
   useEffect(() => {
@@ -212,9 +226,14 @@ export default function SearchScreen() {
           isLiked,
           likesCount: previousCount,
         }))
+        showVelveToast({
+          title: t('search.likeErrorTitle'),
+          message: t('search.likeErrorDescription'),
+          tone: 'error',
+        })
       }
     },
-    [updateItem]
+    [t, updateItem]
   )
 
   const handleWishlist = useCallback(
@@ -242,9 +261,14 @@ export default function SearchScreen() {
           isWishlisted,
           wishlistCount: previousCount,
         }))
+        showVelveToast({
+          title: t('search.saveErrorTitle'),
+          message: t('search.saveErrorDescription'),
+          tone: 'error',
+        })
       }
     },
-    [updateItem]
+    [t, updateItem]
   )
 
   const renderSearchItem = useCallback(
@@ -287,6 +311,16 @@ export default function SearchScreen() {
         <View className="flex-1 items-center justify-center bg-white">
           <ActivityIndicator color={colors.accentDeep} />
           <Text className="mt-3 font-sans text-sm text-ink-dark/45">{t('search.loading')}</Text>
+        </View>
+      ) : errorMessage && items.length === 0 ? (
+        <View className="flex-1 bg-white px-5 pt-24">
+          <EditorialEmptyState
+            icon="cloud-offline-outline"
+            title={t('search.errorTitle')}
+            description={errorMessage}
+            actionLabel={t('common.retry')}
+            onAction={() => loadResults('replace')}
+          />
         </View>
       ) : items.length === 0 ? (
         <View className="flex-1 bg-white px-5 pt-24">

@@ -12,6 +12,7 @@ import { colors } from '@/design/tokens'
 import { useAuth } from '@/hooks/useAuth'
 import { useI18n } from '@/i18n'
 import { getApiErrorMessage } from '@/lib/apiErrors'
+import { showVelveToast } from '@/lib/velveAlert'
 
 type NotificationPreferences = {
   allPush: boolean
@@ -90,19 +91,22 @@ export default function SettingsScreen() {
   const [loadingPreferences, setLoadingPreferences] = useState(true)
   const [savingPreference, setSavingPreference] = useState<keyof NotificationPreferences | null>(null)
   const [savingLocale, setSavingLocale] = useState(false)
+  const [preferencesNotice, setPreferencesNotice] = useState('')
 
   const loadPreferences = useCallback(async () => {
     try {
       const response = await client.get('/api/users/me/notification-preferences')
       if (response.data.ok) {
         setPreferences({ ...DEFAULT_NOTIFICATION_PREFERENCES, ...(response.data.data || {}) })
+        setPreferencesNotice('')
       }
-    } catch {
+    } catch (error) {
       // Keep local defaults if the API is temporarily unavailable.
+      setPreferencesNotice(getApiErrorMessage(error, t('settings.preferencesLoadError')))
     } finally {
       setLoadingPreferences(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     loadPreferences()
@@ -118,8 +122,12 @@ export default function SettingsScreen() {
           try {
             await logout()
             router.replace('/(auth)/login')
-          } catch {
-            Alert.alert(t('common.error'), t('settings.logoutError'))
+          } catch (error) {
+            showVelveToast({
+              title: t('common.error'),
+              message: getApiErrorMessage(error, t('settings.logoutError')),
+              tone: 'error',
+            })
           }
         },
       },
@@ -137,10 +145,15 @@ export default function SettingsScreen() {
         const response = await client.put('/api/users/me/notification-preferences', next)
         if (response.data.ok) {
           setPreferences({ ...DEFAULT_NOTIFICATION_PREFERENCES, ...(response.data.data || next) })
+          setPreferencesNotice('')
         }
       } catch (error) {
         setPreferences(previous)
-        Alert.alert(t('common.error'), getApiErrorMessage(error, t('settings.preferencesSaveError')))
+        showVelveToast({
+          title: t('common.error'),
+          message: getApiErrorMessage(error, t('settings.preferencesSaveError')),
+          tone: 'error',
+        })
       } finally {
         setSavingPreference(null)
       }
@@ -149,7 +162,13 @@ export default function SettingsScreen() {
   )
 
   const openExternal = (url: string) => {
-    Linking.openURL(url).catch(() => Alert.alert(t('common.error'), t('settings.linkError')))
+    Linking.openURL(url).catch((error) =>
+      showVelveToast({
+        title: t('common.error'),
+        message: getApiErrorMessage(error, t('settings.linkError')),
+        tone: 'error',
+      })
+    )
   }
 
   const changeLocale = useCallback(
@@ -159,8 +178,17 @@ export default function SettingsScreen() {
       try {
         setSavingLocale(true)
         await setLocale(language)
-      } catch {
-        Alert.alert(t('common.error'), t('settings.languageSaveError'))
+        showVelveToast({
+          title: t('settings.languageUpdatedTitle'),
+          message: t('settings.languageUpdatedDescription', { language: localeLabels[language] }),
+          tone: 'success',
+        })
+      } catch (error) {
+        showVelveToast({
+          title: t('common.error'),
+          message: getApiErrorMessage(error, t('settings.languageSaveError')),
+          tone: 'error',
+        })
       } finally {
         setSavingLocale(false)
       }
@@ -257,6 +285,21 @@ export default function SettingsScreen() {
           {loadingPreferences ? (
             <View className="items-center py-5">
               <ActivityIndicator size="small" color={colors.accentDeep} />
+            </View>
+          ) : null}
+          {!loadingPreferences && preferencesNotice ? (
+            <View className="mt-3 rounded-[18px] bg-brand-highlight/25 px-4 py-3">
+              <Text className="font-sans text-sm leading-6 text-ink-dark/75">
+                {preferencesNotice}
+              </Text>
+              <TouchableOpacity
+                className="mt-2 self-start rounded-full bg-base-canvas px-3 py-2"
+                onPress={loadPreferences}
+              >
+                <Text className="font-sans text-xs font-semibold text-ink-dark">
+                  {t('common.retry')}
+                </Text>
+              </TouchableOpacity>
             </View>
           ) : null}
           <SettingRow icon="notifications-outline" title={t('settings.allPush')} right={<Switch {...switchProps('allPush')} />} />

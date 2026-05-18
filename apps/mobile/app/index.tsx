@@ -1,12 +1,13 @@
-import { useEffect } from 'react'
-import { View, Text, TouchableOpacity } from 'react-native'
-import { useRouter, useSegments } from 'expo-router'
+import { useRouter, useSegments } from 'expo-router';
+import { useEffect } from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
 
-import { BrandBackground } from '@/components/BrandBackground'
-import { BrandedLoader } from '@/components/BrandedLoader'
-import { GlassSurface } from '@/components/GlassSurface'
-import { useAuth } from '@/hooks/useAuth'
-import { useI18n } from '@/i18n'
+import { BrandBackground } from '@/components/BrandBackground';
+import { BrandedLoader } from '@/components/BrandedLoader';
+import { GlassSurface } from '@/components/GlassSurface';
+import { useAuth } from '@/hooks/useAuth';
+import { useI18n } from '@/i18n';
+import { getProfileResolutionCopy } from '@/lib/authFeedback';
 
 export default function Index() {
   const {
@@ -16,10 +17,11 @@ export default function Index() {
     profileError,
     refreshDbUser,
     logout,
-  } = useAuth()
-  const router = useRouter()
-  const segments = useSegments()
-  const { locale } = useI18n()
+  } = useAuth();
+  const router = useRouter();
+  const segments = useSegments();
+  const { locale, t } = useI18n();
+  const profileResolution = getProfileResolutionCopy(profileError, t);
 
   const copy = {
     sr: {
@@ -43,33 +45,33 @@ export default function Index() {
       logout: 'Выйти',
       loading: 'Velve проверяет твой вход в приложение',
     },
-  } as const
+  } as const;
 
   useEffect(() => {
-    if (authLoading) return
+    if (authLoading) return;
 
-    const isOnValidRoute = segments.length > 0
-    if (isOnValidRoute) return
+    const isOnValidRoute = segments.length > 0;
+    if (isOnValidRoute) return;
 
     if (!currentUser) {
       // Not logged in - go to login
-      router.replace('/(auth)/login')
-      return
+      router.replace('/(auth)/login');
+      return;
     }
 
     // Wait for dbUser to load before redirecting
     if (!dbUser) {
-      console.log('[Index] Waiting for dbUser to load. profileError =', profileError)
-      return
+      console.log('[Index] Waiting for dbUser to load. profileError =', profileError);
+      return;
     }
 
     // Both currentUser and dbUser loaded - safe to redirect
     if (dbUser.onboardingCompleted) {
-      router.replace('/(tabs)/feed')
+      router.replace('/(tabs)/feed');
     } else {
-      router.replace('/onboarding/terms')
+      router.replace('/onboarding/terms');
     }
-  }, [currentUser, dbUser, authLoading, segments])
+  }, [currentUser, dbUser, authLoading, segments]);
 
   if (!authLoading && currentUser && !dbUser && profileError) {
     return (
@@ -78,10 +80,13 @@ export default function Index() {
 
         <GlassSurface className="px-6 py-6">
           <Text className="text-center font-display text-3xl text-ink-dark">
-            {copy[locale].profileLoadTitle}
+            {profileResolution.title || copy[locale].profileLoadTitle}
           </Text>
           <Text className="mt-3 text-center font-sans text-sm leading-6 text-ink-dark/68">
-            {copy[locale].profileLoadDescription}
+            {profileResolution.message || copy[locale].profileLoadDescription}
+          </Text>
+          <Text className="mt-3 text-center font-sans text-sm leading-6 text-ink-dark/68">
+            {profileResolution.recovery}
           </Text>
           <Text className="mt-5 text-center font-mono text-xs text-ink-dark/58">
             {String(profileError)}
@@ -104,8 +109,8 @@ export default function Index() {
           </TouchableOpacity>
         </GlassSurface>
       </View>
-    )
+    );
   }
 
-  return <BrandedLoader label={copy[locale].loading} />
+  return <BrandedLoader label={copy[locale].loading} />;
 }

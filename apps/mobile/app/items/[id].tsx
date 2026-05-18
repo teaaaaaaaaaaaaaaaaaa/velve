@@ -24,7 +24,9 @@ import { RemoteImage } from '@/components/RemoteImage';
 import { VelveTextInput } from '@/components/VelveTextInput';
 import { colors } from '@/design/tokens';
 import { useAuth } from '@/hooks/useAuth';
+import { getApiErrorMessage } from '@/lib/apiErrors';
 import { getPrimaryItemImage, hasDigitizedImage } from '@/lib/itemImages';
+import { showVelveToast } from '@/lib/velveAlert';
 
 type Owner = {
   _id: string;
@@ -189,6 +191,7 @@ export default function ItemDetailsScreen() {
   const [similarItems, setSimilarItems] = useState<DiscoveryCardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingSimilar, setLoadingSimilar] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -202,6 +205,7 @@ export default function ItemDetailsScreen() {
   const [tradeMessage, setTradeMessage] = useState('');
   const [offeredPrice, setOfferedPrice] = useState('');
   const [loadingUserItems, setLoadingUserItems] = useState(false);
+  const [userItemsError, setUserItemsError] = useState<string | null>(null);
   const [submittingTrade, setSubmittingTrade] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editTitle, setEditTitle] = useState('');
@@ -236,6 +240,10 @@ export default function ItemDetailsScreen() {
     return ['trade'] as Array<'trade' | 'buy'>;
   }, [isOwn, item]);
   const showProposalButton = availableProposalModes.length > 0;
+  const showActionError = (title: string, error: unknown, fallback: string) => {
+    Alert.alert(title, getApiErrorMessage(error, fallback));
+  };
+
   const hydrateEditState = (data: Item) => {
     setEditTitle(data.title || '');
     setEditDescription(data.description || '');
@@ -251,17 +259,23 @@ export default function ItemDetailsScreen() {
   const fetchUserItems = async () => {
     if (!dbUser) return;
     setLoadingUserItems(true);
+    setUserItemsError(null);
     try {
       const response = await client.get('/api/items', { params: { userId: dbUser._id } });
-      if (response.data.ok)
+      if (response.data.ok) {
         setCurrentUserItems(
           response.data.data.filter(
             (entry: UserItem & { status?: string }) =>
               entry._id !== id && entry.status === 'available'
           )
         );
-    } catch {
-      Alert.alert('Greska', 'Nije moguce ucitati tvoje iteme.');
+        return;
+      }
+
+      throw new Error('INVALID_ITEMS_RESPONSE');
+    } catch (error) {
+      setCurrentUserItems([]);
+      setUserItemsError(getApiErrorMessage(error, 'Tvoji komadi trenutno nisu dostupni.'));
     } finally {
       setLoadingUserItems(false);
     }
@@ -271,6 +285,7 @@ export default function ItemDetailsScreen() {
     try {
       setLoading(true);
       setLoadingSimilar(true);
+      setLoadError(null);
       const [itemResult, similarResult] = await Promise.allSettled([
         client.get(`/api/items/${id}`),
         client.get(`/api/items/${id}/similar`, { params: { limit: 8 } }),
@@ -307,10 +322,14 @@ export default function ItemDetailsScreen() {
         setWishlistCount(data.wishlistCount || 0);
         setTradeRequestsCount(data.tradeRequestsCount || 0);
         hydrateEditState(data);
+        return;
       }
-    } catch {
-      Alert.alert('Greska', 'Nije moguce ucitati detalje predmeta.');
-      router.back();
+
+      throw new Error('INVALID_ITEM_RESPONSE');
+    } catch (error) {
+      setItem(null);
+      setUnavailableItem(null);
+      setLoadError(getApiErrorMessage(error, 'Detalji ovog artikla trenutno nisu dostupni.'));
     } finally {
       setLoading(false);
       setLoadingSimilar(false);
@@ -330,8 +349,8 @@ export default function ItemDetailsScreen() {
           setLikesCount(response.data.likesCount);
         }
       }
-    } catch {
-      Alert.alert('Greska', 'Nije moguce azurirati lajk.');
+    } catch (error) {
+      showActionError('Lajk nije azuriran', error, 'Pokusaj ponovo za nekoliko trenutaka.');
     }
   };
 
@@ -346,8 +365,8 @@ export default function ItemDetailsScreen() {
         setIsWishlisted(true);
         setWishlistCount((prev) => prev + 1);
       }
-    } catch {
-      Alert.alert('Greska', 'Nije moguce sacuvati ovu objavu.');
+    } catch (error) {
+      showActionError('Objava nije sacuvana', error, 'Pokusaj ponovo za nekoliko trenutaka.');
     }
   };
 
@@ -361,8 +380,8 @@ export default function ItemDetailsScreen() {
           try {
             await client.delete(`/api/items/${id}`);
             router.replace('/(tabs)/closet');
-          } catch {
-            Alert.alert('Greska', 'Nije moguce obrisati predmet.');
+          } catch (error) {
+            showActionError('Objava nije obrisana', error, 'Pokusaj ponovo za nekoliko trenutaka.');
           }
         },
       },
@@ -390,8 +409,12 @@ export default function ItemDetailsScreen() {
       }
 
       router.replace('/(tabs)/closet');
-    } catch {
-      Alert.alert('Greska', 'Nije moguce oznaciti predmet kao prodat.');
+    } catch (error) {
+      showActionError(
+        'Artikal nije arhiviran',
+        error,
+        'Prodaja trenutno nije sacuvana. Pokusaj ponovo.'
+      );
     } finally {
       setMarkingSold(false);
     }
@@ -415,8 +438,12 @@ export default function ItemDetailsScreen() {
       setDigitizing(true);
       await client.post(`/api/items/${id}/digitize`);
       await fetchItemDetails();
-    } catch {
-      Alert.alert('Greska', 'Clean Cut trenutno nije moguce pokrenuti.');
+    } catch (error) {
+      showActionError(
+        'Clean Cut nije pokrenut',
+        error,
+        'Obrada trenutno nije dostupna. Pokusaj ponovo malo kasnije.'
+      );
     } finally {
       setDigitizing(false);
     }
@@ -426,8 +453,12 @@ export default function ItemDetailsScreen() {
     try {
       setCheckingBodyScan(true);
       router.push({ pathname: '/vto/render', params: { itemId: id, mode: 'quick' } });
-    } catch {
-      Alert.alert('Greska', 'Nije moguce pokrenuti Virtual Try-On.');
+    } catch (error) {
+      showActionError(
+        'Virtual Try-On nije otvoren',
+        error,
+        'Pokusaj ponovo za nekoliko trenutaka.'
+      );
     } finally {
       setCheckingBodyScan(false);
     }
@@ -463,7 +494,7 @@ export default function ItemDetailsScreen() {
 
   const handleSaveEdit = async () => {
     if (!editTitle.trim() || !editCategory.trim())
-      return Alert.alert('Greska', 'Naslov i kategorija su obavezni.');
+      return Alert.alert('Dopuni objavu', 'Naslov i kategorija su obavezni.');
     try {
       setSavingEdit(true);
       const response = await client.put(`/api/items/${id}`, {
@@ -487,10 +518,15 @@ export default function ItemDetailsScreen() {
       });
       if (response.data.ok) {
         setShowEditModal(false);
-        fetchItemDetails();
+        fetchItemDetails().catch(() => undefined);
+        showVelveToast({
+          title: 'Izmene sacuvane',
+          message: 'Objava sada prikazuje najnovije podatke.',
+          tone: 'success',
+        });
       }
-    } catch {
-      Alert.alert('Greska', 'Nije moguce sacuvati izmene.');
+    } catch (error) {
+      showActionError('Izmene nisu sacuvane', error, 'Pokusaj ponovo za nekoliko trenutaka.');
     } finally {
       setSavingEdit(false);
     }
@@ -498,7 +534,7 @@ export default function ItemDetailsScreen() {
 
   const handleSubmitProposal = async () => {
     const validationError = getProposalValidationError();
-    if (validationError) return Alert.alert('Greska', validationError);
+    if (validationError) return Alert.alert('Dopuni predlog', validationError);
 
     try {
       setSubmittingTrade(true);
@@ -519,15 +555,25 @@ export default function ItemDetailsScreen() {
         setOfferedPrice('');
         setShowProposalReview(false);
 
-        Alert.alert('Uspeh', 'Predlog je poslat.', [
+        Alert.alert('Predlog je poslat', 'Sta zelis dalje?', [
           {
             text: 'Otvori chat',
             onPress: () => router.push(chatId ? `/(tabs)/chat/${chatId}` : '/(tabs)/chat'),
           },
+          {
+            text: 'Ostani ovde',
+            style: 'cancel',
+            onPress: () =>
+              showVelveToast({
+                title: 'Predlog je stigao',
+                message: 'Vlasnik sada moze da odgovori iz chata.',
+                tone: 'success',
+              }),
+          },
         ]);
       }
-    } catch {
-      Alert.alert('Greska', 'Nije moguce poslati predlog.');
+    } catch (error) {
+      showActionError('Predlog nije poslat', error, 'Pokusaj ponovo za nekoliko trenutaka.');
     } finally {
       setSubmittingTrade(false);
     }
@@ -552,7 +598,7 @@ export default function ItemDetailsScreen() {
   const openProposalReview = () => {
     const validationError = getProposalValidationError();
     if (validationError) {
-      Alert.alert('Greska', validationError);
+      Alert.alert('Dopuni predlog', validationError);
       return;
     }
 
@@ -563,8 +609,8 @@ export default function ItemDetailsScreen() {
     try {
       await client.post(`/api/items/${id}/hide`, { reason: 'not_interested' });
       router.replace('/(tabs)/feed');
-    } catch {
-      Alert.alert('Greska', 'Nije moguce sakriti ovu objavu.');
+    } catch (error) {
+      showActionError('Objava nije sakrivena', error, 'Pokusaj ponovo za nekoliko trenutaka.');
     }
   };
 
@@ -575,9 +621,13 @@ export default function ItemDetailsScreen() {
         onPress: async () => {
           try {
             await client.post(`/api/items/${id}/report`, { reason: 'community_report' });
-            Alert.alert('Hvala', 'Prijava je poslata.');
-          } catch {
-            Alert.alert('Greska', 'Prijava trenutno nije moguca.');
+            showVelveToast({
+              title: 'Prijava je poslata',
+              message: 'Velve tim ce pregledati objavu i korisnika.',
+              tone: 'success',
+            });
+          } catch (error) {
+            showActionError('Prijava nije poslata', error, 'Pokusaj ponovo za nekoliko trenutaka.');
           }
         },
       },
@@ -594,11 +644,14 @@ export default function ItemDetailsScreen() {
         onPress: async () => {
           try {
             await client.post(`/api/users/${owner._id}/block`);
-            Alert.alert('Korisnik blokiran', `@${owner.displayName} vise ti se nece prikazivati.`, [
-              { text: 'U redu', onPress: () => router.replace('/(tabs)/feed') },
-            ]);
-          } catch {
-            Alert.alert('Greska', 'Nije moguce blokirati korisnika.');
+            showVelveToast({
+              title: 'Korisnik je blokiran',
+              message: `@${owner.displayName} vise ti se nece prikazivati u feedu.`,
+              tone: 'success',
+            });
+            router.replace('/(tabs)/feed');
+          } catch (error) {
+            showActionError('Korisnik nije blokiran', error, 'Pokusaj ponovo za nekoliko trenutaka.');
           }
         },
       },
@@ -716,6 +769,32 @@ export default function ItemDetailsScreen() {
   }, [loading, openTrade, item]);
 
   if (loading || !item) {
+    if (!loading && loadError) {
+      return (
+        <View className="flex-1 bg-base-canvas">
+          <Stack.Screen options={{ headerShown: false }} />
+          <BrandBackground />
+          <View className="flex-1 items-center justify-center px-6">
+            <EditorialEmptyState
+              icon="alert-circle-outline"
+              title="Detalji artikla trenutno nisu dostupni"
+              description={loadError}
+              actionLabel="Pokusaj ponovo"
+              onAction={() => {
+                fetchItemDetails().catch(() => undefined);
+              }}
+            />
+            <TouchableOpacity
+              onPress={() => router.back()}
+              className="mt-4 rounded-full border border-ink-dark/10 bg-base-canvas/70 px-5 py-3.5"
+            >
+              <Text className="font-sans text-sm font-semibold text-ink-dark">Nazad</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
     if (!loading && unavailableItem) {
       return (
         <View className="flex-1 bg-base-canvas">
@@ -962,7 +1041,18 @@ export default function ItemDetailsScreen() {
                   ))}
                 </View>
               ) : null}
-              {!loadingUserItems && currentUserItems.length === 0 ? (
+              {!loadingUserItems && userItemsError ? (
+                <EditorialEmptyState
+                  icon="alert-circle-outline"
+                  title="Tvoji komadi trenutno nisu dostupni"
+                  description={userItemsError}
+                  actionLabel="Pokusaj ponovo"
+                  onAction={() => {
+                    fetchUserItems().catch(() => undefined);
+                  }}
+                />
+              ) : null}
+              {!loadingUserItems && !userItemsError && currentUserItems.length === 0 ? (
                 <EditorialEmptyState
                   icon="shirt-outline"
                   title="Nemas jos komad za razmenu"

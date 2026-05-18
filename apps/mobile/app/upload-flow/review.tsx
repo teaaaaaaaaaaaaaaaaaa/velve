@@ -1,81 +1,80 @@
-import { Ionicons } from '@expo/vector-icons'
-import { Alert } from '@/lib/velveAlert'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
-import { Text, TouchableOpacity, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons';
+import { Alert } from '@/lib/velveAlert';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import client from '@/api/client'
-import { BrandBackground } from '@/components/BrandBackground'
-import { BrandedLoader } from '@/components/BrandedLoader'
-import { FullscreenImageModal } from '@/components/FullscreenImageModal'
-import { GlassSurface } from '@/components/GlassSurface'
-import { RemoteImage } from '@/components/RemoteImage'
-import { colors } from '@/design/tokens'
+import client from '@/api/client';
+import { BrandBackground } from '@/components/BrandBackground';
+import { BrandedLoader } from '@/components/BrandedLoader';
+import { FullscreenImageModal } from '@/components/FullscreenImageModal';
+import { GlassSurface } from '@/components/GlassSurface';
+import { RemoteImage } from '@/components/RemoteImage';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
 
 type ImagesPayload = {
-  imageOriginal: string | null
-  imageClean: string | null
-  isDigitized: boolean
-}
+  imageOriginal: string | null;
+  imageClean: string | null;
+  isDigitized: boolean;
+};
 
 export default function CleanCutReviewScreen() {
-  const router = useRouter()
-  const insets = useSafeAreaInsets()
-  const { itemId } = useLocalSearchParams<{ itemId: string }>()
-  const [payload, setPayload] = useState<ImagesPayload | null>(null)
-  const [loading, setLoading] = useState(true)
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { itemId } = useLocalSearchParams<{ itemId: string }>();
+  const { t } = useI18n();
+  const [payload, setPayload] = useState<ImagesPayload | null>(null);
+  const [loading, setLoading] = useState(true);
   const [fullscreenTarget, setFullscreenTarget] = useState<{
-    title: string
-    imageUri?: string | null
-  } | null>(null)
+    title: string;
+    imageUri?: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!itemId) {
-      router.replace('/upload-flow')
-      return
+      router.replace('/upload-flow');
+      return;
     }
 
-    let active = true
-    ;(async () => {
+    let active = true;
+    (async () => {
       try {
-        const response = await client.get(`/api/items/${itemId}/images`)
+        const response = await client.get(`/api/items/${itemId}/images`);
         if (active) {
-          setPayload(response.data?.data)
+          setPayload(response.data?.data);
         }
       } catch {
         if (active) {
-          Alert.alert('Ne mogu da ucitam rezultat', 'Pokusaj ponovo.', [
-            { text: 'Nazad', onPress: () => router.replace('/upload-flow') },
-          ])
+          Alert.alert(t('upload.reviewLoadErrorTitle'), t('upload.reviewLoadErrorDescription'), [
+            { text: t('common.close'), onPress: () => router.replace('/upload-flow') },
+          ]);
         }
       } finally {
-        if (active) setLoading(false)
+        if (active) setLoading(false);
       }
-    })()
+    })();
 
     return () => {
-      active = false
-    }
-  }, [itemId, router])
+      active = false;
+    };
+  }, [itemId, router, t]);
 
   async function retryFlow() {
     try {
-      if (itemId) await client.delete(`/api/items/${itemId}`)
+      if (itemId) await client.delete(`/api/items/${itemId}`);
     } catch {
       // ignore cleanup
     } finally {
-      router.replace('/upload-flow')
+      router.replace('/upload-flow');
     }
   }
 
-  if (loading) return <BrandedLoader />
+  if (loading) return <BrandedLoader />;
 
   return (
-    <View
-      className="flex-1 bg-base-canvas"
-      style={{ paddingTop: insets.top + 8 }}
-    >
+    <View className="flex-1 bg-base-canvas" style={{ paddingTop: insets.top + 8 }}>
       <BrandBackground />
 
       {/* Header */}
@@ -97,11 +96,9 @@ export default function CleanCutReviewScreen() {
 
       <View className="flex-1 px-5 pt-8">
         <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
-          Pregled
+          {t('upload.reviewEyebrow')}
         </Text>
-        <Text className="mt-1 font-display text-4xl text-ink-dark">
-          Izgleda li ovo kao tvoj komad?
-        </Text>
+        <Text className="mt-1 font-display text-4xl text-ink-dark">{t('upload.reviewTitle')}</Text>
 
         {/* Side by side comparison */}
         <View className="mt-8 flex-row gap-3">
@@ -110,14 +107,14 @@ export default function CleanCutReviewScreen() {
             className="flex-1"
             onPress={() =>
               setFullscreenTarget({
-                title: 'Original',
+                title: t('upload.original'),
                 imageUri: payload?.imageOriginal,
               })
             }
           >
             <GlassSurface className="px-3 py-3">
               <Text className="mb-3 text-center font-sans text-[10px] uppercase tracking-[1.2px] text-ink-dark/40">
-                Original
+                {t('upload.original')}
               </Text>
               <RemoteImage
                 uri={payload?.imageOriginal || undefined}
@@ -132,14 +129,14 @@ export default function CleanCutReviewScreen() {
             className="flex-1"
             onPress={() =>
               setFullscreenTarget({
-                title: 'Clean cut',
+                title: t('upload.cleaned'),
                 imageUri: payload?.imageClean,
               })
             }
           >
             <GlassSurface className="px-3 py-3">
               <Text className="mb-3 text-center font-sans text-[10px] uppercase tracking-[1.2px] text-ink-dark/40">
-                Clean cut
+                {t('upload.cleaned')}
               </Text>
               <RemoteImage
                 uri={payload?.imageClean || undefined}
@@ -159,7 +156,7 @@ export default function CleanCutReviewScreen() {
             style={{ marginTop: 1 }}
           />
           <Text className="ml-2 flex-1 font-sans text-xs leading-5 text-ink-dark/55">
-            Dodirni bilo koju sliku da je otvoris preko celog ekrana. Clean varijanta se koristi za Virtual Try-On i prikaz u tvom closet-u.
+            {t('upload.reviewHint')}
           </Text>
         </View>
       </View>
@@ -176,16 +173,13 @@ export default function CleanCutReviewScreen() {
           }
         >
           <Text className="font-sans text-base font-semibold text-base-canvas">
-            Savrseno, nastavi
+            {t('upload.reviewContinue')}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          className="mt-3 items-center rounded-full px-4 py-3"
-          onPress={retryFlow}
-        >
+        <TouchableOpacity className="mt-3 items-center rounded-full px-4 py-3" onPress={retryFlow}>
           <Text className="font-sans text-sm font-semibold text-ink-dark/50">
-            Probaj ponovo
+            {t('upload.retry')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -197,5 +191,5 @@ export default function CleanCutReviewScreen() {
         onClose={() => setFullscreenTarget(null)}
       />
     </View>
-  )
+  );
 }

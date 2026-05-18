@@ -6,7 +6,7 @@
   useEffect,
   useMemo,
   useState,
-} from 'react'
+} from 'react';
 
 import {
   defaultLocale,
@@ -15,10 +15,10 @@ import {
   localeTags,
   supportedLocales,
   SupportedLocale,
-} from '@/design/tokens'
-import { getStorage } from '@/lib/storage'
+} from '@/design/tokens';
+import { getStorage } from '@/lib/storage';
 
-const STORAGE_KEY = '@velve:locale'
+const STORAGE_KEY = '@velve:locale';
 
 const dictionaries = {
   sr: {
@@ -31,6 +31,7 @@ const dictionaries = {
     'common.permission': 'Dozvola',
     'common.retry': 'Pokusaj ponovo',
     'common.cancel': 'Odustani',
+    'common.ok': 'U redu',
     'common.delete': 'Obrisi',
     'common.remove': 'Ukloni',
     'common.save': 'Sacuvaj',
@@ -64,6 +65,8 @@ const dictionaries = {
     'feed.reportSuccessDescription': 'Prijava je poslata i pregledacemo objavu.',
     'feed.reportError': 'Nije moguce poslati prijavu trenutno.',
     'feed.hideError': 'Nije moguce sakriti ovu objavu.',
+    'feed.hideSuccessTitle': 'Objava je sakrivena',
+    'feed.hideSuccessDescription': 'Discovery ce ubuduce manje prikazivati slicne komade.',
     'feed.blockTitle': 'Blokiraj korisnika?',
     'feed.blockDescription': '@{{name}} vise neces vidjati u feedu.',
     'feed.blockCta': 'Blokiraj',
@@ -109,8 +112,7 @@ const dictionaries = {
     'profile.stay': 'Ostani',
     'profile.logoutCta': 'Odjavi se',
     'profile.emptyTitle': 'Profil trenutno nije dostupan',
-    'profile.emptyDescription':
-      'Veza sa backend profilom je pukla. PokuÅ¡aj ponovo za nastavak.',
+    'profile.emptyDescription': 'Veza sa backend profilom je pukla. PokuÅ¡aj ponovo za nastavak.',
     'profile.trades': 'Razmene',
     'profile.defaultBio': 'Dodaj par reci o svom ukusu da profil deluje zivo i licno.',
     'profile.emailVerified': 'Email verifikovan',
@@ -141,6 +143,7 @@ const dictionaries = {
     'profile.avatarUploadError': 'Avatar trenutno nije moguce uploadovati.',
     'profile.nameRequired': 'Ime ne moze biti prazno.',
     'profile.saveError': 'Profil nije sacuvan.',
+    'profile.closetSummary': '{{live}} aktivno / {{drafts}} draft',
     'chat.eyebrow': 'Messages',
     'chat.title': 'Inbox',
     'chat.tradePulse': 'Trade pulse',
@@ -202,9 +205,28 @@ const dictionaries = {
     'settings.terms': 'Uslovi koriscenja',
     'settings.privacyPolicy': 'Politika privatnosti',
     'settings.logoutError': 'Odjava trenutno nije uspela.',
+    'settings.preferencesLoadError':
+      'Prikazujemo lokalna podesavanja dok se notifikacije ponovo ne povezu sa serverom.',
     'settings.preferencesSaveError': 'Podesavanje notifikacija nije sacuvano.',
     'settings.linkError': 'Link trenutno nije dostupan.',
     'settings.languageSaveError': 'Jezik trenutno nije moguce sacuvati.',
+    'settings.languageUpdatedTitle': 'Jezik je azuriran',
+    'settings.languageUpdatedDescription': 'Interfejs sada koristi {{language}}.',
+    'publicProfile.unavailableTitle': 'Profil trenutno nije dostupan',
+    'publicProfile.unavailableDescription':
+      'Moguce je da je korisnik blokiran, uklonjen ili da je veza kratko pukla.',
+    'publicProfile.defaultBio':
+      'Profil jos nema opis, ali stil, trust signal i komadi ispod vec govore dovoljno.',
+    'publicProfile.follow': 'Zaprati',
+    'publicProfile.unfollow': 'Otprati',
+    'publicProfile.message': 'Poruka',
+    'publicProfile.posts': 'Objave',
+    'publicProfile.emptyListingsTitle': 'Trenutno nema aktivnih objava',
+    'publicProfile.emptyListingsDescription':
+      'Korisnik trenutno nema dostupnih komada za otvaranje iz discovery sloja.',
+    'publicProfile.moreActionsDescription': 'Sta zelis da uradis?',
+    'publicProfile.chatError': 'Nije moguce otvoriti razgovor.',
+    'publicProfile.followError': 'Pracenje trenutno nije moguce.',
     'blocked.eyebrow': 'Privacy',
     'blocked.title': 'Blokirani korisnici',
     'blocked.description': 'Ljudi koje blokiras ne ulaze u tvoj feed, search i trade tokove.',
@@ -225,6 +247,15 @@ const dictionaries = {
     'notifications.now': 'Sad',
     'notifications.loadError': 'Notifikacije trenutno nisu dostupne.',
     'notifications.errorTitle': 'Ne mogu da ucitam notifikacije',
+    'notifications.markReadSuccessTitle': 'Sve je procitano',
+    'notifications.markReadSuccessDescription': '{{count}} notifikacija je oznaceno kao procitano.',
+    'notifications.markReadIdleTitle': 'Sve je vec procitano',
+    'notifications.markReadIdleDescription': 'Nema novih notifikacija koje treba oznaciti.',
+    'notifications.markReadErrorTitle': 'Notifikacije nisu osvezene',
+    'notifications.markReadErrorDescription': 'Pokusaj ponovo za nekoliko trenutaka.',
+    'notifications.openFallbackTitle': 'Detalji nisu dostupni',
+    'notifications.openFallbackDescription':
+      'Ova notifikacija trenutno nema direktan ekran za otvaranje.',
     'notifications.emptyTitle': 'Jos nema notifikacija',
     'notifications.emptyDescription':
       'Kada neko lajkuje komad, zaprati te ili promeni trade tok, sve ce stizati ovde.',
@@ -243,6 +274,8 @@ const dictionaries = {
     'wishlist.removeTitle': 'Ukloni iz sacuvanog?',
     'wishlist.removeDescription': 'Ovaj komad vise nece biti u tvom moodboardu.',
     'wishlist.removeError': 'Nije moguce ukloniti item iz sacuvanih.',
+    'wishlist.removeSuccessTitle': 'Uklonjeno iz sacuvanog',
+    'wishlist.removeSuccessDescription': 'Komad vise nije na tvom moodboardu.',
     'wishlist.allFilter': 'Sve',
     'wishlist.sortRecent': 'Nedavno',
     'wishlist.sortPriceLow': 'Cena od najnize',
@@ -252,6 +285,14 @@ const dictionaries = {
       'Promeni kategoriju, velicinu ili sortiranje da opet vidis sacuvane komade.',
     'wishlist.clearFilters': 'Ocisti filtere',
     'search.loading': 'Ucitavamo search...',
+    'search.loadError': 'Search trenutno nije dostupan.',
+    'search.errorTitle': 'Search nije ucitan',
+    'search.loadMoreErrorTitle': 'Jos rezultata nije stiglo',
+    'search.loadMoreErrorDescription': 'Pokusaj da osvezis search za jos komada.',
+    'search.likeErrorTitle': 'Lajk nije sacuvan',
+    'search.likeErrorDescription': 'Pokusaj ponovo za nekoliko trenutaka.',
+    'search.saveErrorTitle': 'Cuvanje nije uspelo',
+    'search.saveErrorDescription': 'Komad nije dodat u sacuvano. Pokusaj ponovo.',
     'search.placeholder': 'Pretrazi komade, brend ili kategoriju...',
     'search.trending': 'Trending',
     'search.clearHistory': 'Ocisti istoriju',
@@ -323,6 +364,169 @@ const dictionaries = {
     'auth.emailPlaceholder': 'Email',
     'auth.passwordPlaceholder': 'Lozinka',
     'auth.passwordLongPlaceholder': 'Lozinka (min. 8 karaktera)',
+    'auth.inlineErrorPrefix': 'Greska',
+    'auth.error.emptyFields': 'Unesi email i lozinku.',
+    'auth.error.emptyFieldsRecovery': 'Proveri da nijedno polje nije ostalo prazno.',
+    'auth.error.invalidEmail': 'Unesi ispravnu email adresu.',
+    'auth.error.invalidEmailRecovery': 'Proveri format, na primer ime@domen.com.',
+    'auth.error.shortPassword': 'Lozinka mora imati najmanje 8 karaktera.',
+    'auth.error.shortPasswordRecovery': 'Dodaj jos nekoliko karaktera pre nego sto nastavis.',
+    'auth.error.invalidCredentials': 'Email ili lozinka nisu tacni.',
+    'auth.error.invalidCredentialsRecovery':
+      'Proveri podatke ili probaj Google prijavu ako si nalog prvo otvorio preko Google-a.',
+    'auth.error.userDisabled': 'Ovaj nalog je trenutno onemogucen.',
+    'auth.error.userDisabledRecovery': 'Javi se podrsci ako mislis da je ovo greska.',
+    'auth.error.tooManyRequests': 'Previse pokusaja prijave u kratkom roku.',
+    'auth.error.tooManyRequestsRecovery': 'Sacekaj malo pa probaj ponovo.',
+    'auth.error.tooManyRequestsRecoveryTimed': 'Sacekaj oko {{seconds}} sekundi pa probaj ponovo.',
+    'auth.error.network': 'Internet konekcija trenutno nije stabilna.',
+    'auth.error.networkRecovery': 'Proveri mrezu i pokusaj ponovo.',
+    'auth.error.emailInUse': 'Za ovaj email vec postoji nalog.',
+    'auth.error.emailInUseRecovery': 'Vrati se na prijavu i uloguj se postojecim nalogom.',
+    'auth.error.weakPassword': 'Lozinka je preslaba.',
+    'auth.error.weakPasswordRecovery':
+      'Koristi najmanje 8 karaktera i kombinuj reci koje ces lako zapamtiti.',
+    'auth.error.operationNotAllowed': 'Registracija emailom trenutno nije dostupna.',
+    'auth.error.operationNotAllowedRecovery': 'Probaj Google prijavu ili kontaktiraj tim.',
+    'auth.error.loginGeneric': 'Prijava trenutno nije uspela.',
+    'auth.error.loginGenericRecovery': 'Pokusaj ponovo za nekoliko trenutaka.',
+    'auth.error.registerGeneric': 'Kreiranje naloga trenutno nije uspelo.',
+    'auth.error.registerGenericRecovery': 'Pokusaj ponovo za nekoliko trenutaka.',
+    'auth.googleErrorTitle': 'Google prijava',
+    'auth.googleErrorUnavailable':
+      'Google prijava trazi development build ili novu nativnu instalaciju aplikacije.',
+    'auth.googleErrorConfig': 'Aplikacija nije pravilno podesena. Kontaktiraj podrsku.',
+    'auth.googleErrorNetwork': 'Proveri internet konekciju i pokusaj ponovo.',
+    'auth.googleErrorOauth': 'Google prijava nije zavrsena. Pokusaj ponovo.',
+    'auth.googleErrorGeneric': 'Nesto je poslo po zlu. Pokusaj ponovo.',
+    'auth.sessionTitle': 'Sesija trazi paznju',
+    'auth.sessionDescription':
+      'Ne mozemo da potvrdimo tvoj Velve profil dok se aplikacija ne usaglasi sa serverom.',
+    'auth.sessionRecovery': 'Probaj osvezavanje. Ako ne uspe, odjavi se i prijavi ponovo.',
+    'auth.sessionMismatchTitle': 'Sesija ne pripada ovom profilu',
+    'auth.sessionMismatchDescription':
+      'Prijavljen nalog i Velve profil nisu uskladjeni, pa smo zaustavili dalji rad radi bezbednosti.',
+    'auth.sessionMismatchRecovery': 'Odjavi se i prijavi ponovo da bismo ucitali pravi profil.',
+    'auth.sessionProfileTitle': 'Profil trenutno nije dostupan',
+    'auth.sessionProfileDescription':
+      'Prijava je uspela, ali podaci profila nisu stigli kako treba.',
+    'auth.sessionProfileRecovery': 'Osvezi profil ili se prijavi ponovo ako problem potraje.',
+    'upload.startEyebrow': 'Clean Cut',
+    'upload.startTitle': 'Dodaj artikal',
+    'upload.startDescription':
+      'Prvo pravimo cist digitalni duplikat, pa tek onda ulazimo u detalje objave.',
+    'upload.digitizeTitle': 'Digitalizuj komad',
+    'upload.digitizeDescription':
+      'Za najbolji rezultat, postavi komad na ravnu povrsinu i fotografisi ga pod dobrim svetlom.',
+    'upload.chooseFromGallery': 'Izaberi iz galerije',
+    'upload.takePhoto': 'Slikaj kamerom',
+    'upload.cameraPermission': 'Potrebna je dozvola za kameru.',
+    'upload.galleryPermission': 'Potrebna je dozvola za galeriju.',
+    'upload.pickerError': 'Ne mogu da otvorim izbor slike.',
+    'upload.previewTitle': 'Pregled fotografije',
+    'upload.previewDescription':
+      'Proveri kadar, pa nastavi kada fotografija izgleda dobro. Ako nije idealna, vrati se i izaberi drugu.',
+    'upload.next': 'Dalje',
+    'upload.chooseAnotherPhoto': 'Izaberi drugu sliku',
+    'upload.analyzeEyebrow': 'AI analiza',
+    'upload.analyzeTitle': 'Povratna informacija u realnom vremenu',
+    'upload.checkLighting': 'Svetlo',
+    'upload.checkFraming': 'Kadar',
+    'upload.checkContrast': 'Kontrast',
+    'upload.checkOk': 'OK',
+    'upload.checkAdjust': 'Podesi',
+    'upload.analysisLoading': 'Velve proverava svetlo, kadar i kontrast...',
+    'upload.analysisReady': 'Sve izgleda dobro. Mozemo da generisemo digitalni artikal.',
+    'upload.analysisAutoContinue': 'Sve je spremno, nastavljamo automatski...',
+    'upload.analysisCta': 'Generisi digitalni artikal',
+    'upload.analysisLightingHint': 'Poboljsaj svetlo tako da komad bude jasnije vidljiv.',
+    'upload.analysisFramingHint': 'Postavi komad vise u centar i uhvati ga celog u kadar.',
+    'upload.analysisContrastHint': 'Probaj cistiju pozadinu ili mirniju ruku za bolji kontrast.',
+    'upload.analysisUnavailableTitle': 'AI analiza nije dostupna',
+    'upload.analysisUnavailableDescription': 'Ne mogu da analiziram ovu sliku sada.',
+    'upload.transformStep1': 'Pripremamo tvoju sliku...',
+    'upload.transformStep2': 'Uklanjamo pozadinu...',
+    'upload.transformStep3': 'Digitalizujemo komad...',
+    'upload.transformStep4': 'Uploadujemo na cloud...',
+    'upload.transformStep5': 'Generisemo AI embedding...',
+    'upload.transformStep6': 'Zavrsavamo...',
+    'upload.transformFailedTitle': 'Transformacija nije uspela',
+    'upload.transformFailedDescription': 'Pokusaj ponovo za nekoliko trenutaka.',
+    'upload.reviewEyebrow': 'Pregled',
+    'upload.reviewTitle': 'Izgleda li ovo kao tvoj komad?',
+    'upload.original': 'Original',
+    'upload.cleaned': 'Clean cut',
+    'upload.reviewHint':
+      'Dodirni bilo koju sliku da je otvoris preko celog ekrana. Clean varijanta se koristi za Virtual Try-On i prikaz u tvom closet-u.',
+    'upload.reviewContinue': 'Savrseno, nastavi',
+    'upload.retry': 'Probaj ponovo',
+    'upload.reviewLoadErrorTitle': 'Ne mogu da ucitam rezultat',
+    'upload.reviewLoadErrorDescription': 'Pokusaj ponovo.',
+    'upload.categoryEyebrow': 'Kategorija',
+    'upload.categoryTitle': 'Sta je ovo?',
+    'upload.conditionEyebrow': 'Stanje',
+    'upload.conditionTitle': 'Kako izgleda?',
+    'upload.conditionNew': 'Novo',
+    'upload.conditionNewDesc': 'Sa etiketom',
+    'upload.conditionLikeNew': 'Kao novo',
+    'upload.conditionLikeNewDesc': 'Noseno jednom',
+    'upload.conditionGood': 'Dobro',
+    'upload.conditionGoodDesc': 'Vidljivi tragovi',
+    'upload.conditionFair': 'Prihvatljivo',
+    'upload.conditionFairDesc': 'Korisceno',
+    'upload.continue': 'Nastavi',
+    'upload.listingEyebrow': 'Ponuda',
+    'upload.listingTitle': 'Kako zelis da ponudis?',
+    'upload.listingTrade': 'Razmeni',
+    'upload.listingTradeDesc': 'Zameni za drugi komad',
+    'upload.listingSell': 'Prodaj',
+    'upload.listingSellDesc': 'Postavi cenu',
+    'upload.listingBoth': 'Oboje',
+    'upload.listingBothDesc': 'Razmena ili prodaja',
+    'upload.priceLabel': 'Cena (EUR)',
+    'upload.tradeForLabel': 'Sta trazis za razmenu?',
+    'upload.tradeForPlaceholder': 'Npr. oversized jakna, Nike patike...',
+    'upload.detailsEyebrow': 'Detalji',
+    'upload.brandLabel': 'Brend',
+    'upload.brandUnknown': 'Ne znam',
+    'upload.brandOther': 'Drugi',
+    'upload.brandPlaceholder': 'Upisi brend...',
+    'upload.sizeLabel': 'Velicina',
+    'upload.sizeOther': 'Druga',
+    'upload.sizePlaceholder': 'Upisi velicinu (npr. 42, EU 38...)',
+    'upload.descriptionEyebrow': 'Poslednji korak',
+    'upload.descriptionTitle': 'Opisi svoj komad',
+    'upload.descriptionIntro':
+      'Naslov smislis ti, a AI moze da predlozi samo opis koji zatim slobodno doradis.',
+    'upload.aiButtonTitle': 'Generisi AI opis',
+    'upload.aiButtonDescription': 'AI analizira sliku i predlaze opis na izabranom jeziku.',
+    'upload.aiGeneratedNotice':
+      'AI opis je generisan. Naslov ostaje tvoj, a tekst mozes odmah da izmenis ispod.',
+    'upload.manualDivider': 'Ili popuni rucno',
+    'upload.editDivider': 'Izmeni ili ostavi',
+    'upload.titleLabel': 'Naslov',
+    'upload.titlePlaceholder': 'Ti smisli naslov svog komada',
+    'upload.descriptionLabel': 'Opis',
+    'upload.descriptionPlaceholder': 'Opisi komad prirodno: boja, kroj, detalji, stanje...',
+    'upload.typeTrade': 'Razmena',
+    'upload.typeSell': 'Prodaja',
+    'upload.typeBoth': 'Razmena + Prodaja',
+    'upload.publish': 'Objavi',
+    'upload.saveDraft': 'Sacuvaj kao draft',
+    'upload.publishConfirmTitle': 'Objavi komad?',
+    'upload.publishConfirmDescription': 'Komad ce biti vidljiv u feedu i drugim clanovima Velvea.',
+    'upload.titleRequired': 'Naslov je obavezan.',
+    'upload.descriptionRequired': 'Opis je obavezan.',
+    'upload.saveError': 'Ne mogu da sacuvam.',
+    'upload.aiUnavailableTitle': 'AI nije dostupan',
+    'upload.aiUnavailableDescription': 'Opis trenutno ne moze da se generise. Popuni ga rucno.',
+    'upload.aiStep1': 'Analiziramo sliku...',
+    'upload.aiStep2': 'Prepoznajemo boju i stil...',
+    'upload.aiStep3': 'Prepoznajemo detalje komada...',
+    'upload.aiStep4': 'Pisemo opis na izabranom jeziku...',
+    'upload.aiCancel': 'Otkazi',
+    'upload.aiCancelA11y': 'Otkazi AI generisanje',
+    'upload.aiTimeout': 'Automatski timeout za {{seconds}}s',
     'onboarding.welcomeStep': 'Korak 1 od 5',
     'onboarding.welcomeTitle': 'UÄ‘i u mreÅ¾u koja stil tretira kao scenu',
     'onboarding.welcomeDescription':
@@ -344,6 +548,7 @@ const dictionaries = {
     'common.permission': 'Permission',
     'common.retry': 'Try again',
     'common.cancel': 'Cancel',
+    'common.ok': 'OK',
     'common.delete': 'Delete',
     'common.remove': 'Remove',
     'common.save': 'Save',
@@ -377,6 +582,8 @@ const dictionaries = {
     'feed.reportSuccessDescription': 'The report was sent and we will review the listing.',
     'feed.reportError': 'Unable to send the report right now.',
     'feed.hideError': 'Unable to hide this listing.',
+    'feed.hideSuccessTitle': 'Listing hidden',
+    'feed.hideSuccessDescription': 'Discovery will show fewer pieces like this going forward.',
     'feed.blockTitle': 'Block user?',
     'feed.blockDescription': 'You will no longer see @{{name}} in your feed.',
     'feed.blockCta': 'Block',
@@ -425,7 +632,8 @@ const dictionaries = {
     'profile.emptyDescription':
       'The connection to your profile broke for a moment. Try again to continue.',
     'profile.trades': 'Trades',
-    'profile.defaultBio': 'Add a few words about your taste so your profile feels alive and personal.',
+    'profile.defaultBio':
+      'Add a few words about your taste so your profile feels alive and personal.',
     'profile.emailVerified': 'Email verified',
     'profile.vtoReadyTitle': 'Virtual Try-On is ready',
     'profile.vtoSetupTitle': 'Add Virtual Try-On',
@@ -454,6 +662,7 @@ const dictionaries = {
     'profile.avatarUploadError': 'Unable to upload the avatar right now.',
     'profile.nameRequired': 'Name cannot be empty.',
     'profile.saveError': 'Profile was not saved.',
+    'profile.closetSummary': '{{live}} live / {{drafts}} drafts',
     'chat.eyebrow': 'Messages',
     'chat.title': 'Inbox',
     'chat.tradePulse': 'Trade pulse',
@@ -515,16 +724,36 @@ const dictionaries = {
     'settings.terms': 'Terms of use',
     'settings.privacyPolicy': 'Privacy policy',
     'settings.logoutError': 'Log out failed right now.',
+    'settings.preferencesLoadError':
+      'Showing local settings until notification preferences reconnect to the server.',
     'settings.preferencesSaveError': 'Notification settings were not saved.',
     'settings.linkError': 'This link is unavailable right now.',
     'settings.languageSaveError': 'Language could not be saved right now.',
+    'settings.languageUpdatedTitle': 'Language updated',
+    'settings.languageUpdatedDescription': 'The interface now uses {{language}}.',
+    'publicProfile.unavailableTitle': 'Profile is currently unavailable',
+    'publicProfile.unavailableDescription':
+      'The user may be blocked, removed, or the connection may have briefly dropped.',
+    'publicProfile.defaultBio':
+      'This profile has no bio yet, but the style, trust signals, and pieces below already say a lot.',
+    'publicProfile.follow': 'Follow',
+    'publicProfile.unfollow': 'Unfollow',
+    'publicProfile.message': 'Message',
+    'publicProfile.posts': 'Listings',
+    'publicProfile.emptyListingsTitle': 'No active listings right now',
+    'publicProfile.emptyListingsDescription':
+      'This user currently has no available pieces to open from the discovery layer.',
+    'publicProfile.moreActionsDescription': 'What would you like to do?',
+    'publicProfile.chatError': 'Unable to open the conversation.',
+    'publicProfile.followError': 'Following is unavailable right now.',
     'blocked.eyebrow': 'Privacy',
     'blocked.title': 'Blocked users',
     'blocked.description': 'People you block will stay out of your feed, search, and trade flows.',
     'blocked.loadError': 'The blocked users list is unavailable right now.',
     'blocked.errorTitle': 'List did not load',
     'blocked.emptyTitle': 'No blocked users',
-    'blocked.emptyDescription': 'If you block someone from a profile or feed, they will appear here.',
+    'blocked.emptyDescription':
+      'If you block someone from a profile or feed, they will appear here.',
     'blocked.unblockTitle': 'Unblock user',
     'blocked.unblockDescription': '{{name}} will be able to see your profile and listings again.',
     'blocked.unblockCta': 'Unblock',
@@ -538,6 +767,15 @@ const dictionaries = {
     'notifications.now': 'Now',
     'notifications.loadError': 'Notifications are unavailable right now.',
     'notifications.errorTitle': 'Unable to load notifications',
+    'notifications.markReadSuccessTitle': 'All caught up',
+    'notifications.markReadSuccessDescription': '{{count}} notifications were marked as read.',
+    'notifications.markReadIdleTitle': 'Everything is already read',
+    'notifications.markReadIdleDescription': 'There are no new notifications to update.',
+    'notifications.markReadErrorTitle': 'Notifications were not updated',
+    'notifications.markReadErrorDescription': 'Please try again in a moment.',
+    'notifications.openFallbackTitle': 'Details are unavailable',
+    'notifications.openFallbackDescription':
+      'This notification does not have a direct screen to open right now.',
     'notifications.emptyTitle': 'No notifications yet',
     'notifications.emptyDescription':
       'When someone likes a piece, follows you, or changes a trade flow, it will arrive here.',
@@ -556,6 +794,8 @@ const dictionaries = {
     'wishlist.removeTitle': 'Remove from saved?',
     'wishlist.removeDescription': 'This piece will leave your moodboard.',
     'wishlist.removeError': 'Unable to remove the item from saved.',
+    'wishlist.removeSuccessTitle': 'Removed from saved',
+    'wishlist.removeSuccessDescription': 'This piece is no longer on your moodboard.',
     'wishlist.allFilter': 'All',
     'wishlist.sortRecent': 'Recent',
     'wishlist.sortPriceLow': 'Price low to high',
@@ -565,6 +805,14 @@ const dictionaries = {
       'Change the category, size, or sorting to see your saved pieces again.',
     'wishlist.clearFilters': 'Clear filters',
     'search.loading': 'Loading search...',
+    'search.loadError': 'Search is unavailable right now.',
+    'search.errorTitle': 'Search did not load',
+    'search.loadMoreErrorTitle': 'More results did not load',
+    'search.loadMoreErrorDescription': 'Try refreshing search for more pieces.',
+    'search.likeErrorTitle': 'Like was not saved',
+    'search.likeErrorDescription': 'Please try again in a moment.',
+    'search.saveErrorTitle': 'Save did not go through',
+    'search.saveErrorDescription': 'The piece was not added to saved. Try again.',
     'search.placeholder': 'Search pieces, brand, or category...',
     'search.trending': 'Trending',
     'search.clearHistory': 'Clear history',
@@ -613,8 +861,10 @@ const dictionaries = {
     'closet.liveEmptyTitle': 'Live closet is empty',
     'closet.draftsEmptyTitle': 'No draft pieces',
     'closet.archiveEmptyTitle': 'Archive has no pieces yet',
-    'closet.liveEmptyDescription': 'Publish a piece or bring an archived item back to your active closet.',
-    'closet.draftsEmptyDescription': 'Save an unfinished listing as a draft and return to it later.',
+    'closet.liveEmptyDescription':
+      'Publish a piece or bring an archived item back to your active closet.',
+    'closet.draftsEmptyDescription':
+      'Save an unfinished listing as a draft and return to it later.',
     'closet.archiveEmptyDescription':
       'When you sell, swap, or archive a piece, the record stays here.',
     'closet.addListing': 'Add listing',
@@ -636,6 +886,174 @@ const dictionaries = {
     'auth.emailPlaceholder': 'Email',
     'auth.passwordPlaceholder': 'Password',
     'auth.passwordLongPlaceholder': 'Password (min. 8 characters)',
+    'auth.inlineErrorPrefix': 'Error',
+    'auth.error.emptyFields': 'Enter your email and password.',
+    'auth.error.emptyFieldsRecovery': 'Make sure neither field is left blank.',
+    'auth.error.invalidEmail': 'Enter a valid email address.',
+    'auth.error.invalidEmailRecovery': 'Check the format, for example name@domain.com.',
+    'auth.error.shortPassword': 'Password must be at least 8 characters.',
+    'auth.error.shortPasswordRecovery': 'Add a few more characters before continuing.',
+    'auth.error.invalidCredentials': 'That email or password does not match.',
+    'auth.error.invalidCredentialsRecovery':
+      'Check the details or try Google sign-in if you first joined with Google.',
+    'auth.error.userDisabled': 'This account is currently disabled.',
+    'auth.error.userDisabledRecovery': 'Contact support if you think this should be available.',
+    'auth.error.tooManyRequests': 'Too many sign-in attempts in a short time.',
+    'auth.error.tooManyRequestsRecovery': 'Wait a bit, then try again.',
+    'auth.error.tooManyRequestsRecoveryTimed': 'Wait about {{seconds}} seconds, then try again.',
+    'auth.error.network': 'Your internet connection is not stable right now.',
+    'auth.error.networkRecovery': 'Check your connection and try again.',
+    'auth.error.emailInUse': 'An account already exists for this email.',
+    'auth.error.emailInUseRecovery': 'Go back to sign in with your existing account.',
+    'auth.error.weakPassword': 'That password is too weak.',
+    'auth.error.weakPasswordRecovery':
+      'Use at least 8 characters and choose something you can remember.',
+    'auth.error.operationNotAllowed': 'Email sign-up is not available right now.',
+    'auth.error.operationNotAllowedRecovery': 'Try Google sign-in or contact support.',
+    'auth.error.loginGeneric': 'Unable to sign in right now.',
+    'auth.error.loginGenericRecovery': 'Please try again in a moment.',
+    'auth.error.registerGeneric': 'Unable to create your account right now.',
+    'auth.error.registerGenericRecovery': 'Please try again in a moment.',
+    'auth.googleErrorTitle': 'Google sign-in',
+    'auth.googleErrorUnavailable':
+      'Google sign-in requires a development build or a fresh native app install.',
+    'auth.googleErrorConfig': 'The app is not configured correctly. Contact support.',
+    'auth.googleErrorNetwork': 'Check your internet connection and try again.',
+    'auth.googleErrorOauth': 'Google sign-in did not complete. Try again.',
+    'auth.googleErrorGeneric': 'Something went wrong. Try again.',
+    'auth.sessionTitle': 'Session needs attention',
+    'auth.sessionDescription':
+      'We cannot confirm your Velve profile until the app syncs correctly with the server.',
+    'auth.sessionRecovery': 'Try refreshing first. If that fails, log out and sign in again.',
+    'auth.sessionMismatchTitle': 'This session does not match the profile',
+    'auth.sessionMismatchDescription':
+      'The signed-in account and Velve profile do not line up, so we paused the session for safety.',
+    'auth.sessionMismatchRecovery': 'Log out and sign in again so we can load the right profile.',
+    'auth.sessionProfileTitle': 'The profile is temporarily unavailable',
+    'auth.sessionProfileDescription':
+      'Sign-in worked, but the profile data did not arrive in a usable shape.',
+    'auth.sessionProfileRecovery': 'Refresh the profile or sign in again if the problem continues.',
+    'upload.startEyebrow': 'Clean Cut',
+    'upload.startTitle': 'Add listing',
+    'upload.startDescription':
+      'We create a clean digital duplicate first, then move into the listing details.',
+    'upload.digitizeTitle': 'Digitize the piece',
+    'upload.digitizeDescription':
+      'For the best result, place the piece on a flat surface and photograph it in good light.',
+    'upload.chooseFromGallery': 'Choose from gallery',
+    'upload.takePhoto': 'Take a photo',
+    'upload.cameraPermission': 'Camera permission is required.',
+    'upload.galleryPermission': 'Gallery permission is required.',
+    'upload.pickerError': 'Unable to open image selection.',
+    'upload.previewTitle': 'Photo preview',
+    'upload.previewDescription':
+      'Check the frame, then continue once the photo looks right. If it is not ideal, go back and pick another one.',
+    'upload.next': 'Next',
+    'upload.chooseAnotherPhoto': 'Choose another photo',
+    'upload.analyzeEyebrow': 'AI analysis',
+    'upload.analyzeTitle': 'Real-time feedback',
+    'upload.checkLighting': 'Lighting',
+    'upload.checkFraming': 'Framing',
+    'upload.checkContrast': 'Contrast',
+    'upload.checkOk': 'OK',
+    'upload.checkAdjust': 'Adjust',
+    'upload.analysisLoading': 'Velve is checking lighting, framing, and contrast...',
+    'upload.analysisReady': 'Everything looks good. We can generate the digital item.',
+    'upload.analysisAutoContinue': 'Everything is ready, continuing automatically...',
+    'upload.analysisCta': 'Generate digital item',
+    'upload.analysisLightingHint': 'Improve the lighting so the piece is easier to read.',
+    'upload.analysisFramingHint': 'Center the piece more and make sure it fits fully in frame.',
+    'upload.analysisContrastHint':
+      'Try a cleaner background or a steadier hand for better contrast.',
+    'upload.analysisUnavailableTitle': 'AI analysis is unavailable',
+    'upload.analysisUnavailableDescription': 'I cannot analyze this photo right now.',
+    'upload.transformStep1': 'Preparing your image...',
+    'upload.transformStep2': 'Removing the background...',
+    'upload.transformStep3': 'Digitizing the piece...',
+    'upload.transformStep4': 'Uploading to the cloud...',
+    'upload.transformStep5': 'Generating the AI embedding...',
+    'upload.transformStep6': 'Finishing up...',
+    'upload.transformFailedTitle': 'Transformation failed',
+    'upload.transformFailedDescription': 'Please try again in a few moments.',
+    'upload.reviewEyebrow': 'Review',
+    'upload.reviewTitle': 'Does this look like your piece?',
+    'upload.original': 'Original',
+    'upload.cleaned': 'Clean cut',
+    'upload.reviewHint':
+      'Tap either image to open it fullscreen. The clean version is used for Virtual Try-On and your closet view.',
+    'upload.reviewContinue': 'Perfect, continue',
+    'upload.retry': 'Try again',
+    'upload.reviewLoadErrorTitle': 'Unable to load the result',
+    'upload.reviewLoadErrorDescription': 'Please try again.',
+    'upload.categoryEyebrow': 'Category',
+    'upload.categoryTitle': 'What is this?',
+    'upload.conditionEyebrow': 'Condition',
+    'upload.conditionTitle': 'How does it look?',
+    'upload.conditionNew': 'New',
+    'upload.conditionNewDesc': 'With tags',
+    'upload.conditionLikeNew': 'Like new',
+    'upload.conditionLikeNewDesc': 'Worn once',
+    'upload.conditionGood': 'Good',
+    'upload.conditionGoodDesc': 'Visible signs of wear',
+    'upload.conditionFair': 'Fair',
+    'upload.conditionFairDesc': 'Used',
+    'upload.continue': 'Continue',
+    'upload.listingEyebrow': 'Offer',
+    'upload.listingTitle': 'How do you want to offer it?',
+    'upload.listingTrade': 'Trade',
+    'upload.listingTradeDesc': 'Swap it for another piece',
+    'upload.listingSell': 'Sell',
+    'upload.listingSellDesc': 'Set a price',
+    'upload.listingBoth': 'Both',
+    'upload.listingBothDesc': 'Trade or sell',
+    'upload.priceLabel': 'Price (EUR)',
+    'upload.tradeForLabel': 'What are you looking for in return?',
+    'upload.tradeForPlaceholder': 'For example: oversized jacket, Nike sneakers...',
+    'upload.detailsEyebrow': 'Details',
+    'upload.brandLabel': 'Brand',
+    'upload.brandUnknown': "I don't know",
+    'upload.brandOther': 'Other',
+    'upload.brandPlaceholder': 'Type the brand...',
+    'upload.sizeLabel': 'Size',
+    'upload.sizeOther': 'Other',
+    'upload.sizePlaceholder': 'Enter size (for example 42, EU 38...)',
+    'upload.descriptionEyebrow': 'Final step',
+    'upload.descriptionTitle': 'Describe your piece',
+    'upload.descriptionIntro':
+      'You come up with the title, and AI can suggest only the description for you to refine.',
+    'upload.aiButtonTitle': 'Generate AI description',
+    'upload.aiButtonDescription':
+      'AI analyzes the image and suggests copy in the selected language.',
+    'upload.aiGeneratedNotice':
+      'The AI description is ready. The title stays yours, and you can edit the text below right away.',
+    'upload.manualDivider': 'Or fill it in manually',
+    'upload.editDivider': 'Edit it or keep it',
+    'upload.titleLabel': 'Title',
+    'upload.titlePlaceholder': 'You decide the title of your piece',
+    'upload.descriptionLabel': 'Description',
+    'upload.descriptionPlaceholder':
+      'Describe the piece naturally: color, cut, details, condition...',
+    'upload.typeTrade': 'Trade',
+    'upload.typeSell': 'Sale',
+    'upload.typeBoth': 'Trade + sale',
+    'upload.publish': 'Publish',
+    'upload.saveDraft': 'Save as draft',
+    'upload.publishConfirmTitle': 'Publish this piece?',
+    'upload.publishConfirmDescription':
+      'The piece will be visible in the feed and to other Velve members.',
+    'upload.titleRequired': 'Title is required.',
+    'upload.descriptionRequired': 'Description is required.',
+    'upload.saveError': 'Unable to save right now.',
+    'upload.aiUnavailableTitle': 'AI is unavailable',
+    'upload.aiUnavailableDescription':
+      'The description cannot be generated right now. Fill it in manually.',
+    'upload.aiStep1': 'Analyzing the image...',
+    'upload.aiStep2': 'Detecting color and style...',
+    'upload.aiStep3': 'Detecting garment details...',
+    'upload.aiStep4': 'Writing the description in the selected language...',
+    'upload.aiCancel': 'Cancel',
+    'upload.aiCancelA11y': 'Cancel AI generation',
+    'upload.aiTimeout': 'Automatic timeout in {{seconds}}s',
     'onboarding.welcomeStep': 'Step 1 of 5',
     'onboarding.welcomeTitle': 'Enter a network that treats style like a scene',
     'onboarding.welcomeDescription':
@@ -662,8 +1080,10 @@ const dictionaries = {
     'feed.emptyTitle': 'Ð›ÐµÐ½Ñ‚Ð° Ð¶Ð´ÐµÑ‚ Ñ‚Ð²Ð¾Ð¹ ÑÐ»ÐµÐ´ÑƒÑŽÑ‰Ð¸Ð¹ ÑÐ¸Ð³Ð½Ð°Ð»',
     'feed.emptyDescription':
       'Ð¡ÐºÑ€Ñ‹Ð²Ð°Ð¹ Ñ‚Ð¾, Ñ‡Ñ‚Ð¾ Ð½Ðµ Ñ†ÐµÐ¿Ð»ÑÐµÑ‚, ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÐ¹ Ñ‚Ð¾, Ñ‡Ñ‚Ð¾ Ð¿Ð¾Ð¿Ð°Ð´Ð°ÐµÑ‚ Ð² Ð½Ð°ÑÑ‚Ñ€Ð¾ÐµÐ½Ð¸Ðµ, Ð¸ discovery Ð±Ñ‹ÑÑ‚Ñ€Ð¾ Ð¿Ð¾Ð´ÑÑ‚Ñ€Ð¾Ð¸Ñ‚ÑÑ Ð¿Ð¾Ð´ Ñ‚Ð²Ð¾Ð¹ ÑÑ‚Ð¸Ð»ÑŒ.',
-    'feed.manualFallback': 'ÐŸÑƒÑÑ‚Ð¾Ð¹ ÐºÐ°Ð´Ñ€ Ð½Ðµ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚. Ð”Ð¾Ð±Ð°Ð²ÑŒ Ñ„Ð¾Ñ‚Ð¾ Ð¸ Ð¿Ñ€Ð¾Ð´Ð¾Ð»Ð¶Ð°Ð¹.',
-    'feed.sheetSubtitle': 'ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ discovery Ñ‚Ð°Ðº, Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð¾Ð½ Ð´ÐµÑ€Ð¶Ð°Ð» Ñ‚Ð²Ð¾Ð¹ Ñ€Ð¸Ñ‚Ð¼.',
+    'feed.manualFallback':
+      'ÐŸÑƒÑÑ‚Ð¾Ð¹ ÐºÐ°Ð´Ñ€ Ð½Ðµ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚. Ð”Ð¾Ð±Ð°Ð²ÑŒ Ñ„Ð¾Ñ‚Ð¾ Ð¸ Ð¿Ñ€Ð¾Ð´Ð¾Ð»Ð¶Ð°Ð¹.',
+    'feed.sheetSubtitle':
+      'ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ discovery Ñ‚Ð°Ðº, Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð¾Ð½ Ð´ÐµÑ€Ð¶Ð°Ð» Ñ‚Ð²Ð¾Ð¹ Ñ€Ð¸Ñ‚Ð¼.',
     'feed.hideItem': 'Ð¡ÐºÑ€Ñ‹Ñ‚ÑŒ ÑÑ‚Ð¾Ñ‚ Ð»Ð¾Ñ‚',
     'feed.reportItem': 'ÐŸÐ¾Ð¶Ð°Ð»Ð¾Ð²Ð°Ñ‚ÑŒÑÑ',
     'feed.viewProfile': 'ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ Ð¿Ñ€Ð¾Ñ„Ð¸Ð»ÑŒ',
@@ -711,7 +1131,8 @@ const dictionaries = {
     'chat.directConversation': 'ÐŸÑ€ÑÐ¼Ð¾Ð¹ Ñ€Ð°Ð·Ð³Ð¾Ð²Ð¾Ñ€',
     'chat.placeholder': 'ÐÐ°Ð¿Ð¸ÑˆÐ¸ ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ðµ...',
     'chat.typeStatus': '{{name}} Ð¿ÐµÑ‡Ð°Ñ‚Ð°ÐµÑ‚...',
-    'chat.threadEmpty': 'Ð¢Ñ€ÐµÐ´ ÑƒÐ¶Ðµ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚. Ð¡Ð»ÐµÐ´ÑƒÑŽÑ‰ÐµÐµ ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ðµ Ð·Ð°Ð´Ð°ÐµÑ‚ Ñ€Ð¸Ñ‚Ð¼.',
+    'chat.threadEmpty':
+      'Ð¢Ñ€ÐµÐ´ ÑƒÐ¶Ðµ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚. Ð¡Ð»ÐµÐ´ÑƒÑŽÑ‰ÐµÐµ ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ðµ Ð·Ð°Ð´Ð°ÐµÑ‚ Ñ€Ð¸Ñ‚Ð¼.',
     'chat.tradeProposal': 'Trade proposal',
     'chat.buyRequest': 'Buy request',
     'chat.tradeUpdate': 'Trade update',
@@ -740,7 +1161,8 @@ const dictionaries = {
     'auth.passwordPlaceholder': 'ÐŸÐ°Ñ€Ð¾Ð»ÑŒ',
     'auth.passwordLongPlaceholder': 'ÐŸÐ°Ñ€Ð¾Ð»ÑŒ (Ð¼Ð¸Ð½Ð¸Ð¼ÑƒÐ¼ 8 ÑÐ¸Ð¼Ð²Ð¾Ð»Ð¾Ð²)',
     'onboarding.welcomeStep': 'Ð¨Ð°Ð³ 1 Ð¸Ð· 5',
-    'onboarding.welcomeTitle': 'Ð’Ð¾Ð¹Ð´Ð¸ Ð² ÑÐµÑ‚ÑŒ, Ð³Ð´Ðµ ÑÑ‚Ð¸Ð»ÑŒ Ð¾Ñ‰ÑƒÑ‰Ð°ÐµÑ‚ÑÑ ÐºÐ°Ðº ÑÑ†ÐµÐ½Ð°',
+    'onboarding.welcomeTitle':
+      'Ð’Ð¾Ð¹Ð´Ð¸ Ð² ÑÐµÑ‚ÑŒ, Ð³Ð´Ðµ ÑÑ‚Ð¸Ð»ÑŒ Ð¾Ñ‰ÑƒÑ‰Ð°ÐµÑ‚ÑÑ ÐºÐ°Ðº ÑÑ†ÐµÐ½Ð°',
     'onboarding.welcomeDescription':
       'Velve ÑÐ¾ÐµÐ´Ð¸Ð½ÑÐµÑ‚ discovery, Ð¾Ð±Ð¼ÐµÐ½ Ð¸ Ð¼Ð¾Ð´Ð½ÑƒÑŽ Ð¸Ð´ÐµÐ½Ñ‚Ð¸Ñ‡Ð½Ð¾ÑÑ‚ÑŒ Ð² Ð¾Ð´Ð½Ñƒ Ð¿Ð»Ð°Ð²Ð½ÑƒÑŽ Ð»ÐµÐ½Ñ‚Ñƒ.',
     'onboarding.welcomeMood': 'curated for your style',
@@ -750,66 +1172,67 @@ const dictionaries = {
     'language.en': 'EN',
     'language.ru': 'RU',
   },
-} as const
+} as const;
 
-const defaultDictionary = dictionaries[defaultLocale]
+const defaultDictionary = dictionaries[defaultLocale];
 
-export type TranslationKey = keyof typeof defaultDictionary
-type Params = Record<string, string | number>
-export type LocalizedCopy<T> = Partial<Record<SupportedLocale, T>> & Record<typeof defaultLocale, T>
+export type TranslationKey = keyof typeof defaultDictionary;
+type Params = Record<string, string | number>;
+export type LocalizedCopy<T> = Partial<Record<SupportedLocale, T>> &
+  Record<typeof defaultLocale, T>;
 
 type I18nContextValue = {
-  locale: SupportedLocale
-  locales: readonly SupportedLocale[]
-  localeLabels: Record<SupportedLocale, string>
-  setLocale: (nextLocale: SupportedLocale) => Promise<void>
-  t: (key: TranslationKey, params?: Params) => string
-  formatDate: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string
-}
+  locale: SupportedLocale;
+  locales: readonly SupportedLocale[];
+  localeLabels: Record<SupportedLocale, string>;
+  setLocale: (nextLocale: SupportedLocale) => Promise<void>;
+  t: (key: TranslationKey, params?: Params) => string;
+  formatDate: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string;
+};
 
-const I18nContext = createContext<I18nContextValue | null>(null)
+const I18nContext = createContext<I18nContextValue | null>(null);
 
 function fillTemplate(template: string, params?: Params) {
-  if (!params) return template
+  if (!params) return template;
 
   return Object.entries(params).reduce((result, [key, value]) => {
-    return result.replace(new RegExp(`{{${key}}}`, 'g'), String(value))
-  }, template)
+    return result.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
+  }, template);
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<SupportedLocale>(detectLocaleFromDevice())
+  const [locale, setLocaleState] = useState<SupportedLocale>(detectLocaleFromDevice());
 
   useEffect(() => {
     getStorage()
       .getItem(STORAGE_KEY)
       .then((stored) => {
         if (isSupportedLocale(stored)) {
-          setLocaleState(stored)
+          setLocaleState(stored);
         }
       })
-      .catch(() => undefined)
-  }, [])
+      .catch(() => undefined);
+  }, []);
 
   const setLocale = useCallback(async (nextLocale: SupportedLocale) => {
-    setLocaleState(nextLocale)
-    await getStorage().setItem(STORAGE_KEY, nextLocale)
-  }, [])
+    setLocaleState(nextLocale);
+    await getStorage().setItem(STORAGE_KEY, nextLocale);
+  }, []);
 
   const t = useCallback(
     (key: TranslationKey, params?: Params) => {
-      const activeDictionary = dictionaries[locale] as Partial<Record<TranslationKey, string>>
-      const value = activeDictionary[key] ?? defaultDictionary[key] ?? key
-      return fillTemplate(value, params)
+      const activeDictionary = dictionaries[locale] as Partial<Record<TranslationKey, string>>;
+      const value = activeDictionary[key] ?? defaultDictionary[key] ?? key;
+      return fillTemplate(value, params);
     },
     [locale]
-  )
+  );
 
   const formatDate = useCallback(
     (value: Date | string | number, options?: Intl.DateTimeFormatOptions) =>
       new Date(value).toLocaleDateString(localeTags[locale], options),
     [locale]
-  )
+  );
 
   const contextValue = useMemo(
     () => ({
@@ -821,25 +1244,25 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       formatDate,
     }),
     [formatDate, locale, setLocale, t]
-  )
+  );
 
-  return <I18nContext.Provider value={contextValue}>{children}</I18nContext.Provider>
+  return <I18nContext.Provider value={contextValue}>{children}</I18nContext.Provider>;
 }
 
 function isSupportedLocale(value: string | null): value is SupportedLocale {
-  return supportedLocales.includes(value as SupportedLocale)
+  return supportedLocales.includes(value as SupportedLocale);
 }
 
 export function getLocalizedCopy<T>(locale: SupportedLocale, copy: LocalizedCopy<T>) {
-  return copy[locale] ?? copy[defaultLocale]
+  return copy[locale] ?? copy[defaultLocale];
 }
 
 export function useI18n() {
-  const context = useContext(I18nContext)
+  const context = useContext(I18nContext);
 
   if (!context) {
-    throw new Error('useI18n must be used inside I18nProvider')
+    throw new Error('useI18n must be used inside I18nProvider');
   }
 
-  return context
+  return context;
 }

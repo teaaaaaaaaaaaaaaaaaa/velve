@@ -1,13 +1,14 @@
-import { Ionicons } from '@expo/vector-icons'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useState } from 'react'
-import { Text, TouchableOpacity, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BrandBackground } from '@/components/BrandBackground'
-import { colors } from '@/design/tokens'
+import { BrandBackground } from '@/components/BrandBackground';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
 
-type Condition = 'new' | 'like_new' | 'good' | 'fair'
+type Condition = 'new' | 'like_new' | 'good' | 'fair';
 
 const CATEGORIES: { value: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { value: 'Majice', icon: 'shirt-outline' },
@@ -16,24 +17,25 @@ const CATEGORIES: { value: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { value: 'Jakne', icon: 'snow-outline' },
   { value: 'Obuca', icon: 'footsteps-outline' },
   { value: 'Dodaci', icon: 'watch-outline' },
-]
+];
 
 const CONDITIONS: { value: Condition; label: string; desc: string }[] = [
   { value: 'new', label: 'Novo', desc: 'Sa etiketom' },
   { value: 'like_new', label: 'Kao novo', desc: 'Noseno jednom' },
   { value: 'good', label: 'Dobro', desc: 'Vidljivi tragovi' },
   { value: 'fair', label: 'Prihvatljivo', desc: 'Korisceno' },
-]
+];
 
 export default function CategoryScreen() {
-  const router = useRouter()
-  const insets = useSafeAreaInsets()
-  const { itemId } = useLocalSearchParams<{ itemId: string }>()
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { itemId } = useLocalSearchParams<{ itemId: string }>();
+  const { t } = useI18n();
 
-  const [category, setCategory] = useState('')
-  const [condition, setCondition] = useState<Condition | ''>('')
+  const [category, setCategory] = useState('');
+  const [condition, setCondition] = useState<Condition | ''>('');
 
-  const canContinue = category && condition
+  const canContinue = category && condition;
 
   return (
     <View className="flex-1 bg-base-canvas" style={{ paddingTop: insets.top + 8 }}>
@@ -58,10 +60,10 @@ export default function CategoryScreen() {
 
       <View className="flex-1 px-5 pt-8">
         <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
-          Kategorija
+          {t('upload.categoryEyebrow')}
         </Text>
         <Text className="mt-1 font-display text-4xl text-ink-dark">
-          Sta je ovo?
+          {t('upload.categoryTitle')}
         </Text>
 
         {/* Category grid */}
@@ -87,7 +89,17 @@ export default function CategoryScreen() {
                   category === cat.value ? 'text-base-canvas' : 'text-ink-dark'
                 }`}
               >
-                {cat.value}
+                {cat.value === 'Majice'
+                  ? t('search.categoryTops')
+                  : cat.value === 'Haljine'
+                    ? t('search.categoryDresses')
+                    : cat.value === 'Pantalone'
+                      ? t('search.categoryPants')
+                      : cat.value === 'Jakne'
+                        ? t('search.categoryOuterwear')
+                        : cat.value === 'Obuca'
+                          ? t('search.categoryShoes')
+                          : t('search.categoryAccessories')}
               </Text>
             </TouchableOpacity>
           ))}
@@ -95,10 +107,10 @@ export default function CategoryScreen() {
 
         {/* Condition */}
         <Text className="mt-8 font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
-          Stanje
+          {t('upload.conditionEyebrow')}
         </Text>
         <Text className="mt-1 font-display text-2xl text-ink-dark">
-          Kako izgleda?
+          {t('upload.conditionTitle')}
         </Text>
 
         <View className="mt-4 gap-2">
@@ -118,14 +130,26 @@ export default function CategoryScreen() {
                     condition === cond.value ? 'text-base-canvas' : 'text-ink-dark'
                   }`}
                 >
-                  {cond.label}
+                  {cond.value === 'new'
+                    ? t('upload.conditionNew')
+                    : cond.value === 'like_new'
+                      ? t('upload.conditionLikeNew')
+                      : cond.value === 'good'
+                        ? t('upload.conditionGood')
+                        : t('upload.conditionFair')}
                 </Text>
                 <Text
                   className={`mt-0.5 font-sans text-xs ${
                     condition === cond.value ? 'text-base-canvas/70' : 'text-ink-dark/50'
                   }`}
                 >
-                  {cond.desc}
+                  {cond.value === 'new'
+                    ? t('upload.conditionNewDesc')
+                    : cond.value === 'like_new'
+                      ? t('upload.conditionLikeNewDesc')
+                      : cond.value === 'good'
+                        ? t('upload.conditionGoodDesc')
+                        : t('upload.conditionFairDesc')}
                 </Text>
               </View>
               {condition === cond.value ? (
@@ -151,10 +175,10 @@ export default function CategoryScreen() {
           }`}
         >
           <Text className="font-sans text-base font-semibold text-base-canvas">
-            Nastavi
+            {t('upload.continue')}
           </Text>
         </TouchableOpacity>
       </View>
     </View>
-  )
+  );
 }

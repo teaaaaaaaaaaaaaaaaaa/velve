@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Alert } from '@/lib/velveAlert'
+import { Alert } from '@/lib/velveAlert';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -15,6 +15,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { RemoteImage } from '@/components/RemoteImage';
 import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
 import { analyzeLocalImage } from '@/lib/imageRequests';
 
 type AnalysisPayload = {
@@ -27,7 +28,17 @@ type AnalysisPayload = {
   };
 };
 
-function CheckRow({ label, ok }: { label: string; ok: boolean }) {
+function CheckRow({
+  label,
+  ok,
+  okLabel,
+  adjustLabel,
+}: {
+  label: string;
+  ok: boolean;
+  okLabel: string;
+  adjustLabel: string;
+}) {
   return (
     <View className="flex-row items-center justify-between rounded-[22px] bg-surface-panel px-4 py-4">
       <Text className="font-sans text-sm text-ink-dark">{label}</Text>
@@ -35,7 +46,7 @@ function CheckRow({ label, ok }: { label: string; ok: boolean }) {
         className={`rounded-full px-3 py-1.5 ${ok ? 'bg-brand-highlight' : 'bg-brand-accent-light/35'}`}
       >
         <Text className="font-sans text-xs font-semibold text-ink-dark">
-          {ok ? 'OK' : 'Podesi'}
+          {ok ? okLabel : adjustLabel}
         </Text>
       </View>
     </View>
@@ -46,6 +57,7 @@ export default function CleanCutAnalyzeScreen() {
   const router = useRouter();
   const { imageUri } = useLocalSearchParams<{ imageUri: string }>();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const [analysis, setAnalysis] = useState<AnalysisPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const scan = useRef(new Animated.Value(0)).current;
@@ -85,9 +97,11 @@ export default function CleanCutAnalyzeScreen() {
           setAnalysis(payload);
         }
       } catch (error) {
-        Alert.alert('AI analiza nije dostupna', 'Ne mogu da analiziram ovu sliku sada.', [
-          { text: 'Nazad', onPress: () => router.replace('/upload-flow') },
-        ]);
+        Alert.alert(
+          t('upload.analysisUnavailableTitle'),
+          t('upload.analysisUnavailableDescription'),
+          [{ text: t('common.close'), onPress: () => router.replace('/upload-flow') }]
+        );
       } finally {
         if (active) {
           setLoading(false);
@@ -98,7 +112,7 @@ export default function CleanCutAnalyzeScreen() {
     return () => {
       active = false;
     };
-  }, [imageUri, router]);
+  }, [imageUri, router, t]);
 
   const scanTranslate = useMemo(
     () =>
@@ -108,6 +122,14 @@ export default function CleanCutAnalyzeScreen() {
       }),
     [scan]
   );
+  const analysisMessages = useMemo(() => {
+    if (!analysis) return [];
+    const next: string[] = [];
+    if (!analysis.checks?.lighting?.ok) next.push(t('upload.analysisLightingHint'));
+    if (!analysis.checks?.framing?.ok) next.push(t('upload.analysisFramingHint'));
+    if (!analysis.checks?.contrast?.ok) next.push(t('upload.analysisContrastHint'));
+    return next;
+  }, [analysis, t]);
 
   useEffect(() => {
     if (!analysis?.ready || loading || hasAutoNavigated.current) return;
@@ -145,9 +167,9 @@ export default function CleanCutAnalyzeScreen() {
         </TouchableOpacity>
 
         <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
-          AI analiza
+          {t('upload.analyzeEyebrow')}
         </Text>
-        <Text className="mt-2 font-display text-4xl text-ink-dark">Real-time feedback</Text>
+        <Text className="mt-2 font-display text-4xl text-ink-dark">{t('upload.analyzeTitle')}</Text>
 
         <View className="mt-6 overflow-hidden rounded-[34px] bg-surface-panel px-3 py-3">
           <View className="overflow-hidden rounded-[28px] bg-base-canvas">
@@ -164,9 +186,24 @@ export default function CleanCutAnalyzeScreen() {
         </View>
 
         <View className="mt-6 gap-3">
-          <CheckRow label="Svetlo" ok={!!analysis?.checks?.lighting?.ok} />
-          <CheckRow label="Kadar" ok={!!analysis?.checks?.framing?.ok} />
-          <CheckRow label="Kontrast" ok={!!analysis?.checks?.contrast?.ok} />
+          <CheckRow
+            label={t('upload.checkLighting')}
+            ok={!!analysis?.checks?.lighting?.ok}
+            okLabel={t('upload.checkOk')}
+            adjustLabel={t('upload.checkAdjust')}
+          />
+          <CheckRow
+            label={t('upload.checkFraming')}
+            ok={!!analysis?.checks?.framing?.ok}
+            okLabel={t('upload.checkOk')}
+            adjustLabel={t('upload.checkAdjust')}
+          />
+          <CheckRow
+            label={t('upload.checkContrast')}
+            ok={!!analysis?.checks?.contrast?.ok}
+            okLabel={t('upload.checkOk')}
+            adjustLabel={t('upload.checkAdjust')}
+          />
         </View>
 
         <View className="mt-5 rounded-[24px] bg-surface-panel px-4 py-4">
@@ -174,25 +211,25 @@ export default function CleanCutAnalyzeScreen() {
             <View className="flex-row items-center">
               <ActivityIndicator size="small" color={colors.accentDeep} />
               <Text className="ml-3 flex-1 font-sans text-sm text-ink-dark/65">
-                Velve proverava svetlo, kadar i kontrast...
+                {t('upload.analysisLoading')}
               </Text>
             </View>
-          ) : analysis?.messages?.length ? (
-            analysis.messages.map((message) => (
+          ) : analysisMessages.length ? (
+            analysisMessages.map((message) => (
               <Text key={message} className="mb-2 font-sans text-sm leading-6 text-ink-dark/70">
                 {message}
               </Text>
             ))
           ) : (
             <Text className="font-sans text-sm leading-6 text-ink-dark/70">
-              Sve izgleda dobro. Mozemo da generisemo digitalni artikal.
+              {t('upload.analysisReady')}
             </Text>
           )}
         </View>
 
         {analysis?.ready && !loading ? (
           <Text className="mt-4 font-sans text-sm text-ink-dark/55">
-            Sve je spremno, nastavljamo automatski...
+            {t('upload.analysisAutoContinue')}
           </Text>
         ) : null}
 
@@ -210,7 +247,7 @@ export default function CleanCutAnalyzeScreen() {
             }`}
           >
             <Text className="font-sans text-base font-semibold text-base-canvas">
-              Generisi digitalni artikal
+              {t('upload.analysisCta')}
             </Text>
           </TouchableOpacity>
         </View>

@@ -1,25 +1,17 @@
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Alert } from '@/lib/velveAlert'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Animated, Easing, Text, View } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Alert } from '@/lib/velveAlert';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Text, View } from 'react-native';
 
-import client from '@/api/client'
-import { BrandWordmark } from '@/components/BrandWordmark'
-import { BrandBackground } from '@/components/BrandBackground'
-import { uploadImageUri } from '@/lib/imageRequests'
-
-const STEPS = [
-  'Pripremamo tvoju sliku...',
-  'Uklanjamo pozadinu...',
-  'Digitalizujemo komad...',
-  'Uploadujemo na cloud...',
-  'Generisemo AI embedding...',
-  'Zavrsavamo...',
-]
+import client from '@/api/client';
+import { BrandWordmark } from '@/components/BrandWordmark';
+import { BrandBackground } from '@/components/BrandBackground';
+import { useI18n } from '@/i18n';
+import { uploadImageUri } from '@/lib/imageRequests';
 
 function useStepCycler(steps: string[], intervalMs = 3200) {
-  const [index, setIndex] = useState(0)
-  const fade = useRef(new Animated.Value(1)).current
+  const [index, setIndex] = useState(0);
+  const fade = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -29,25 +21,25 @@ function useStepCycler(steps: string[], intervalMs = 3200) {
         easing: Easing.out(Easing.ease),
         useNativeDriver: true,
       }).start(() => {
-        setIndex((prev) => (prev + 1) % steps.length)
+        setIndex((prev) => (prev + 1) % steps.length);
         Animated.timing(fade, {
           toValue: 1,
           duration: 400,
           easing: Easing.in(Easing.ease),
           useNativeDriver: true,
-        }).start()
-      })
-    }, intervalMs)
+        }).start();
+      });
+    }, intervalMs);
 
-    return () => clearInterval(timer)
-  }, [fade, intervalMs, steps.length])
+    return () => clearInterval(timer);
+  }, [fade, intervalMs, steps.length]);
 
-  return { text: steps[index], opacity: fade }
+  return { text: steps[index], opacity: fade };
 }
 
 function usePulse() {
-  const scale = useRef(new Animated.Value(1)).current
-  const opacity = useRef(new Animated.Value(0.85)).current
+  const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(0.85)).current;
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -81,27 +73,36 @@ function usePulse() {
           }),
         ]),
       ])
-    )
-    loop.start()
-    return () => loop.stop()
-  }, [scale, opacity])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [scale, opacity]);
 
-  return { scale, opacity }
+  return { scale, opacity };
 }
 
 export default function CleanCutTransformScreen() {
-  const router = useRouter()
-  const { imageUri } = useLocalSearchParams<{ imageUri: string }>()
-  const step = useStepCycler(STEPS)
-  const pulse = usePulse()
+  const router = useRouter();
+  const { imageUri } = useLocalSearchParams<{ imageUri: string }>();
+  const { t } = useI18n();
+  const steps = [
+    t('upload.transformStep1'),
+    t('upload.transformStep2'),
+    t('upload.transformStep3'),
+    t('upload.transformStep4'),
+    t('upload.transformStep5'),
+    t('upload.transformStep6'),
+  ];
+  const step = useStepCycler(steps);
+  const pulse = usePulse();
 
   const doTransform = useCallback(async () => {
     if (!imageUri) {
-      router.replace('/upload-flow')
-      return
+      router.replace('/upload-flow');
+      return;
     }
 
-    const uploadResult = await uploadImageUri(imageUri)
+    const uploadResult = await uploadImageUri(imageUri);
 
     const createResponse = await client.post('/api/items', {
       status: 'draft',
@@ -110,20 +111,20 @@ export default function CleanCutTransformScreen() {
       category: 'Unsorted',
       title: 'Untitled draft',
       listingType: 'trade',
-    })
+    });
 
-    const itemId = createResponse.data?.data?._id
+    const itemId = createResponse.data?.data?._id;
     if (!itemId) {
-      throw new Error('Draft item was not created')
+      throw new Error('Draft item was not created');
     }
 
-    await client.post(`/api/items/${itemId}/digitize`, {}, { timeout: 120000 })
+    await client.post(`/api/items/${itemId}/digitize`, {}, { timeout: 120000 });
 
-    return itemId
-  }, [imageUri, router])
+    return itemId;
+  }, [imageUri, router]);
 
   useEffect(() => {
-    let active = true
+    let active = true;
 
     doTransform()
       .then((itemId) => {
@@ -131,32 +132,28 @@ export default function CleanCutTransformScreen() {
           router.replace({
             pathname: '/upload-flow/review',
             params: { itemId },
-          })
+          });
         }
       })
       .catch((error: any) => {
-        if (!active) return
+        if (!active) return;
         Alert.alert(
-          'Transformacija nije uspela',
-          error?.response?.data?.error ||
-            error?.message ||
-            'Pokusaj ponovo za nekoliko trenutaka.',
-          [{ text: 'Nazad', onPress: () => router.replace('/upload-flow') }]
-        )
-      })
+          t('upload.transformFailedTitle'),
+          error?.response?.data?.error || error?.message || t('upload.transformFailedDescription'),
+          [{ text: t('common.close'), onPress: () => router.replace('/upload-flow') }]
+        );
+      });
 
     return () => {
-      active = false
-    }
-  }, [doTransform, router])
+      active = false;
+    };
+  }, [doTransform, router, t]);
 
   return (
     <View className="flex-1 items-center justify-center bg-base-canvas">
       <BrandBackground />
 
-      <Animated.View
-        style={{ transform: [{ scale: pulse.scale }], opacity: pulse.opacity }}
-      >
+      <Animated.View style={{ transform: [{ scale: pulse.scale }], opacity: pulse.opacity }}>
         <BrandWordmark width={180} />
       </Animated.View>
 
@@ -166,5 +163,5 @@ export default function CleanCutTransformScreen() {
         </Text>
       </Animated.View>
     </View>
-  )
+  );
 }

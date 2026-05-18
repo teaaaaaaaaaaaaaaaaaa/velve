@@ -1,178 +1,183 @@
-﻿import { Ionicons } from '@expo/vector-icons'
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
-import { Alert } from '@/lib/velveAlert'
-import { useEffect, useState } from 'react'
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
+﻿import { Ionicons } from '@expo/vector-icons';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Alert } from '@/lib/velveAlert';
+import { useEffect, useState } from 'react';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
-import client from '@/api/client'
-import { BrandedLoader } from '@/components/BrandedLoader'
-import { DiscoveryCardItem, DiscoveryItemCard } from '@/components/DiscoveryItemCard'
-import { EditorialEmptyState } from '@/components/EditorialEmptyState'
-import { RemoteImage } from '@/components/RemoteImage'
-import { VelveStoryHighlights } from '@/components/VelveStoryHighlights'
-import { getApiErrorMessage } from '@/lib/apiErrors'
+import client from '@/api/client';
+import { BrandedLoader } from '@/components/BrandedLoader';
+import { DiscoveryCardItem, DiscoveryItemCard } from '@/components/DiscoveryItemCard';
+import { EditorialEmptyState } from '@/components/EditorialEmptyState';
+import { RemoteImage } from '@/components/RemoteImage';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
+import { getApiErrorMessage } from '@/lib/apiErrors';
 
 type PublicUser = {
-  _id: string
-  displayName: string
-  photoURL?: string
-  bio?: string
-  averageRating?: number
-  completedTrades?: number
-  followersCount?: number
-  followingCount?: number
-  itemsCount?: number
-  location?: { city?: string; region?: string }
-  isSelf?: boolean
-  isFollowing?: boolean
-  joinedAt?: string
-  responseRate?: number | null
-  successfulSwaps?: number
-  profileCompleteness?: number
-  stylePreferences?: string[]
-  favoriteBrands?: string[]
-}
+  _id: string;
+  displayName: string;
+  photoURL?: string;
+  bio?: string;
+  averageRating?: number;
+  completedTrades?: number;
+  followersCount?: number;
+  followingCount?: number;
+  itemsCount?: number;
+  location?: { city?: string; region?: string };
+  isSelf?: boolean;
+  isFollowing?: boolean;
+  joinedAt?: string;
+  responseRate?: number | null;
+  successfulSwaps?: number;
+  profileCompleteness?: number;
+  stylePreferences?: string[];
+  favoriteBrands?: string[];
+};
 
 export default function PublicProfileScreen() {
-  const router = useRouter()
-  const { id } = useLocalSearchParams<{ id: string }>()
-  const [user, setUser] = useState<PublicUser | null>(null)
-  const [items, setItems] = useState<DiscoveryCardItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [isFollowing, setIsFollowing] = useState(false)
-  const [followersCount, setFollowersCount] = useState(0)
-  const [followLoading, setFollowLoading] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
+  const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { t, formatDate } = useI18n();
+  const [user, setUser] = useState<PublicUser | null>(null);
+  const [items, setItems] = useState<DiscoveryCardItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const loadProfile = async () => {
     try {
-      setLoading(true)
+      setLoading(true);
       const [userResponse, itemsResponse] = await Promise.all([
         client.get(`/api/users/${id}`),
         client.get('/api/items', { params: { userId: id, limit: 30 } }),
-      ])
+      ]);
 
       if (userResponse.data.ok) {
-        const userData = userResponse.data.data as PublicUser
-        setUser(userData)
-        setIsFollowing(Boolean(userData.isFollowing))
-        setFollowersCount(userData.followersCount || 0)
+        const userData = userResponse.data.data as PublicUser;
+        setUser(userData);
+        setIsFollowing(Boolean(userData.isFollowing));
+        setFollowersCount(userData.followersCount || 0);
       }
 
       if (itemsResponse.data.ok) {
-        setItems(itemsResponse.data.data as DiscoveryCardItem[])
+        setItems(itemsResponse.data.data as DiscoveryCardItem[]);
       }
-      setErrorMessage('')
+      setErrorMessage('');
     } catch (error) {
-      setUser(null)
-      setItems([])
-      setErrorMessage(
-        getApiErrorMessage(
-          error,
-          'Moguce je da je korisnik blokiran, uklonjen ili da je veza kratko pukla.'
-        )
-      )
+      setUser(null);
+      setItems([]);
+      setErrorMessage(getApiErrorMessage(error, t('publicProfile.unavailableDescription')));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
     if (id) {
-      loadProfile()
+      loadProfile();
     }
-  }, [id])
+  }, [id, t]);
 
   useEffect(() => {
     if (user?.isSelf) {
-      router.replace('/(tabs)/profile')
+      router.replace('/(tabs)/profile');
     }
-  }, [router, user?.isSelf])
+  }, [router, user?.isSelf]);
 
   const handleReport = () => {
-    if (!id) return
-    Alert.alert('Prijavi profil?', 'Velve tim ce pregledati ovaj profil i aktivnost korisnika.', [
+    if (!id) return;
+    Alert.alert(t('feed.reportTitle'), t('feed.reportDescription'), [
       {
-        text: 'Prijavi',
+        text: t('feed.reportCta'),
         onPress: async () => {
           try {
-            await client.post(`/api/users/${id}/report`, { reason: 'community_report' })
-            Alert.alert('Hvala', 'Profil je prijavljen i pregledace ga tim.')
+            await client.post(`/api/users/${id}/report`, { reason: 'community_report' });
+            Alert.alert(t('feed.reportSuccessTitle'), t('feed.reportSuccessDescription'));
           } catch {
-            Alert.alert('Greska', 'Prijava trenutno nije moguca.')
+            Alert.alert(t('common.error'), t('feed.reportError'));
           }
         },
       },
-      { text: 'Odustani', style: 'cancel' },
-    ])
-  }
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
 
   const handleBlock = () => {
-    if (!id || !user) return
-    Alert.alert('Blokiraj korisnika?', `@${user.displayName} vise neces vidjati u feedu.`, [
+    if (!id || !user) return;
+    Alert.alert(t('feed.blockTitle'), t('feed.blockDescription', { name: user.displayName }), [
       {
-        text: 'Blokiraj',
+        text: t('feed.blockCta'),
         style: 'destructive',
         onPress: async () => {
           try {
-            await client.post(`/api/users/${id}/block`)
-            Alert.alert('Korisnik blokiran', `Sadrzaj profila @${user.displayName} vise ti se nece prikazivati.`, [
-              {
-                text: 'U redu',
-                onPress: () => router.replace('/(tabs)/feed'),
-              },
-            ])
+            await client.post(`/api/users/${id}/block`);
+            Alert.alert(
+              t('feed.blockSuccessTitle'),
+              t('feed.blockSuccessDescription', { name: user.displayName }),
+              [
+                {
+                  text: t('common.ok'),
+                  onPress: () => router.replace('/(tabs)/feed'),
+                },
+              ]
+            );
           } catch {
-            Alert.alert('Greska', 'Blokiranje trenutno nije moguce.')
+            Alert.alert(t('common.error'), t('feed.blockError'));
           }
         },
       },
-      { text: 'Odustani', style: 'cancel' },
-    ])
-  }
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
 
   const handleMoreOptions = () => {
-    Alert.alert(`@${user?.displayName || 'Korisnik'}`, 'Sta zelis da uradis?', [
-      { text: 'Prijavi profil', onPress: handleReport },
-      { text: 'Blokiraj korisnika', style: 'destructive', onPress: handleBlock },
-      { text: 'Odustani', style: 'cancel' },
-    ])
-  }
+    Alert.alert(
+      `@${user?.displayName || t('common.user')}`,
+      t('publicProfile.moreActionsDescription'),
+      [
+        { text: t('feed.reportItem'), onPress: handleReport },
+        { text: t('feed.blockUser'), style: 'destructive', onPress: handleBlock },
+        { text: t('common.cancel'), style: 'cancel' },
+      ]
+    );
+  };
 
   const handleOpenChat = async () => {
-    if (!id) return
+    if (!id) return;
     try {
-      const response = await client.post(`/api/chat/direct/${id}`)
+      const response = await client.post(`/api/chat/direct/${id}`);
       if (response.data.ok) {
-        router.push(`/(tabs)/chat/${response.data.data.chatId as string}`)
+        router.push(`/(tabs)/chat/${response.data.data.chatId as string}`);
       }
     } catch {
-      Alert.alert('Greska', 'Nije moguce otvoriti razgovor.')
+      Alert.alert(t('common.error'), t('publicProfile.chatError'));
     }
-  }
+  };
 
   const handleFollow = async () => {
-    if (!id || followLoading) return
+    if (!id || followLoading) return;
 
-    setFollowLoading(true)
-    const wasFollowing = isFollowing
-    setIsFollowing(!wasFollowing)
-    setFollowersCount((prev) => prev + (wasFollowing ? -1 : 1))
+    setFollowLoading(true);
+    const wasFollowing = isFollowing;
+    setIsFollowing(!wasFollowing);
+    setFollowersCount((prev) => prev + (wasFollowing ? -1 : 1));
 
     try {
       if (wasFollowing) {
-        await client.delete(`/api/users/${id}/follow`)
+        await client.delete(`/api/users/${id}/follow`);
       } else {
-        await client.post(`/api/users/${id}/follow`)
+        await client.post(`/api/users/${id}/follow`);
       }
     } catch {
-      setIsFollowing(wasFollowing)
-      setFollowersCount((prev) => prev + (wasFollowing ? 1 : -1))
-      Alert.alert('Greska', 'Pracenje trenutno nije moguce.')
+      setIsFollowing(wasFollowing);
+      setFollowersCount((prev) => prev + (wasFollowing ? 1 : -1));
+      Alert.alert(t('common.error'), t('publicProfile.followError'));
     } finally {
-      setFollowLoading(false)
+      setFollowLoading(false);
     }
-  }
+  };
 
   if (loading) {
     return (
@@ -180,7 +185,7 @@ export default function PublicProfileScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <BrandedLoader />
       </>
-    )
+    );
   }
 
   if (!user) {
@@ -189,16 +194,16 @@ export default function PublicProfileScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <EditorialEmptyState
           icon="person-outline"
-          title="Profil trenutno nije dostupan"
-          description={errorMessage || 'Moguce je da je korisnik blokiran ili uklonjen.'}
-          actionLabel="Pokusaj ponovo"
+          title={t('publicProfile.unavailableTitle')}
+          description={errorMessage || t('publicProfile.unavailableDescription')}
+          actionLabel={t('common.retry')}
           onAction={loadProfile}
         />
       </View>
-    )
+    );
   }
 
-  if (user.isSelf) return null
+  if (user.isSelf) return null;
 
   return (
     <ScrollView className="flex-1 bg-base-canvas" contentContainerStyle={{ paddingBottom: 120 }}>
@@ -210,21 +215,27 @@ export default function PublicProfileScreen() {
             onPress={() => router.back()}
             className="h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
           >
-            <Ionicons name="arrow-back" size={22} color="#2B2A2B" />
+            <Ionicons name="arrow-back" size={22} color={colors.inkDark} />
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={handleMoreOptions}
             className="h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
           >
-            <Ionicons name="ellipsis-horizontal" size={22} color="#2B2A2B" />
+            <Ionicons name="ellipsis-horizontal" size={22} color={colors.inkDark} />
           </TouchableOpacity>
         </View>
 
-        <View className="overflow-hidden rounded-[34px] border border-ink-dark/6 bg-surface-panel px-5 pb-5 pt-6"
-          style={{ shadowColor: '#2B2A2B', shadowOpacity: 0.08, shadowRadius: 24, shadowOffset: { width: 0, height: 6 }, elevation: 6 }}
+        <View
+          className="overflow-hidden rounded-[34px] border border-ink-dark/6 bg-surface-panel px-5 pb-5 pt-6"
+          style={{
+            shadowColor: colors.inkDark,
+            shadowOpacity: 0.08,
+            shadowRadius: 24,
+            shadowOffset: { width: 0, height: 6 },
+            elevation: 6,
+          }}
         >
-
           <View className="flex-row items-center">
             {user.photoURL ? (
               <RemoteImage
@@ -256,45 +267,59 @@ export default function PublicProfileScreen() {
               ) : null}
               <Text className="mt-2 font-sans text-sm text-brand-accent-deep">
                 {user.joinedAt
-                  ? `Od ${new Date(user.joinedAt).toLocaleDateString('sr-Latn', {
-                      month: 'long',
-                      year: 'numeric',
-                    })}`
-                  : 'Novi clan'}
+                  ? t('profile.joinedPrefix', {
+                      date: formatDate(user.joinedAt, {
+                        month: 'long',
+                        year: 'numeric',
+                      }),
+                    })
+                  : t('profile.newMember')}
               </Text>
             </View>
           </View>
 
           <Text className="mt-5 font-sans text-sm leading-6 text-ink-dark/75">
-            {user.bio || 'Profil jos nema opis, ali trust signal i garderoba ispod vec govore o stilu ovog naloga.'}
+            {user.bio || t('publicProfile.defaultBio')}
           </Text>
-
-          <VelveStoryHighlights profile={user} />
 
           <View className="mt-5 flex-row rounded-[24px] bg-base-canvas px-4 py-4">
             <View className="flex-1 items-center">
-              <Text className="font-display text-2xl text-ink-dark">{user.itemsCount || items.length}</Text>
-              <Text className="font-sans text-xs text-ink-dark/50">Objave</Text>
+              <Text className="font-display text-2xl text-ink-dark">
+                {user.itemsCount || items.length}
+              </Text>
+              <Text className="font-sans text-xs text-ink-dark/50">{t('publicProfile.posts')}</Text>
             </View>
             <TouchableOpacity
               className="flex-1 items-center"
-              onPress={() => router.push({ pathname: '/connections', params: { userId: user._id, tab: 'followers' } })}
+              onPress={() =>
+                router.push({
+                  pathname: '/connections',
+                  params: { userId: user._id, tab: 'followers' },
+                })
+              }
             >
               <Text className="font-display text-2xl text-ink-dark">{followersCount}</Text>
-              <Text className="font-sans text-xs text-ink-dark/50">Pratioci</Text>
+              <Text className="font-sans text-xs text-ink-dark/50">{t('profile.followers')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               className="flex-1 items-center"
-              onPress={() => router.push({ pathname: '/connections', params: { userId: user._id, tab: 'following' } })}
+              onPress={() =>
+                router.push({
+                  pathname: '/connections',
+                  params: { userId: user._id, tab: 'following' },
+                })
+              }
             >
-              <Text className="font-display text-2xl text-ink-dark">{user.followingCount || 0}</Text>
-              <Text className="font-sans text-xs text-ink-dark/50">Prati</Text>
+              <Text className="font-display text-2xl text-ink-dark">
+                {user.followingCount || 0}
+              </Text>
+              <Text className="font-sans text-xs text-ink-dark/50">{t('profile.following')}</Text>
             </TouchableOpacity>
             <View className="flex-1 items-center">
               <Text className="font-display text-2xl text-ink-dark">
                 {user.successfulSwaps || user.completedTrades || 0}
               </Text>
-              <Text className="font-sans text-xs text-ink-dark/50">Razmene</Text>
+              <Text className="font-sans text-xs text-ink-dark/50">{t('profile.trades')}</Text>
             </View>
           </View>
 
@@ -304,28 +329,31 @@ export default function PublicProfileScreen() {
               disabled={followLoading}
               className={`flex-1 items-center rounded-full px-4 py-3 ${isFollowing ? 'border border-ink-dark/10 bg-base-canvas' : 'bg-brand-accent-deep'}`}
             >
-              <Text className={`font-sans text-sm font-semibold ${isFollowing ? 'text-ink-dark' : 'text-base-canvas'}`}>
-                {isFollowing ? 'Otprati' : 'Zaprati'}
+              <Text
+                className={`font-sans text-sm font-semibold ${isFollowing ? 'text-ink-dark' : 'text-base-canvas'}`}
+              >
+                {isFollowing ? t('publicProfile.unfollow') : t('publicProfile.follow')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleOpenChat}
+              accessibilityLabel={t('publicProfile.message')}
               className="h-11 w-11 items-center justify-center rounded-full bg-brand-accent-light/25"
             >
-              <Ionicons name="chatbubble-outline" size={20} color="#431A43" />
+              <Ionicons name="chatbubble-outline" size={20} color={colors.accentDeep} />
             </TouchableOpacity>
           </View>
         </View>
 
         <View className="mt-8">
-          <Text className="font-display text-3xl text-ink-dark">Objave</Text>
+          <Text className="font-display text-3xl text-ink-dark">{t('publicProfile.posts')}</Text>
 
           {items.length === 0 ? (
             <View className="mt-4">
               <EditorialEmptyState
                 icon="shirt-outline"
-                title="Trenutno nema aktivnih objava"
-                description="Korisnik trenutno nema dostupnih komada za otvaranje iz discovery sloja."
+                title={t('publicProfile.emptyListingsTitle')}
+                description={t('publicProfile.emptyListingsDescription')}
               />
             </View>
           ) : (
@@ -343,5 +371,5 @@ export default function PublicProfileScreen() {
         </View>
       </View>
     </ScrollView>
-  )
+  );
 }

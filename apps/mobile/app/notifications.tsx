@@ -10,6 +10,7 @@ import { RemoteImage } from '@/components/RemoteImage'
 import { colors } from '@/design/tokens'
 import { useI18n } from '@/i18n'
 import { getApiErrorMessage } from '@/lib/apiErrors'
+import { showVelveToast } from '@/lib/velveAlert'
 
 type NotificationRecord = {
   _id: string
@@ -57,6 +58,7 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [markingAllRead, setMarkingAllRead] = useState(false)
 
   const grouped = useMemo(
     () => ({
@@ -89,9 +91,44 @@ export default function NotificationsScreen() {
   }, [loadNotifications])
 
   const markAllRead = useCallback(async () => {
-    await client.put('/api/notifications/read').catch(() => undefined)
-    setNotifications((prev) => prev.map((entry) => ({ ...entry, readAt: entry.readAt || new Date().toISOString() })))
-  }, [])
+    if (markingAllRead) return
+
+    const unreadCount = notifications.filter((entry) => !entry.readAt).length
+    if (unreadCount === 0) {
+      showVelveToast({
+        title: t('notifications.markReadIdleTitle'),
+        message: t('notifications.markReadIdleDescription'),
+        tone: 'info',
+      })
+      return
+    }
+
+    const readAt = new Date().toISOString()
+    const previousNotifications = notifications
+
+    setNotifications((prev) =>
+      prev.map((entry) => ({ ...entry, readAt: entry.readAt || readAt }))
+    )
+
+    try {
+      setMarkingAllRead(true)
+      await client.put('/api/notifications/read')
+      showVelveToast({
+        title: t('notifications.markReadSuccessTitle'),
+        message: t('notifications.markReadSuccessDescription', { count: unreadCount }),
+        tone: 'success',
+      })
+    } catch (error) {
+      setNotifications(previousNotifications)
+      showVelveToast({
+        title: t('notifications.markReadErrorTitle'),
+        message: getApiErrorMessage(error, t('notifications.markReadErrorDescription')),
+        tone: 'error',
+      })
+    } finally {
+      setMarkingAllRead(false)
+    }
+  }, [markingAllRead, notifications, t])
 
   const openNotification = useCallback(
     async (notification: NotificationRecord) => {
@@ -117,9 +154,15 @@ export default function NotificationsScreen() {
         router.push('/trade-archive')
       } else if (actorId) {
         router.push(`/users/${actorId}`)
+      } else {
+        showVelveToast({
+          title: t('notifications.openFallbackTitle'),
+          message: t('notifications.openFallbackDescription'),
+          tone: 'info',
+        })
       }
     },
-    [router]
+    [router, t]
   )
 
   const renderGroup = (title: string, entries: NotificationRecord[]) => {
@@ -200,8 +243,14 @@ export default function NotificationsScreen() {
           >
             <Ionicons name="arrow-back" size={20} color={colors.inkDark} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={markAllRead} className="rounded-full bg-surface-panel px-4 py-3">
-            <Text className="font-sans text-sm font-semibold text-brand-accent-deep">{t('notifications.markRead')}</Text>
+          <TouchableOpacity
+            onPress={markAllRead}
+            disabled={markingAllRead}
+            className={`rounded-full px-4 py-3 ${markingAllRead ? 'bg-surface-panel/70' : 'bg-surface-panel'}`}
+          >
+            <Text className="font-sans text-sm font-semibold text-brand-accent-deep">
+              {markingAllRead ? t('common.saving') : t('notifications.markRead')}
+            </Text>
           </TouchableOpacity>
         </View>
 

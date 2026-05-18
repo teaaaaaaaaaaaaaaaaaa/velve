@@ -28,6 +28,7 @@ import { prefetchImageUri } from '@/lib/expoImage'
 import { getApiErrorMessage } from '@/lib/apiErrors'
 import { getPrimaryItemImage } from '@/lib/itemImages'
 import { normalizeImageUri } from '@/lib/images'
+import { showVelveToast } from '@/lib/velveAlert'
 
 type FeedMode = 'for_you' | 'following'
 
@@ -68,6 +69,7 @@ export default function FeedScreen() {
   const [searchItems, setSearchItems] = useState<ImmersiveFeedItem[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchLoadingMore, setSearchLoadingMore] = useState(false)
+  const [searchError, setSearchError] = useState('')
   const [searchNextCursor, setSearchNextCursor] = useState<string | null>(null)
   const [searchHasMore, setSearchHasMore] = useState(false)
   const searchInputRef = useRef<VelveTextInputRef>(null)
@@ -82,6 +84,7 @@ export default function FeedScreen() {
     setSearchActive(false)
     setSearchQuery('')
     setSearchItems([])
+    setSearchError('')
     setSearchNextCursor(null)
   }, [])
 
@@ -110,15 +113,28 @@ export default function FeedScreen() {
           setSearchItems((prev) => (mode === 'append' ? [...prev, ...nextItems] : nextItems))
           setSearchNextCursor(response.data.nextCursor ? String(response.data.nextCursor) : null)
           setSearchHasMore(Boolean(response.data.hasMore))
+          setSearchError('')
+          return
         }
-      } catch {
-        if (mode === 'replace') setSearchItems([])
+
+        throw new Error('INVALID_SEARCH_RESPONSE')
+      } catch (error) {
+        if (mode === 'replace') {
+          setSearchItems([])
+          setSearchError(getApiErrorMessage(error, t('search.loadError')))
+        } else {
+          showVelveToast({
+            title: t('search.loadMoreErrorTitle'),
+            message: getApiErrorMessage(error, t('search.loadMoreErrorDescription')),
+            tone: 'error',
+          })
+        }
       } finally {
         setSearchLoading(false)
         setSearchLoadingMore(false)
       }
     },
-    [searchNextCursor, searchQuery]
+    [searchNextCursor, searchQuery, t]
   )
 
   // Debounced search trigger
@@ -267,9 +283,14 @@ export default function FeedScreen() {
           isLiked: previousLiked,
           likesCount: previousCount,
         }))
+        showVelveToast({
+          title: t('search.likeErrorTitle'),
+          message: t('search.likeErrorDescription'),
+          tone: 'error',
+        })
       }
     },
-    [updateItem]
+    [t, updateItem]
   )
 
   const handleWishlist = useCallback(
@@ -297,9 +318,14 @@ export default function FeedScreen() {
           isWishlisted,
           wishlistCount: previousCount,
         }))
+        showVelveToast({
+          title: t('search.saveErrorTitle'),
+          message: t('search.saveErrorDescription'),
+          tone: 'error',
+        })
       }
     },
-    [updateItem]
+    [t, updateItem]
   )
 
   const handleHideItem = useCallback(async (item: ImmersiveFeedItem) => {
@@ -307,8 +333,13 @@ export default function FeedScreen() {
       await client.post(`/api/items/${item._id}/hide`, { reason: 'not_interested' })
       setItems((prev) => prev.filter((entry) => entry._id !== item._id))
       setActionItem(null)
-    } catch {
-      Alert.alert(t('common.error'), t('feed.hideError'))
+      showVelveToast({
+        title: t('feed.hideSuccessTitle'),
+        message: t('feed.hideSuccessDescription'),
+        tone: 'success',
+      })
+    } catch (error) {
+      Alert.alert(t('common.error'), getApiErrorMessage(error, t('feed.hideError')))
     }
   }, [t])
 
@@ -320,9 +351,13 @@ export default function FeedScreen() {
           try {
             await client.post(`/api/items/${item._id}/report`, { reason: 'community_report' })
             setActionItem(null)
-            Alert.alert(t('feed.reportSuccessTitle'), t('feed.reportSuccessDescription'))
-          } catch {
-            Alert.alert(t('common.error'), t('feed.reportError'))
+            showVelveToast({
+              title: t('feed.reportSuccessTitle'),
+              message: t('feed.reportSuccessDescription'),
+              tone: 'success',
+            })
+          } catch (error) {
+            Alert.alert(t('common.error'), getApiErrorMessage(error, t('feed.reportError')))
           }
         },
       },
@@ -340,12 +375,13 @@ export default function FeedScreen() {
             await client.post(`/api/users/${item.userId._id}/block`)
             setItems((prev) => prev.filter((entry) => entry.userId._id !== item.userId._id))
             setActionItem(null)
-            Alert.alert(
-              t('feed.blockSuccessTitle'),
-              t('feed.blockSuccessDescription', { name: item.userId.displayName })
-            )
-          } catch {
-            Alert.alert(t('common.error'), t('feed.blockError'))
+            showVelveToast({
+              title: t('feed.blockSuccessTitle'),
+              message: t('feed.blockSuccessDescription', { name: item.userId.displayName }),
+              tone: 'success',
+            })
+          } catch (error) {
+            Alert.alert(t('common.error'), getApiErrorMessage(error, t('feed.blockError')))
           }
         },
       },
@@ -420,9 +456,14 @@ export default function FeedScreen() {
         }
       } catch {
         updateSearchItem(itemId, (item) => ({ ...item, isLiked, likesCount: previousCount }))
+        showVelveToast({
+          title: t('search.likeErrorTitle'),
+          message: t('search.likeErrorDescription'),
+          tone: 'error',
+        })
       }
     },
-    [updateSearchItem]
+    [t, updateSearchItem]
   )
 
   const handleSearchWishlist = useCallback(
@@ -437,9 +478,14 @@ export default function FeedScreen() {
         else await client.post(`/api/wishlist/${itemId}`)
       } catch {
         updateSearchItem(itemId, (item) => ({ ...item, isWishlisted, wishlistCount: previousCount }))
+        showVelveToast({
+          title: t('search.saveErrorTitle'),
+          message: t('search.saveErrorDescription'),
+          tone: 'error',
+        })
       }
     },
-    [updateSearchItem]
+    [t, updateSearchItem]
   )
 
   const renderSearchItem = useCallback(
@@ -471,6 +517,16 @@ export default function FeedScreen() {
         // --- Search results overlay ---
         searchLoading && searchItems.length === 0 ? (
           <BrandedLoader showSpinner />
+        ) : searchError && searchItems.length === 0 ? (
+          <View className="flex-1 bg-surface-panel px-5 pt-24">
+            <EditorialEmptyState
+              icon="cloud-offline-outline"
+              title={t('search.errorTitle')}
+              description={searchError}
+              actionLabel={t('common.retry')}
+              onAction={() => loadSearchResults('replace')}
+            />
+          </View>
         ) : searchItems.length === 0 ? (
           <View className="flex-1 bg-surface-panel px-5 pt-24">
             <EditorialEmptyState

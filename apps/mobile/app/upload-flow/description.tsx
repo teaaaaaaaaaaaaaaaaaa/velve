@@ -1,7 +1,7 @@
-import { Ionicons } from '@expo/vector-icons'
-import { Alert } from '@/lib/velveAlert'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Ionicons } from '@expo/vector-icons';
+import { Alert } from '@/lib/velveAlert';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -11,38 +11,45 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import client from '@/api/client'
-import { BrandBackground } from '@/components/BrandBackground'
-import { BrandWordmark } from '@/components/BrandWordmark'
-import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen'
-import { VelveTextInput } from '@/components/VelveTextInput'
-import { colors } from '@/design/tokens'
-import { getPrimaryItemImage } from '@/lib/itemImages'
+import client from '@/api/client';
+import { BrandBackground } from '@/components/BrandBackground';
+import { BrandWordmark } from '@/components/BrandWordmark';
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen';
+import { VelveTextInput } from '@/components/VelveTextInput';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
+import { getPrimaryItemImage } from '@/lib/itemImages';
 
 type ItemPayload = {
-  _id: string
-  images: string[]
-  imageClean?: string | null
-  primaryImage?: string | null
-}
+  _id: string;
+  images: string[];
+  imageClean?: string | null;
+  primaryImage?: string | null;
+};
 
-const AI_STEPS = [
-  'Analiziramo sliku...',
-  'Prepoznajemo boju i stil...',
-  'Prepoznajemo detalje komada...',
-  'Pisemo opis na srpskom...',
-]
-const AI_TIMEOUT_SECONDS = 120
+const AI_TIMEOUT_SECONDS = 120;
 
-function AiLoadingOverlay({ onCancel }: { onCancel: () => void }) {
-  const [stepIndex, setStepIndex] = useState(0)
-  const [secondsLeft, setSecondsLeft] = useState(AI_TIMEOUT_SECONDS)
-  const fade = useRef(new Animated.Value(1)).current
-  const pulse = useRef(new Animated.Value(1)).current
-  const progress = useRef(new Animated.Value(0)).current
+function AiLoadingOverlay({
+  onCancel,
+  steps,
+  cancelLabel,
+  cancelA11yLabel,
+  timeoutLabel,
+}: {
+  onCancel: () => void;
+  steps: string[];
+  cancelLabel: string;
+  cancelA11yLabel: string;
+  timeoutLabel: string;
+}) {
+  const [stepIndex, setStepIndex] = useState(0);
+  const [secondsLeft, setSecondsLeft] = useState(AI_TIMEOUT_SECONDS);
+  const fade = useRef(new Animated.Value(1)).current;
+  const pulse = useRef(new Animated.Value(1)).current;
+  const progress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -60,10 +67,10 @@ function AiLoadingOverlay({ onCancel }: { onCancel: () => void }) {
           useNativeDriver: true,
         }),
       ])
-    )
-    loop.start()
-    return () => loop.stop()
-  }, [pulse])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -72,16 +79,16 @@ function AiLoadingOverlay({ onCancel }: { onCancel: () => void }) {
         duration: 250,
         useNativeDriver: true,
       }).start(() => {
-        setStepIndex((prev) => (prev + 1) % AI_STEPS.length)
+        setStepIndex((prev) => (prev + 1) % steps.length);
         Animated.timing(fade, {
           toValue: 1,
           duration: 350,
           useNativeDriver: true,
-        }).start()
-      })
-    }, 2500)
-    return () => clearInterval(timer)
-  }, [fade])
+        }).start();
+      });
+    }, 2500);
+    return () => clearInterval(timer);
+  }, [fade, steps.length]);
 
   useEffect(() => {
     Animated.timing(progress, {
@@ -89,21 +96,21 @@ function AiLoadingOverlay({ onCancel }: { onCancel: () => void }) {
       duration: AI_TIMEOUT_SECONDS * 1000,
       easing: Easing.linear,
       useNativeDriver: false,
-    }).start()
+    }).start();
 
     const countdown = setInterval(() => {
-      setSecondsLeft((prev) => Math.max(0, prev - 1))
-    }, 1000)
+      setSecondsLeft((prev) => Math.max(0, prev - 1));
+    }, 1000);
 
-    return () => clearInterval(countdown)
-  }, [progress])
+    return () => clearInterval(countdown);
+  }, [progress]);
 
   return (
     <View className="absolute inset-0 z-50 items-center justify-center bg-base-canvas/95">
       <TouchableOpacity
         onPress={onCancel}
         accessibilityRole="button"
-        accessibilityLabel="Otkazi AI generisanje"
+        accessibilityLabel={cancelA11yLabel}
         className="absolute right-5 top-14 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
       >
         <Ionicons name="close" size={22} color={colors.inkDark} />
@@ -117,7 +124,7 @@ function AiLoadingOverlay({ onCancel }: { onCancel: () => void }) {
 
       <Animated.View style={{ opacity: fade, marginTop: 24 }}>
         <Text className="text-center font-sans text-base tracking-wide text-ink-dark/60">
-          {AI_STEPS[stepIndex]}
+          {steps[stepIndex]}
         </Text>
       </Animated.View>
 
@@ -134,66 +141,73 @@ function AiLoadingOverlay({ onCancel }: { onCancel: () => void }) {
           />
         </View>
         <Text className="mt-3 text-center font-sans text-xs text-ink-dark/45">
-          Automatski timeout za {secondsLeft}s
+          {timeoutLabel.replace('{{seconds}}', String(secondsLeft))}
         </Text>
       </View>
 
       <BrandWordmark width={100} style={{ marginTop: 32, opacity: 0.25 }} />
 
       <TouchableOpacity onPress={onCancel} className="mt-8 px-8 py-3">
-        <Text className="font-sans text-sm text-ink-dark/45">Otkaži</Text>
+        <Text className="font-sans text-sm text-ink-dark/45">{cancelLabel}</Text>
       </TouchableOpacity>
     </View>
-  )
+  );
 }
 
 export default function DescriptionScreen() {
-  const router = useRouter()
-  const insets = useSafeAreaInsets()
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { locale, t } = useI18n();
   const params = useLocalSearchParams<{
-    itemId: string
-    category: string
-    condition: string
-    listingType: string
-    price: string
-    tradeFor: string
-    brand: string
-    size: string
-  }>()
+    itemId: string;
+    category: string;
+    condition: string;
+    listingType: string;
+    price: string;
+    tradeFor: string;
+    brand: string;
+    size: string;
+  }>();
 
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [fieldErrors, setFieldErrors] = useState<{ title?: string; description?: string }>({})
-  const [generating, setGenerating] = useState(false)
-  const [generated, setGenerated] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [imageUrl, setImageUrl] = useState('')
-  const abortControllerRef = useRef<AbortController | null>(null)
-  const titleInputRef = useRef<TextInput>(null)
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ title?: string; description?: string }>({});
+  const [generating, setGenerating] = useState(false);
+  const [generated, setGenerated] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [imageUrl, setImageUrl] = useState('');
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const titleInputRef = useRef<TextInput>(null);
+  const aiSteps = [
+    t('upload.aiStep1'),
+    t('upload.aiStep2'),
+    t('upload.aiStep3'),
+    t('upload.aiStep4'),
+  ];
 
   // Fetch item to get image URL for AI
   useEffect(() => {
-    if (!params.itemId) return
+    if (!params.itemId) return;
     client
       .get(`/api/items/${params.itemId}`)
       .then((res) => {
-        const item = res.data?.data as ItemPayload
-        const url = getPrimaryItemImage(item) || item?.images?.[0] || ''
-        setImageUrl(url)
+        const item = res.data?.data as ItemPayload;
+        const url = getPrimaryItemImage(item) || item?.images?.[0] || '';
+        setImageUrl(url);
       })
-      .catch(() => {})
-  }, [params.itemId])
+      .catch(() => {});
+  }, [params.itemId]);
 
   const handleCancelGeneration = useCallback(() => {
-    abortControllerRef.current?.abort()
-    setGenerating(false)
-    requestAnimationFrame(() => titleInputRef.current?.focus())
-  }, [])
+    abortControllerRef.current?.abort();
+    setGenerating(false);
+    requestAnimationFrame(() => titleInputRef.current?.focus());
+  }, []);
 
   const generateAiDescription = useCallback(async () => {
-    const controller = new AbortController()
-    abortControllerRef.current = controller
-    setGenerating(true)
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    setGenerating(true);
     try {
       const response = await client.post(
         '/api/ai/generate-description',
@@ -203,36 +217,36 @@ export default function DescriptionScreen() {
           size: params.size,
           condition: params.condition,
           image_url: imageUrl,
-          language: 'sr',
+          language: locale,
         },
         { timeout: AI_TIMEOUT_SECONDS * 1000, signal: controller.signal }
-      )
+      );
 
-      const payload = response.data?.data
-      if (payload?.description) setDescription(payload.description)
-      setGenerated(true)
+      const payload = response.data?.data;
+      if (payload?.description) setDescription(payload.description);
+      setGenerated(true);
     } catch (error: any) {
-      if (controller.signal.aborted) return
-      Alert.alert('AI nije dostupan', 'Opis trenutno ne moze da se generise. Popuni rucno.')
+      if (controller.signal.aborted) return;
+      Alert.alert(t('upload.aiUnavailableTitle'), t('upload.aiUnavailableDescription'));
     } finally {
-      setGenerating(false)
+      setGenerating(false);
     }
-  }, [params.category, params.brand, params.size, params.condition, imageUrl])
+  }, [imageUrl, locale, params.brand, params.category, params.condition, params.size, t]);
 
   const publish = useCallback(
     async (status: 'available' | 'draft') => {
       const nextErrors = {
-        title: title.trim() ? undefined : 'Naslov je obavezan.',
-        description: description.trim() ? undefined : 'Opis je obavezan.',
-      }
+        title: title.trim() ? undefined : t('upload.titleRequired'),
+        description: description.trim() ? undefined : t('upload.descriptionRequired'),
+      };
 
       if (nextErrors.title || nextErrors.description) {
-        setFieldErrors(nextErrors)
-        return
+        setFieldErrors(nextErrors);
+        return;
       }
 
-      setFieldErrors({})
-      setSaving(true)
+      setFieldErrors({});
+      setSaving(true);
       try {
         await client.put(`/api/items/${params.itemId}`, {
           title: title.trim(),
@@ -250,48 +264,52 @@ export default function DescriptionScreen() {
             params.listingType === 'trade' || params.listingType === 'both'
               ? params.tradeFor?.trim() || undefined
               : undefined,
-        })
+        });
 
-        await client.put(`/api/items/${params.itemId}/status`, { status })
-        router.replace('/(tabs)/closet')
+        await client.put(`/api/items/${params.itemId}/status`, { status });
+        router.replace('/(tabs)/closet');
       } catch (error: any) {
         Alert.alert(
-          'Greska',
-          error?.response?.data?.error || error?.message || 'Ne mogu da sacuvam.'
-        )
+          t('common.error'),
+          error?.response?.data?.error || error?.message || t('upload.saveError')
+        );
       } finally {
-        setSaving(false)
+        setSaving(false);
       }
     },
-    [title, description, params, router]
-  )
+    [description, params, router, t, title]
+  );
 
   const confirmPublish = useCallback(() => {
     const nextErrors = {
-      title: title.trim() ? undefined : 'Naslov je obavezan.',
-      description: description.trim() ? undefined : 'Opis je obavezan.',
-    }
+      title: title.trim() ? undefined : t('upload.titleRequired'),
+      description: description.trim() ? undefined : t('upload.descriptionRequired'),
+    };
 
     if (nextErrors.title || nextErrors.description) {
-      setFieldErrors(nextErrors)
-      return
+      setFieldErrors(nextErrors);
+      return;
     }
 
-    Alert.alert(
-      'Objavi komad?',
-      'Komad ce biti vidljiv u feedu i drugim clanovima Velvea.',
-      [
-        { text: 'Objavi', onPress: () => publish('available') },
-        { text: 'Odustani', style: 'cancel' },
-      ]
-    )
-  }, [description, publish, title])
+    Alert.alert(t('upload.publishConfirmTitle'), t('upload.publishConfirmDescription'), [
+      { text: t('upload.publish'), onPress: () => publish('available') },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  }, [description, publish, t, title]);
 
   return (
     <KeyboardAwareScreen className="bg-base-canvas">
       <BrandBackground />
 
-      {generating ? <AiLoadingOverlay onCancel={handleCancelGeneration} /> : null}
+      {generating ? (
+        <AiLoadingOverlay
+          onCancel={handleCancelGeneration}
+          steps={aiSteps}
+          cancelLabel={t('upload.aiCancel')}
+          cancelA11yLabel={t('upload.aiCancelA11y')}
+          timeoutLabel={t('upload.aiTimeout')}
+        />
+      ) : null}
 
       <ScrollView
         className="flex-1"
@@ -317,13 +335,13 @@ export default function DescriptionScreen() {
 
         <View className="px-5 pt-8">
           <Text className="font-sans text-xs uppercase tracking-[1.4px] text-ink-dark/45">
-            Poslednji korak
+            {t('upload.descriptionEyebrow')}
           </Text>
           <Text className="mt-1 font-display text-4xl text-ink-dark">
-            Opisi svoj komad
+            {t('upload.descriptionTitle')}
           </Text>
           <Text className="mt-2 font-sans text-sm leading-6 text-ink-dark/55">
-            Naslov smislis ti, a AI moze da predlozi samo opis koji zatim slobodno doradis.
+            {t('upload.descriptionIntro')}
           </Text>
 
           {/* AI Generate Button */}
@@ -346,10 +364,10 @@ export default function DescriptionScreen() {
                 </View>
                 <View className="flex-1">
                   <Text className="font-sans text-base font-semibold text-ink-dark">
-                    Generisi AI opis
+                    {t('upload.aiButtonTitle')}
                   </Text>
                   <Text className="mt-0.5 font-sans text-xs text-ink-dark/50">
-                    AI analizira sliku i predlaze opis na prirodnom srpskom
+                    {t('upload.aiButtonDescription')}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.mutedText} />
@@ -359,7 +377,7 @@ export default function DescriptionScreen() {
             <View className="mt-6 flex-row items-center rounded-[20px] bg-brand-highlight/20 px-4 py-3">
               <Ionicons name="checkmark-circle" size={20} color={colors.accentDeep} />
               <Text className="ml-2 flex-1 font-sans text-sm text-ink-dark/70">
-                AI opis je generisan. Naslov ostaje tvoj, a tekst mozes odmah da izmenis ispod.
+                {t('upload.aiGeneratedNotice')}
               </Text>
               <TouchableOpacity onPress={generateAiDescription}>
                 <Ionicons name="refresh" size={18} color={colors.accentDeep} />
@@ -371,45 +389,47 @@ export default function DescriptionScreen() {
           <View className="my-6 flex-row items-center gap-3">
             <View className="h-px flex-1 bg-ink-dark/8" />
             <Text className="font-sans text-xs text-ink-dark/30">
-              {generated ? 'Izmeni ili ostavi' : 'Ili popuni rucno'}
+              {generated ? t('upload.editDivider') : t('upload.manualDivider')}
             </Text>
             <View className="h-px flex-1 bg-ink-dark/8" />
           </View>
 
           {/* Title */}
           <View>
-            <Text className="mb-2 font-sans text-sm font-semibold text-ink-dark">Naslov</Text>
+            <Text className="mb-2 font-sans text-sm font-semibold text-ink-dark">
+              {t('upload.titleLabel')}
+            </Text>
             <VelveTextInput
               ref={titleInputRef}
               value={title}
               onChangeText={(value) => {
-                setTitle(value)
-                if (fieldErrors.title) setFieldErrors((prev) => ({ ...prev, title: undefined }))
+                setTitle(value);
+                if (fieldErrors.title) setFieldErrors((prev) => ({ ...prev, title: undefined }));
               }}
-              placeholder="Ti smisli naslov svog komada"
+              placeholder={t('upload.titlePlaceholder')}
               className={`rounded-[20px] border bg-surface-panel px-5 py-4 font-sans text-sm text-ink-dark ${
                 fieldErrors.title ? 'border-signal-danger/35' : 'border-ink-dark/8'
               }`}
             />
             {fieldErrors.title ? (
-              <Text className="mt-2 font-sans text-xs text-signal-danger">
-                {fieldErrors.title}
-              </Text>
+              <Text className="mt-2 font-sans text-xs text-signal-danger">{fieldErrors.title}</Text>
             ) : null}
           </View>
 
           {/* Description */}
           <View className="mt-4">
-            <Text className="mb-2 font-sans text-sm font-semibold text-ink-dark">Opis</Text>
+            <Text className="mb-2 font-sans text-sm font-semibold text-ink-dark">
+              {t('upload.descriptionLabel')}
+            </Text>
             <VelveTextInput
               value={description}
               onChangeText={(value) => {
-                setDescription(value)
+                setDescription(value);
                 if (fieldErrors.description) {
-                  setFieldErrors((prev) => ({ ...prev, description: undefined }))
+                  setFieldErrors((prev) => ({ ...prev, description: undefined }));
                 }
               }}
-              placeholder="Opisi komad prirodno: boja, kroj, detalji, stanje..."
+              placeholder={t('upload.descriptionPlaceholder')}
               multiline
               textAlignVertical="top"
               className={`min-h-[140px] rounded-[20px] border bg-surface-panel px-5 py-4 font-sans text-sm leading-6 text-ink-dark ${
@@ -428,7 +448,17 @@ export default function DescriptionScreen() {
             {params.category ? (
               <View className="rounded-full bg-brand-accent-light/20 px-3 py-1.5">
                 <Text className="font-sans text-xs font-semibold text-brand-accent-deep">
-                  {params.category}
+                  {params.category === 'Majice'
+                    ? t('search.categoryTops')
+                    : params.category === 'Haljine'
+                      ? t('search.categoryDresses')
+                      : params.category === 'Pantalone'
+                        ? t('search.categoryPants')
+                        : params.category === 'Jakne'
+                          ? t('search.categoryOuterwear')
+                          : params.category === 'Obuca'
+                            ? t('search.categoryShoes')
+                            : t('search.categoryAccessories')}
                 </Text>
               </View>
             ) : null}
@@ -446,10 +476,10 @@ export default function DescriptionScreen() {
               <View className="rounded-full bg-surface-panel px-3 py-1.5">
                 <Text className="font-sans text-xs text-ink-dark/60">
                   {params.listingType === 'trade'
-                    ? 'Razmena'
+                    ? t('upload.typeTrade')
                     : params.listingType === 'sell'
-                      ? 'Prodaja'
-                      : 'Razmena + Prodaja'}
+                      ? t('upload.typeSell')
+                      : t('upload.typeBoth')}
                 </Text>
               </View>
             ) : null}
@@ -478,7 +508,7 @@ export default function DescriptionScreen() {
             <ActivityIndicator size="small" color={colors.baseCanvas} />
           ) : (
             <Text className="font-sans text-base font-semibold text-base-canvas">
-              Objavi
+              {t('upload.publish')}
             </Text>
           )}
         </TouchableOpacity>
@@ -489,10 +519,10 @@ export default function DescriptionScreen() {
           className="mt-2 items-center rounded-full px-4 py-3"
         >
           <Text className="font-sans text-sm font-semibold text-ink-dark/50">
-            Sacuvaj kao draft
+            {t('upload.saveDraft')}
           </Text>
         </TouchableOpacity>
       </View>
     </KeyboardAwareScreen>
-  )
+  );
 }

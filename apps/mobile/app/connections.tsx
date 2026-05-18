@@ -11,6 +11,7 @@ import { RemoteImage } from '@/components/RemoteImage'
 import { colors } from '@/design/tokens'
 import { useAuth } from '@/hooks/useAuth'
 import { getApiErrorMessage } from '@/lib/apiErrors'
+import { showVelveToast } from '@/lib/velveAlert'
 
 type ConnectionTab = 'followers' | 'following'
 
@@ -132,15 +133,30 @@ export default function ConnectionsScreen() {
     try {
       if (wasFollowing) {
         await client.delete(`/api/users/${connection._id}/follow`)
+        showVelveToast({
+          title: 'Otpraceno',
+          message: `${connection.displayName || 'Korisnik'} vise nije u tvom social closetu.`,
+          tone: 'success',
+        })
       } else {
         await client.post(`/api/users/${connection._id}/follow`)
+        showVelveToast({
+          title: 'Zapraceno',
+          message: `${connection.displayName || 'Korisnik'} je dodat u tvoj social closet.`,
+          tone: 'success',
+        })
       }
-    } catch {
+    } catch (error) {
       setUsers((prev) =>
         prev.map((entry) =>
           entry._id === connection._id ? { ...entry, isFollowing: wasFollowing } : entry
         )
       )
+      showVelveToast({
+        title: 'Pracenje nije azurirano',
+        message: getApiErrorMessage(error, 'Pokusaj ponovo za nekoliko trenutaka.'),
+        tone: 'error',
+      })
     } finally {
       setBusyId(null)
     }
@@ -160,8 +176,14 @@ export default function ConnectionsScreen() {
               setBusyId(connection._id)
               setUsers((prev) => prev.filter((entry) => entry._id !== connection._id))
               await client.delete(`/api/users/${connection._id}/follower`)
-            } catch {
+              showVelveToast({
+                title: 'Pratilac je uklonjen',
+                message: `${connection.displayName || 'Korisnik'} vise ne prati tvoj profil.`,
+                tone: 'success',
+              })
+            } catch (error) {
               await loadConnections()
+              Alert.alert('Uklanjanje nije uspelo', getApiErrorMessage(error, 'Pokusaj ponovo za nekoliko trenutaka.'))
             } finally {
               setBusyId(null)
             }
