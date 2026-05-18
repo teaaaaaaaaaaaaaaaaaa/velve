@@ -16,7 +16,7 @@ import {
 } from '@/config/firebase';
 import { isExpectedAuthError } from '@/lib/authFeedback';
 
-type AuthContextType = {
+export type AuthContextType = {
   currentUser: AuthUser | null;
   dbUser: DbUser | null;
   loading: boolean;
@@ -30,7 +30,7 @@ type AuthContextType = {
   logout: () => Promise<void>;
 };
 
-type DbUser = {
+export type DbUser = {
   _id: string;
   firebaseUid: string;
   email: string;

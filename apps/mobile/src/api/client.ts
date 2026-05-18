@@ -1,6 +1,8 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios';
 
+import { designPreviewAdapter } from '@/api/designPreviewAdapter';
 import { API_URL } from '@/config/api';
+import { isDesignPreviewMode } from '@/config/designPreview';
 import { auth, getAuthToken } from '@/config/firebase';
 
 function debugLog(...args: unknown[]) {
@@ -18,6 +20,7 @@ type RetriableRequestConfig = InternalAxiosRequestConfig & {
 const client = axios.create({
   baseURL: API_URL,
   timeout: 30000,
+  adapter: isDesignPreviewMode ? designPreviewAdapter : undefined,
   headers: {
     'Content-Type': 'application/json',
   },

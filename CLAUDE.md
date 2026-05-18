@@ -28,6 +28,9 @@ cd apps/mobile && cp .env.example .env && npm install && npx expo start
 # Web (Vite)
 cd apps/web && npm install && npm run dev
 
+# Mobile web design preview (za Figma/Claude capture)
+npm run dev:mobile:web
+
 # AI Server (Python)
 cd apps/ai-server && python -m venv .venv && .venv/Scripts/activate && pip install -r requirements.txt && python main.py
 ```
@@ -37,6 +40,13 @@ cd apps/ai-server && python -m venv .venv && .venv/Scripts/activate && pip insta
 - Fontovi: Ballet (logo), Alte Haas Grotesk (headings), Inter (UI)
 - Stilizacija: NativeWind v4 klase u mobile (nikad hardcoded boje/fontovi)
 - Tailwind config: apps/mobile/tailwind.config.js
+
+## Mobile design capture
+- iPhone Expo Go/dev build je source of truth za mobile dizajn.
+- Za mobile screen capture koristiti `npm run dev:mobile:web`, koji otvara Expo mobile app sa `EXPO_PUBLIC_DESIGN_PREVIEW=1`.
+- Ne koristiti `npm run dev:web` za mobile screenove; `apps/web` je samo public landing page.
+- Preview gallery je na `/design-preview` i koristi mock podatke da ekrani ne zavise od auth/backend-a.
+- Svaki capture treba zabeleziti: route, platform, viewport/device, i da li se slaze sa iPhone gold screenshotom.
 
 ## Koji agent koristiti
 

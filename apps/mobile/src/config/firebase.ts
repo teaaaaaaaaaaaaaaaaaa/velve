@@ -6,7 +6,9 @@
  */
 
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
+import { isDesignPreviewMode } from '@/config/designPreview';
 import { getStorage } from '@/lib/storage';
 
 type AuthProviderInfo = {
@@ -26,6 +28,7 @@ type AuthCredential = unknown;
 type AuthResult = { user: AuthUser };
 
 const isExpoGo = Constants.appOwnership === 'expo';
+const shouldUseFirebaseWebSdk = isExpoGo || Platform.OS === 'web' || isDesignPreviewMode;
 
 const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID?.trim() ?? '';
 const firebaseWebConfig = {
@@ -79,7 +82,7 @@ let getAuthTokenInternal: (user: AuthUser, forceRefresh?: boolean) => Promise<st
 let createGoogleCredentialInternal: (idToken: string) => AuthCredential;
 const inFlightTokenRequests = new Map<string, Promise<string>>();
 
-if (isExpoGo) {
+if (shouldUseFirebaseWebSdk) {
   const firebaseAppModule = require('firebase/app') as typeof import('firebase/app');
   const firebaseAuthModule = require('firebase/auth') as typeof import('firebase/auth');
 
@@ -90,6 +93,7 @@ if (isExpoGo) {
 
   try {
     const reactNativePersistence =
+      (Platform.OS === 'web' ? firebaseAuthModule.browserLocalPersistence : undefined) ??
       (firebaseAuthModule as any).getReactNativePersistence?.(getStorage()) ??
       firebaseAuthModule.inMemoryPersistence;
 
@@ -111,7 +115,7 @@ if (isExpoGo) {
     firebaseAuthModule.GoogleAuthProvider.credential(idToken);
 
   console.log(
-    '[Firebase] Initialized Firebase web auth fallback for Expo Go with persistent storage'
+    '[Firebase] Initialized Firebase web auth fallback with persistent storage'
   );
   if (firebaseWebConfigError) {
     console.warn(`[Firebase] WARNING: ${firebaseWebConfigError}`);

@@ -6,12 +6,63 @@ import { Text, TouchableOpacity, View } from 'react-native';
 
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { VelveFeedbackProvider } from '@/components/VelveFeedbackProvider';
-import { useAuth, useAuthProvider, AuthContext } from '@/hooks/useAuth';
+import { isDesignPreviewMode } from '@/config/designPreview';
+import { previewUser } from '@/design/previewData';
+import {
+  useAuth,
+  useAuthProvider,
+  AuthContext,
+  type AuthContextType,
+  type DbUser,
+} from '@/hooks/useAuth';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { I18nProvider, useI18n } from '@/i18n';
 import { getProfileResolutionCopy } from '@/lib/authFeedback';
 
 export { ErrorBoundary };
+
+const previewAuth: AuthContextType = {
+  currentUser: {
+    uid: previewUser.firebaseUid,
+    email: previewUser.email,
+    emailVerified: true,
+    isAnonymous: false,
+    providerData: [{ providerId: 'design-preview' }],
+  },
+  dbUser: previewUser as DbUser,
+  loading: false,
+  profileError: null,
+  googleSignInAvailable: false,
+  googleSignInUnavailableReason: 'Design preview uses a mock authenticated session.',
+  refreshDbUser: async () => undefined,
+  signInWithGoogle: async () => undefined,
+  signInWithEmail: async () => ({ user: previewAuth.currentUser }),
+  registerWithEmail: async () => ({ user: previewAuth.currentUser }),
+  logout: async () => undefined,
+};
+
+function AppStack() {
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="design-preview" />
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="onboarding" />
+      <Stack.Screen name="items/[id]" />
+      <Stack.Screen name="users/[id]" />
+      <Stack.Screen name="search" />
+      <Stack.Screen name="settings" />
+      <Stack.Screen name="notifications" />
+      <Stack.Screen name="connections" />
+      <Stack.Screen name="blocked-users" />
+      <Stack.Screen name="rate-trade" />
+      <Stack.Screen name="upload-flow" />
+      <Stack.Screen name="vto" />
+      <Stack.Screen name="trade-archive" />
+    </Stack>
+  );
+}
 
 function AuthGate() {
   const { currentUser, loading, profileError, refreshDbUser, logout } = useAuth();
@@ -44,23 +95,25 @@ function AuthGate() {
       minSplashDone,
       segments,
     });
-    const inAuthGroup = segments[0] === '(auth)';
-    const inOnboarding = segments[0] === 'onboarding';
-    const inTabs = segments[0] === '(tabs)';
-    const inItems = segments[0] === 'items';
-    const inUsers = segments[0] === 'users';
-    const inSearch = segments[0] === 'search';
-    const inSettings = segments[0] === 'settings';
-    const inNotifications = segments[0] === 'notifications';
-    const inConnections = segments[0] === 'connections';
-    const inBlockedUsers = segments[0] === 'blocked-users';
-    const inRateTrade = segments[0] === 'rate-trade';
-    const inUploadFlow = segments[0] === 'upload-flow';
-    const inVto = segments[0] === 'vto';
-    const inTradeArchive = segments[0] === 'trade-archive';
+    const rootSegment = String(segments[0] ?? '');
+    const inAuthGroup = rootSegment === '(auth)';
+    const inDesignPreview = rootSegment === 'design-preview';
+    const inOnboarding = rootSegment === 'onboarding';
+    const inTabs = rootSegment === '(tabs)';
+    const inItems = rootSegment === 'items';
+    const inUsers = rootSegment === 'users';
+    const inSearch = rootSegment === 'search';
+    const inSettings = rootSegment === 'settings';
+    const inNotifications = rootSegment === 'notifications';
+    const inConnections = rootSegment === 'connections';
+    const inBlockedUsers = rootSegment === 'blocked-users';
+    const inRateTrade = rootSegment === 'rate-trade';
+    const inUploadFlow = rootSegment === 'upload-flow';
+    const inVto = rootSegment === 'vto';
+    const inTradeArchive = rootSegment === 'trade-archive';
     const isIndex = false; // TypeScript knows segments.length is never 0
 
-    if (!currentUser && !inAuthGroup) {
+    if (!currentUser && !inAuthGroup && !inDesignPreview) {
       console.log('[AuthGate] Redirecting signed-out user to /(auth)/login');
       router.replace('/(auth)/login');
     } else if (currentUser && inAuthGroup) {
@@ -81,6 +134,7 @@ function AuthGate() {
       !inUploadFlow &&
       !inVto &&
       !inTradeArchive &&
+      !inDesignPreview &&
       !isIndex
     ) {
       console.log(
@@ -129,28 +183,10 @@ function AuthGate() {
     );
   }
 
-  return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="onboarding" />
-      <Stack.Screen name="items/[id]" />
-      <Stack.Screen name="users/[id]" />
-      <Stack.Screen name="search" />
-      <Stack.Screen name="settings" />
-      <Stack.Screen name="notifications" />
-      <Stack.Screen name="connections" />
-      <Stack.Screen name="blocked-users" />
-      <Stack.Screen name="rate-trade" />
-      <Stack.Screen name="upload-flow" />
-      <Stack.Screen name="vto" />
-      <Stack.Screen name="trade-archive" />
-    </Stack>
-  );
+  return <AppStack />;
 }
 
-function RootLayout() {
+function AppRootLayout() {
   const auth = useAuthProvider();
 
   return (
@@ -162,6 +198,45 @@ function RootLayout() {
       </AuthContext.Provider>
     </I18nProvider>
   );
+}
+
+function PreviewGate() {
+  const router = useRouter();
+  const segments = useSegments();
+  const [fontsLoaded] = useFonts({
+    Ballet: require('../assets/fonts/Ballet-Regular.ttf'),
+    'AlteHaasGrotesk-Bold': require('../assets/fonts/AlteHaasGrotesk-Bold.ttf'),
+    Inter: require('../assets/fonts/Inter-Variable.ttf'),
+  });
+
+  useEffect(() => {
+    if (!fontsLoaded) return;
+    if (!segments[0]) {
+      router.replace('/design-preview' as never);
+    }
+  }, [fontsLoaded, router, segments]);
+
+  if (!fontsLoaded) {
+    return <BrandedLoader label="Loading Velve design preview" />;
+  }
+
+  return <AppStack />;
+}
+
+function PreviewRootLayout() {
+  return (
+    <I18nProvider>
+      <AuthContext.Provider value={previewAuth}>
+        <VelveFeedbackProvider>
+          <PreviewGate />
+        </VelveFeedbackProvider>
+      </AuthContext.Provider>
+    </I18nProvider>
+  );
+}
+
+function RootLayout() {
+  return isDesignPreviewMode ? <PreviewRootLayout /> : <AppRootLayout />;
 }
 
 export default RootLayout;

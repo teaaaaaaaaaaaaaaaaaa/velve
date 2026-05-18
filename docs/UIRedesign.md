@@ -9,35 +9,28 @@
 
 ## 3. LOŠA LOGIKA / TOKOVI
 
-### 3.1 Tab: Trades placeholder ⚠️ PARTIAL
-Tab je sakriven (`href: null`) ali fajl `trades.tsx` još uvek postoji sa "Trade Desk je privremeno isključen" porukom.
-
-**Fix:** Ukloniti trades.tsx ili potpuno preusmeriti na chat Trades tab kad/ako se tab vrati.
-
----
-
-### 3.2 Propozal bez sopstvenih artikala — dead end ❌ NOT DONE xxx
+### 3.1 Propozal bez sopstvenih artikala — dead end ❌ NOT DONE xxx
 Korisnik otvori trade modal, tip je odabran, ali lista artikala je prazna. Nema CTA koji vodi na upload.
 
 **Fix:** "Dodaj artikal" dugme u praznom stanju trade modala → `router.push('/upload-flow')` sa `dismissAll`.
 
 ---
 
-### 3.3 VTO bez body scana — redirect loop rizik ⚠️ PARTIAL
+### 3.2 VTO bez body scana — redirect loop rizik ⚠️ PARTIAL
 Hub radi redirect na `/vto/body-scan` ako body scan ne postoji. Ako korisnik preskoči, može opet biti redirectovan sa Huba.
 
 **Fix:** Lokalni session flag da se ne redirect-uje ponovo ako je korisnik već preskočio. Na Hubu prikazati info karticu sa opcijom, ne force-redirect.
 
 ---
 
-### 3.4 Item detalj — "Označi kao prodato" bez follow-up ❌ NOT DONE
+### 3.3 Item detalj — "Označi kao prodato" bez follow-up ❌ NOT DONE
 Korisnik označi artikal kao prodat, samo potvrda postoji. Nema pitanje "Da li je ovo bilo putem Velve razmene?"
 
 **Fix:** Follow-up Alert sa "Da li je ovo bilo putem Velve razmene?" — ako jeste, ažuriraj trade archive.
 
 ---
 
-### 3.5 Onboarding opcioni koraci — vizuelno nejasno ⚠️ PARTIAL
+### 3.4 Onboarding opcioni koraci — vizuelno nejasno ⚠️ PARTIAL
 `photo.tsx` i `scan.tsx` imaju Skip. Ali nema vizuelnog jezika koji komunicira koji koraci su opcioni a koji obavezni.
 
 **Fix:** Opcioni koraci → "Preskoči" link u corner-u. Obavezni → bez skip opcije. Dodati suptilni label "Opcionalno".

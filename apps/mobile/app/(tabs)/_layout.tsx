@@ -21,8 +21,8 @@ export default function TabsLayout() {
   const socketRef = useRef<Socket | null>(null);
   const pathnameRef = useRef(pathname);
   const lastNotificationBadgeFetchRef = useRef(0);
-  // Hide only inside a specific conversation (e.g. /chat/<id>). The chat list
-  // (/chat), closet, and trades keep the floating nav visible.
+  // Hide only inside a specific conversation (e.g. /chat/<id>). The chat list,
+  // closet, and wishlist keep the floating nav visible.
   const hideFloatingBar = /\/chat\/[^/]+$/.test(pathname);
 
   useEffect(() => {
@@ -222,7 +222,6 @@ export default function TabsLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="trades" options={{ href: null }} />
       <Tabs.Screen name="closet" options={{ href: null }} />
       <Tabs.Screen name="wishlist" options={{ href: null }} />
       <Tabs.Screen name="chat/[id]" options={{ href: null }} />

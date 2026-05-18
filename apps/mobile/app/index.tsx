@@ -5,6 +5,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { BrandBackground } from '@/components/BrandBackground';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { GlassSurface } from '@/components/GlassSurface';
+import { isDesignPreviewMode } from '@/config/designPreview';
 import { useAuth } from '@/hooks/useAuth';
 import { useI18n } from '@/i18n';
 import { getProfileResolutionCopy } from '@/lib/authFeedback';
@@ -48,6 +49,11 @@ export default function Index() {
   } as const;
 
   useEffect(() => {
+    if (isDesignPreviewMode) {
+      router.replace('/design-preview' as never);
+      return;
+    }
+
     if (authLoading) return;
 
     const isOnValidRoute = segments.length > 0;
