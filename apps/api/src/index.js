@@ -73,6 +73,7 @@ app.use(
       'https://velve.app',
       'https://velveapp.com',
       'https://www.velveapp.com',
+      'https://admin.velveapp.com',
     ],
     credentials: true,
   })

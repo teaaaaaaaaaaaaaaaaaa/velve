@@ -52,6 +52,9 @@ type Props = {
   onLike: (itemId: string, isLiked: boolean) => void
   onWishlist: (itemId: string, isWishlisted: boolean) => void
   onMore?: (item: ImmersiveFeedItem) => void
+  onItemPress?: (item: ImmersiveFeedItem) => void
+  onOwnerPress?: (item: ImmersiveFeedItem) => void
+  onTradePress?: (item: ImmersiveFeedItem) => void
 }
 
 export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
@@ -63,6 +66,9 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
   onLike,
   onWishlist,
   onMore,
+  onItemPress,
+  onOwnerPress,
+  onTradePress,
 }: Props) {
   const router = useRouter()
   const imageUri = getPrimaryItemImage(item)
@@ -87,7 +93,7 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
     <View style={{ height }} className="w-full bg-surface-panel">
       <Pressable
         style={StyleSheet.absoluteFillObject}
-        onPress={() => router.push(`/items/${item._id}`)}
+        onPress={() => (onItemPress ? onItemPress(item) : router.push(`/items/${item._id}`))}
       >
         {imageUri ? (
           <RemoteImage
@@ -121,11 +127,15 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
         topInset={topInset}
         bottomOffset={contentBottomOffset}
         onOwnerPress={() =>
-          router.push({ pathname: '/users/[id]', params: { id: item.userId._id } })
+          onOwnerPress
+            ? onOwnerPress(item)
+            : router.push({ pathname: '/users/[id]', params: { id: item.userId._id } })
         }
         actionIcon="swap-horizontal"
         actionAccessibilityLabel={labels.trade}
-        onActionPress={() => router.push(`/items/${item._id}?openTrade=true`)}
+        onActionPress={() =>
+          onTradePress ? onTradePress(item) : router.push(`/items/${item._id}?openTrade=true`)
+        }
         showOwnerArrow
       />
 
@@ -144,7 +154,9 @@ export const ImmersiveFeedCard = memo(function ImmersiveFeedCard({
         <GlassCountActionButton
           icon="swap-horizontal"
           count={item.tradeRequestsCount ?? 0}
-          onPress={() => router.push(`/items/${item._id}?openTrade=true`)}
+          onPress={() =>
+            onTradePress ? onTradePress(item) : router.push(`/items/${item._id}?openTrade=true`)
+          }
           accessibilityLabel={labels.trade}
           tone="dark"
         />

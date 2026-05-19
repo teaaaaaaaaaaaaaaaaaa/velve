@@ -60,8 +60,7 @@ export default function Index() {
     if (isOnValidRoute) return;
 
     if (!currentUser) {
-      // Not logged in - go to login
-      router.replace('/(auth)/login');
+      router.replace('/(tabs)/feed');
       return;
     }
 

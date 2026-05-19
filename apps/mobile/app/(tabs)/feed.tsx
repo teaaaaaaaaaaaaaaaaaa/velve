@@ -23,9 +23,11 @@ import { BrandWordmark } from '@/components/BrandWordmark'
 import { ImmersiveFeedCard, ImmersiveFeedItem } from '@/components/ImmersiveFeedCard'
 import { VelveTextInput, type VelveTextInputRef } from '@/components/VelveTextInput'
 import { colors } from '@/design/tokens'
+import { useAuth } from '@/hooks/useAuth'
 import { useI18n } from '@/i18n'
 import { prefetchImageUri } from '@/lib/expoImage'
 import { getApiErrorMessage } from '@/lib/apiErrors'
+import { trackGuestEvent, type GuestEventType } from '@/lib/guestAnalytics'
 import { getPrimaryItemImage } from '@/lib/itemImages'
 import { normalizeImageUri } from '@/lib/images'
 import { showVelveToast } from '@/lib/velveAlert'
@@ -48,6 +50,8 @@ export default function FeedScreen() {
   const insets = useSafeAreaInsets()
   const { width: windowWidth, height: windowHeight } = useWindowDimensions()
   const { locale, t } = useI18n()
+  const { currentUser, dbUser } = useAuth()
+  const isGuest = !currentUser && !dbUser
 
   const [items, setItems] = useState<ImmersiveFeedItem[]>([])
   const [feedMode, setFeedMode] = useState<FeedMode>('for_you')
@@ -74,11 +78,33 @@ export default function FeedScreen() {
   const [searchHasMore, setSearchHasMore] = useState(false)
   const searchInputRef = useRef<VelveTextInputRef>(null)
 
+  const requireSignIn = useCallback(
+    (
+      eventType: GuestEventType,
+      options: { item?: ImmersiveFeedItem; surface?: string; query?: string } = {}
+    ) => {
+      void trackGuestEvent(eventType, {
+        itemId: options.item?._id,
+        route: '/(tabs)/feed',
+        metadata: {
+          surface: options.surface,
+          query: options.query,
+        },
+      })
+      router.push('/(auth)/login')
+    },
+    [router]
+  )
+
   const openSearch = useCallback(() => {
+    if (isGuest) {
+      requireSignIn('guest_search_attempt', { surface: 'feed_search_button' })
+      return
+    }
     setSearchActive(true)
     setSearchLoading(true)
     setTimeout(() => searchInputRef.current?.focus(), 120)
-  }, [])
+  }, [isGuest, requireSignIn])
 
   const finishCloseSearch = useCallback(() => {
     setSearchActive(false)
@@ -174,6 +200,21 @@ export default function FeedScreen() {
         if (pageNum === 0 && mode === 'replace') setIsLoading(true)
         else setIsLoadingMore(true)
 
+        if (isGuest) {
+          const response = await client.get('/api/feed/guest')
+          if (response.data.ok && isCurrentRequest()) {
+            const nextItems = dedupeItemsById(response.data.data as ImmersiveFeedItem[])
+            setItems(nextItems)
+            setHasMore(false)
+            setFeedError('')
+            void trackGuestEvent('guest_feed_view', {
+              route: '/(tabs)/feed',
+              metadata: { count: nextItems.length },
+            })
+          }
+          return
+        }
+
         const params: Record<string, string | number> = {
           limit: 10,
           page: mode === 'append' ? 0 : pageNum,
@@ -220,7 +261,7 @@ export default function FeedScreen() {
         }
       }
     },
-    [feedMode, t]
+    [feedMode, isGuest, t]
   )
 
   useEffect(() => {
@@ -243,9 +284,9 @@ export default function FeedScreen() {
   }, [fetchFeed])
 
   const handleLoadMore = useCallback(() => {
-    if (isLoadingMore || !hasMore || items.length === 0) return
+    if (isGuest || isLoadingMore || !hasMore || items.length === 0) return
     fetchFeed(0, 'append', items.map((item) => item._id))
-  }, [fetchFeed, hasMore, isLoadingMore, items])
+  }, [fetchFeed, hasMore, isGuest, isLoadingMore, items])
 
   const updateItem = useCallback((itemId: string, updater: (item: ImmersiveFeedItem) => ImmersiveFeedItem) => {
     setItems((prev) => prev.map((item) => (item._id === itemId ? updater(item) : item)))
@@ -253,6 +294,12 @@ export default function FeedScreen() {
 
   const handleLike = useCallback(
     async (itemId: string, isLiked: boolean) => {
+      if (isGuest) {
+        const item = itemsRef.current.find((entry) => entry._id === itemId)
+        requireSignIn('guest_like_attempt', { item, surface: 'feed_like_button' })
+        return
+      }
+
       const previousLiked = isLiked
       let previousCount = 0
 
@@ -290,11 +337,17 @@ export default function FeedScreen() {
         })
       }
     },
-    [t, updateItem]
+    [isGuest, requireSignIn, t, updateItem]
   )
 
   const handleWishlist = useCallback(
     async (itemId: string, isWishlisted: boolean) => {
+      if (isGuest) {
+        const item = itemsRef.current.find((entry) => entry._id === itemId)
+        requireSignIn('guest_wishlist_attempt', { item, surface: 'feed_save_button' })
+        return
+      }
+
       let previousCount = 0
 
       updateItem(itemId, (item) => {
@@ -325,7 +378,7 @@ export default function FeedScreen() {
         })
       }
     },
-    [t, updateItem]
+    [isGuest, requireSignIn, t, updateItem]
   )
 
   const handleHideItem = useCallback(async (item: ImmersiveFeedItem) => {
@@ -390,6 +443,7 @@ export default function FeedScreen() {
   }, [t])
 
   const prefetchedRef = useRef(new Set<string>())
+  const guestImpressionsRef = useRef(new Set<string>())
   const itemsRef = useRef(items)
   itemsRef.current = items
 
@@ -398,6 +452,15 @@ export default function FeedScreen() {
       if (viewableItems.length === 0 || viewableItems[0].index == null) return
       const currentIndex = viewableItems[0].index
       const currentItems = itemsRef.current
+      const visibleItem = currentItems[currentIndex]
+      if (visibleItem && isGuest && !guestImpressionsRef.current.has(visibleItem._id)) {
+        guestImpressionsRef.current.add(visibleItem._id)
+        void trackGuestEvent('guest_item_impression', {
+          itemId: visibleItem._id,
+          route: '/(tabs)/feed',
+          metadata: { index: currentIndex },
+        })
+      }
       for (let i = 1; i <= 2; i++) {
         const nextItem = currentItems[currentIndex + i]
         if (!nextItem) continue
@@ -422,10 +485,45 @@ export default function FeedScreen() {
         bottomInset={insets.bottom}
         onLike={handleLike}
         onWishlist={handleWishlist}
-        onMore={setActionItem}
+        onMore={
+          isGuest
+            ? (pressedItem) =>
+                requireSignIn('guest_nav_attempt', {
+                  item: pressedItem,
+                  surface: 'feed_more_button',
+                })
+            : setActionItem
+        }
+        onItemPress={
+          isGuest
+            ? (pressedItem) =>
+                requireSignIn('guest_item_open_attempt', {
+                  item: pressedItem,
+                  surface: 'feed_card',
+                })
+            : undefined
+        }
+        onOwnerPress={
+          isGuest
+            ? (pressedItem) =>
+                requireSignIn('guest_item_open_attempt', {
+                  item: pressedItem,
+                  surface: 'owner_chip',
+                })
+            : undefined
+        }
+        onTradePress={
+          isGuest
+            ? (pressedItem) =>
+                requireSignIn('guest_trade_attempt', {
+                  item: pressedItem,
+                  surface: 'feed_trade_button',
+                })
+            : undefined
+        }
       />
     ),
-    [handleLike, handleWishlist, insets.bottom, insets.top, locale, pageHeight]
+    [handleLike, handleWishlist, insets.bottom, insets.top, isGuest, locale, pageHeight, requireSignIn]
   )
 
   // Search-specific item updater + handlers
@@ -644,7 +742,20 @@ export default function FeedScreen() {
           })}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListFooterComponent={
-            isLoadingMore ? (
+            isGuest ? (
+              <GuestSignupCard
+                height={pageHeight}
+                topInset={insets.top}
+                bottomInset={insets.bottom}
+                onPrimary={() => {
+                  void trackGuestEvent('guest_signup_cta_click', {
+                    route: '/(tabs)/feed',
+                    metadata: { surface: 'feed_end_card' },
+                  })
+                  router.push('/(auth)/login')
+                }}
+              />
+            ) : isLoadingMore ? (
               <View className="py-8">
                 <View className="mx-auto rounded-full border border-ink-dark/8 bg-ink-dark/4 px-5 py-3">
                   <Text className="font-sans text-sm text-ink-dark/62">{t('common.loadingMore')}</Text>
@@ -695,7 +806,18 @@ export default function FeedScreen() {
               <View className="flex-1 flex-row items-center pr-3">
                 <BrandWordmark width={92} tone="dark" />
                 <View className="flex-1 items-center" style={{ marginRight: 32 }}>
-                  <FeedModeToggle feedMode={feedMode} onChangeMode={setFeedMode} />
+                  <FeedModeToggle
+                    feedMode={feedMode}
+                    onChangeMode={(mode) => {
+                      if (isGuest) {
+                        requireSignIn('guest_nav_attempt', {
+                          surface: `feed_mode_${mode}`,
+                        })
+                        return
+                      }
+                      setFeedMode(mode)
+                    }}
+                  />
                 </View>
               </View>
               <TouchableOpacity
@@ -771,6 +893,57 @@ const FEED_TABS = [
   { key: 'following' as const, label: 'Following' },
   { key: 'for_you' as const, label: 'For You' },
 ]
+
+function GuestSignupCard({
+  height,
+  topInset,
+  bottomInset,
+  onPrimary,
+}: {
+  height: number
+  topInset: number
+  bottomInset: number
+  onPrimary: () => void
+}) {
+  useEffect(() => {
+    void trackGuestEvent('guest_signup_wall_view', {
+      route: '/(tabs)/feed',
+      metadata: { surface: 'feed_end_card' },
+    })
+  }, [])
+
+  return (
+    <View
+      className="w-full justify-center bg-base-canvas px-6"
+      style={{ height, paddingTop: topInset + 28, paddingBottom: bottomInset + 110 }}
+    >
+      <View className="mx-auto w-full max-w-[420px]">
+        <View className="mb-5 h-14 w-14 items-center justify-center rounded-full bg-brand-highlight">
+          <Ionicons name="sparkles-outline" size={24} color={colors.inkDark} />
+        </View>
+        <Text className="font-display text-[38px] leading-[42px] text-ink-dark">
+          Ovo je samo jedan deo.
+        </Text>
+        <Text className="mt-4 font-sans text-[15px] leading-7 text-ink-dark/68">
+          Napravi profil da Velve pocne da prikazuje komade konkretnije po tvom
+          ukusu, sacuva favorite i pomogne ti da pronadjes stvar koju stvarno zelis.
+        </Text>
+        <TouchableOpacity
+          className="mt-7 items-center rounded-full bg-brand-accent-deep px-5 py-4"
+          activeOpacity={0.88}
+          onPress={onPrimary}
+        >
+          <Text className="font-sans text-base font-semibold text-base-canvas">
+            Nastavi sa Google nalogom
+          </Text>
+        </TouchableOpacity>
+        <Text className="mt-4 text-center font-sans text-xs text-ink-dark/45">
+          Feed ostaje ovde kad se vratis nazad.
+        </Text>
+      </View>
+    </View>
+  )
+}
 
 function FeedModeToggle({
   feedMode,

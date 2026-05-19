@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -156,6 +157,21 @@ export default function LoginScreen() {
   return (
     <KeyboardAwareScreen className="bg-base-canvas" offset={10}>
       <BrandBackground />
+
+      <TouchableOpacity
+        className="absolute left-5 z-10 h-11 w-11 items-center justify-center rounded-full bg-surface-panel"
+        style={{ top: insets.top + 10 }}
+        activeOpacity={0.86}
+        onPress={() => {
+          if (router.canGoBack()) {
+            router.back();
+            return;
+          }
+          router.replace('/(tabs)/feed');
+        }}
+      >
+        <Ionicons name="arrow-back" size={22} color={colors.inkDark} />
+      </TouchableOpacity>
 
       <ScrollView
         ref={scrollRef}

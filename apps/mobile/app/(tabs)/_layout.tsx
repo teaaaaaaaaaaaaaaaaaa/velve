@@ -10,6 +10,7 @@ import { auth as firebaseAuth, getAuthToken } from '@/config/firebase';
 import { colors, fonts, shadows } from '@/design/tokens';
 import { useAuth } from '@/hooks/useAuth';
 import { useI18n } from '@/i18n';
+import { trackGuestEvent } from '@/lib/guestAnalytics';
 
 export default function TabsLayout() {
   const { dbUser } = useAuth();
@@ -24,6 +25,18 @@ export default function TabsLayout() {
   // Hide only inside a specific conversation (e.g. /chat/<id>). The chat list,
   // closet, and wishlist keep the floating nav visible.
   const hideFloatingBar = /\/chat\/[^/]+$/.test(pathname);
+  const isGuest = !dbUser?._id;
+
+  const requireSignedIn = useCallback(
+    (surface: string) => {
+      void trackGuestEvent('guest_nav_attempt', {
+        route: pathname,
+        metadata: { surface },
+      });
+      router.push('/(auth)/login');
+    },
+    [pathname, router]
+  );
 
   useEffect(() => {
     pathnameRef.current = pathname;
@@ -184,6 +197,11 @@ export default function TabsLayout() {
         }}
         listeners={{
           tabPress: (event) => {
+            if (isGuest) {
+              event.preventDefault();
+              requireSignedIn('upload_tab');
+              return;
+            }
             // Fabric crashes (addViewAt) when redirecting from a tab screen
             // via router.replace inside useEffect. Intercept the tab tap and
             // navigate directly so the upload tab itself never mounts.
@@ -206,6 +224,13 @@ export default function TabsLayout() {
             <Ionicons name="chatbubble-outline" size={size} color={color} />
           ),
         }}
+        listeners={{
+          tabPress: (event) => {
+            if (!isGuest) return;
+            event.preventDefault();
+            requireSignedIn('chat_tab');
+          },
+        }}
       />
       <Tabs.Screen
         name="profile"
@@ -220,6 +245,13 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),
+        }}
+        listeners={{
+          tabPress: (event) => {
+            if (!isGuest) return;
+            event.preventDefault();
+            requireSignedIn('profile_tab');
+          },
         }}
       />
       <Tabs.Screen name="closet" options={{ href: null }} />

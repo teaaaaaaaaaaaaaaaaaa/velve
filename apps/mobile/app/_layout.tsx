@@ -111,9 +111,12 @@ function AuthGate() {
     const inUploadFlow = rootSegment === 'upload-flow';
     const inVto = rootSegment === 'vto';
     const inTradeArchive = rootSegment === 'trade-archive';
-    const isIndex = false; // TypeScript knows segments.length is never 0
+    const isIndex = rootSegment === '';
+    const isGuestPreviewRoute = inTabs && String(segments[1] ?? '') === 'feed';
 
-    if (!currentUser && !inAuthGroup && !inDesignPreview) {
+    if (!currentUser && isIndex) {
+      router.replace('/(tabs)/feed');
+    } else if (!currentUser && !inAuthGroup && !inDesignPreview && !isGuestPreviewRoute) {
       console.log('[AuthGate] Redirecting signed-out user to /(auth)/login');
       router.replace('/(auth)/login');
     } else if (currentUser && inAuthGroup) {

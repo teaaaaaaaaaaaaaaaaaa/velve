@@ -4,7 +4,11 @@ const adminAuditLogSchema = new mongoose.Schema(
   {
     actorUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     action: { type: String, required: true, maxlength: 120 },
-    targetType: { type: String, enum: ['item', 'user', 'report', 'system'], required: true },
+    targetType: {
+      type: String,
+      enum: ['item', 'user', 'report', 'system', 'guest_feed'],
+      required: true,
+    },
     targetId: { type: mongoose.Schema.Types.ObjectId },
     details: { type: Object, default: {} },
   },

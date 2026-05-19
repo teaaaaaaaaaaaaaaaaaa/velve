@@ -30,6 +30,23 @@ const uploadLimiter = rateLimit({
   message: { error: 'Too many uploads, please try again later.' },
 })
 
+const guestAnalyticsLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: Number(process.env.GUEST_ANALYTICS_RATE_LIMIT_MAX || 80),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many guest events, please slow down.' },
+})
+
+const adminLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: Number(process.env.ADMIN_RATE_LIMIT_MAX || 180),
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => String(req.dbUser?._id || req.user?.uid || 'admin-unknown'),
+  message: { error: 'Too many admin requests, please slow down.' },
+})
+
 // Chat messages should be limited per authenticated user, not per IP. Multiple
 // real users can sit behind the same carrier/NAT address on mobile networks.
 const messageLimiter = rateLimit({
@@ -41,4 +58,11 @@ const messageLimiter = rateLimit({
   message: { error: 'Too many messages, please slow down.' },
 })
 
-module.exports = { apiLimiter, authLimiter, uploadLimiter, messageLimiter }
+module.exports = {
+  adminLimiter,
+  apiLimiter,
+  authLimiter,
+  guestAnalyticsLimiter,
+  messageLimiter,
+  uploadLimiter,
+}

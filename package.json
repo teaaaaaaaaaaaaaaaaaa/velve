@@ -9,7 +9,7 @@
     "dev:api": "npm run dev --workspace=apps/api",
     "dev:mobile": "npm run start --workspace=apps/mobile",
     "dev:mobile:web": "node scripts/start-mobile-web-preview.js",
-    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:admin": "npm run dev --workspace=apps/admin",
     "dev:ai": "npm run dev --workspace=apps/ai-server",
     "lint": "npm run lint --workspaces --if-present",
     "lint:fix": "npm run lint:fix --workspaces --if-present",
