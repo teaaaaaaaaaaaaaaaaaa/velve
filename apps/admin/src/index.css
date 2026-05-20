@@ -39,7 +39,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -92,6 +93,19 @@ button:disabled {
   color: var(--danger);
   font-size: 13px;
   font-weight: 800;
+}
+
+.floating-error {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  max-width: min(520px, calc(100vw - 48px));
+  border: 1px solid rgba(179, 38, 30, 0.28);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--danger);
+  padding: 12px 14px;
+  box-shadow: 0 18px 48px rgba(43, 42, 43, 0.12);
 }
 
 .auth-panel {
@@ -247,6 +261,14 @@ button:disabled {
   font-size: 28px;
 }
 
+.tone-warning {
+  border-color: rgba(203, 218, 99, 0.7);
+}
+
+.tone-danger {
+  border-color: rgba(179, 38, 30, 0.3);
+}
+
 .panel {
   padding: 20px;
 }
@@ -293,6 +315,23 @@ button:disabled {
   padding: 12px 14px;
   color: var(--ink);
   background: var(--paper);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.filters input,
+.filters select {
+  min-width: 180px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 10px 12px;
 }
 
 .item-list,
@@ -428,6 +467,146 @@ button:disabled {
   border-bottom: 0;
 }
 
+.metrics-list,
+.table-list {
+  display: grid;
+  gap: 8px;
+}
+
+.metric-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0;
+}
+
+.metric-row span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric-row:last-child {
+  border-bottom: 0;
+}
+
+.ops-row,
+.report-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  padding: 12px;
+}
+
+.item-ops-row {
+  grid-template-columns: 56px minmax(0, 1fr) auto auto;
+}
+
+.item-ops-row .thumb {
+  width: 56px;
+  height: 56px;
+}
+
+.row-main {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.row-main strong,
+.report-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-main span,
+.report-row span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.row-actions button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--accent);
+  font-weight: 800;
+  padding: 8px 10px;
+}
+
+.row-actions .danger-button,
+.danger-button {
+  border-color: rgba(179, 38, 30, 0.24);
+  color: var(--danger);
+}
+
+.pill {
+  display: inline-flex;
+  min-width: 76px;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 10px;
+  text-transform: capitalize;
+}
+
+.pill-active,
+.pill-available,
+.pill-online,
+.pill-completed {
+  border-color: rgba(99, 149, 105, 0.3);
+  color: #38643d;
+}
+
+.pill-suspended,
+.pill-hidden,
+.pill-deleted,
+.pill-archived,
+.pill-sold,
+.pill-unavailable,
+.pill-cancelled,
+.pill-rejected,
+.pill-expired {
+  border-color: rgba(179, 38, 30, 0.24);
+  color: var(--danger);
+}
+
+.pill-pending,
+.pill-pending_trade,
+.pill-reserved,
+.pill-swapped,
+.pill-reviewed {
+  border-color: rgba(203, 218, 99, 0.75);
+  color: #686f28;
+}
+
+.report-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .checklist {
   margin: 0;
   padding-left: 18px;
@@ -458,6 +637,22 @@ button:disabled {
   .two,
   .editor-grid {
     grid-template-columns: 1fr;
+  }
+
+  .ops-row,
+  .report-row,
+  .item-ops-row {
+    grid-template-columns: 1fr;
+  }
+
+  .filters {
+    justify-content: stretch;
+  }
+
+  .filters input,
+  .filters select,
+  .filters button {
+    width: 100%;
   }
 }
 

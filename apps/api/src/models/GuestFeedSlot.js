@@ -12,6 +12,5 @@ const guestFeedSlotSchema = new mongoose.Schema(
 )
 
 guestFeedSlotSchema.index({ active: 1, rank: 1 })
-guestFeedSlotSchema.index({ itemId: 1 }, { unique: true })
 
 module.exports = mongoose.model('GuestFeedSlot', guestFeedSlotSchema)

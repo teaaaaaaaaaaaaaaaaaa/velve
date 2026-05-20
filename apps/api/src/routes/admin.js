@@ -10,6 +10,7 @@ const {
 } = require('../models/GuestAnalyticsEvent')
 const Item = require('../models/Item')
 const Report = require('../models/Report')
+const TradeRequest = require('../models/TradeRequest')
 const User = require('../models/User')
 
 const router = express.Router()
@@ -38,11 +39,60 @@ function toObjectId(id) {
   return new mongoose.Types.ObjectId(String(id))
 }
 
+function getRequiredReason(req, fallback = '') {
+  const reason = String(req.body.reason || fallback).trim().slice(0, 300)
+  if (reason.length < 4) return null
+  return reason
+}
+
 function buildItemHealth(item) {
   if (!item) return 'missing'
   if (item.isDeleted) return 'deleted'
   if (item.status !== 'available') return item.status || 'unavailable'
   return 'available'
+}
+
+function serializeAdminUser(user, counts = {}) {
+  if (!user) return null
+
+  return {
+    _id: user._id,
+    email: user.email,
+    displayName: user.displayName,
+    photoURL: user.photoURL,
+    role: user.role,
+    accountStatus: user.accountStatus,
+    emailVerified: !!user.emailVerified,
+    averageRating: user.averageRating || 0,
+    completedTrades: user.completedTrades || 0,
+    location: user.location || {},
+    onboardingCompleted: !!user.onboardingCompleted,
+    itemsCount: counts.itemsCount || 0,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    suspendedAt: user.suspendedAt,
+    suspendedReason: user.suspendedReason,
+  }
+}
+
+function serializeAdminTrade(trade) {
+  if (!trade) return null
+
+  return {
+    _id: trade._id,
+    type: trade.type,
+    status: trade.status,
+    offeredPrice: trade.offeredPrice,
+    sender: serializeAdminUser(trade.senderId),
+    receiver: serializeAdminUser(trade.receiverId),
+    offeredItem: serializeAdminItem(trade.offeredItemId),
+    requestedItem: serializeAdminItem(trade.requestedItemId),
+    message: trade.message,
+    createdAt: trade.createdAt,
+    updatedAt: trade.updatedAt,
+    respondedAt: trade.respondedAt,
+    completedAt: trade.completedAt,
+  }
 }
 
 function serializeAdminItem(item, selectedIds = new Set()) {
@@ -97,6 +147,162 @@ router.get('/me', async (req, res) => {
       role: req.dbUser.role,
     },
   })
+})
+
+router.get('/overview', async (_req, res) => {
+  try {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const [
+      totalUsers,
+      activeUsers,
+      suspendedUsers,
+      newUsers7d,
+      activeItems,
+      hiddenItems,
+      openReports,
+      pendingTrades,
+      guestSessions,
+      guestSignupClicks,
+      latestAudit,
+    ] = await Promise.all([
+      User.countDocuments({}),
+      User.countDocuments({ accountStatus: 'active' }),
+      User.countDocuments({ accountStatus: 'suspended' }),
+      User.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
+      Item.countDocuments({ status: 'available', isDeleted: false }),
+      Item.countDocuments({ $or: [{ status: 'archived' }, { isDeleted: true }] }),
+      Report.countDocuments({ status: 'open' }),
+      TradeRequest.countDocuments({ status: 'pending' }),
+      GuestAnalyticsEvent.distinct('sessionId', { createdAt: { $gte: sevenDaysAgo } }),
+      GuestAnalyticsEvent.countDocuments({
+        eventType: 'guest_signup_cta_click',
+        createdAt: { $gte: sevenDaysAgo },
+      }),
+      AdminAuditLog.find({})
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .populate('actorUserId', 'displayName email photoURL')
+        .lean(),
+    ])
+
+    res.json({
+      ok: true,
+      data: {
+        users: { total: totalUsers, active: activeUsers, suspended: suspendedUsers, new7d: newUsers7d },
+        items: { active: activeItems, hidden: hiddenItems },
+        reports: { open: openReports },
+        trades: { pending: pendingTrades },
+        guest: { sessions7d: guestSessions.length, signupClicks7d: guestSignupClicks },
+        system: { api: 'online', generatedAt: new Date() },
+        latestAudit,
+      },
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.get('/users', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 40, 100)
+    const searchRegex = normalizeSearch(req.query.search)
+    const status = String(req.query.status || 'all')
+    const role = String(req.query.role || 'all')
+    const query = {}
+
+    if (status !== 'all') query.accountStatus = status
+    if (role !== 'all') query.role = role
+    if (searchRegex) {
+      query.$or = [{ displayName: searchRegex }, { email: searchRegex }]
+    }
+
+    const users = await User.find(query)
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(limit)
+      .select('-expoPushToken -bodyScanUrl')
+      .lean()
+
+    const userIds = users.map((user) => user._id)
+    const itemCounts = await Item.aggregate([
+      { $match: { userId: { $in: userIds }, isDeleted: false } },
+      { $group: { _id: '$userId', itemsCount: { $sum: 1 } } },
+    ])
+    const countsByUserId = new Map(itemCounts.map((entry) => [String(entry._id), entry]))
+
+    res.json({
+      ok: true,
+      data: users.map((user) => serializeAdminUser(user, countsByUserId.get(String(user._id)))),
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.get('/items', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 60, 120)
+    const searchRegex = normalizeSearch(req.query.search)
+    const status = String(req.query.status || 'available')
+    const filters = []
+
+    if (status === 'all') {
+      // Intentionally include hidden/deleted content for admin review.
+    } else if (status === 'hidden') {
+      filters.push({ $or: [{ status: 'archived' }, { isDeleted: true }] })
+    } else {
+      filters.push({ status, isDeleted: false })
+    }
+
+    if (searchRegex) {
+      filters.push({
+        $or: [
+          { title: searchRegex },
+          { description: searchRegex },
+          { brand: searchRegex },
+          { category: searchRegex },
+        ],
+      })
+    }
+
+    const query = filters.length > 0 ? { $and: filters } : {}
+
+    const items = await Item.find(query)
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(limit)
+      .populate('userId', 'displayName email photoURL accountStatus')
+      .lean()
+
+    res.json({ ok: true, data: items.map((item) => serializeAdminItem(item)) })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.get('/trades', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 40, 100)
+    const status = String(req.query.status || 'pending')
+    const query = status === 'all' ? {} : { status }
+
+    const trades = await TradeRequest.find(query)
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(limit)
+      .populate('senderId', 'displayName email photoURL accountStatus averageRating completedTrades')
+      .populate('receiverId', 'displayName email photoURL accountStatus averageRating completedTrades')
+      .populate({
+        path: 'offeredItemId',
+        populate: { path: 'userId', select: 'displayName email photoURL accountStatus' },
+      })
+      .populate({
+        path: 'requestedItemId',
+        populate: { path: 'userId', select: 'displayName email photoURL accountStatus' },
+      })
+      .lean()
+
+    res.json({ ok: true, data: trades.map(serializeAdminTrade) })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
 })
 
 router.get('/guest-feed', async (_req, res) => {
@@ -352,18 +558,56 @@ router.post('/items/:id/hide', async (req, res) => {
       return res.status(400).json({ error: 'Invalid item ID' })
     }
 
+    const reason = getRequiredReason(req)
+    if (!reason) {
+      return res.status(400).json({ error: 'A moderation reason is required' })
+    }
+
     const item = await Item.findByIdAndUpdate(
       req.params.id,
       {
-        status: 'archived',
-        archivedAt: new Date(),
-        archivedReason: String(req.body.reason || 'admin_hide').slice(0, 80),
+        $set: {
+          status: 'archived',
+          archivedAt: new Date(),
+          archivedReason: reason.slice(0, 80),
+        },
       },
       { new: true }
     ).lean()
 
     if (!item) return res.status(404).json({ error: 'Item not found' })
     await writeAudit(req, 'item_hidden', 'item', item._id, { reason: item.archivedReason })
+    res.json({ ok: true, data: item })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.post('/items/:id/restore', async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid item ID' })
+    }
+
+    const reason = getRequiredReason(req)
+    if (!reason) {
+      return res.status(400).json({ error: 'A restore reason is required' })
+    }
+
+    const item = await Item.findByIdAndUpdate(
+      req.params.id,
+      {
+        $set: {
+          status: 'available',
+          isDeleted: false,
+        },
+        $unset: { archivedAt: 1, archivedReason: 1, deletedAt: 1 },
+      },
+      { new: true }
+    ).lean()
+
+    if (!item) return res.status(404).json({ error: 'Item not found' })
+    await writeAudit(req, 'item_restored', 'item', item._id, { reason })
     res.json({ ok: true, data: item })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -379,12 +623,19 @@ router.post('/users/:id/suspend', async (req, res) => {
       return res.status(400).json({ error: 'Admins cannot suspend themselves' })
     }
 
+    const reason = getRequiredReason(req)
+    if (!reason) {
+      return res.status(400).json({ error: 'A suspension reason is required' })
+    }
+
     const user = await User.findByIdAndUpdate(
       req.params.id,
       {
-        accountStatus: 'suspended',
-        suspendedAt: new Date(),
-        suspendedReason: String(req.body.reason || '').slice(0, 300),
+        $set: {
+          accountStatus: 'suspended',
+          suspendedAt: new Date(),
+          suspendedReason: reason,
+        },
       },
       { new: true }
     )
@@ -405,10 +656,15 @@ router.post('/users/:id/activate', async (req, res) => {
       return res.status(400).json({ error: 'Invalid user ID' })
     }
 
+    const reason = getRequiredReason(req)
+    if (!reason) {
+      return res.status(400).json({ error: 'An activation reason is required' })
+    }
+
     const user = await User.findByIdAndUpdate(
       req.params.id,
       {
-        accountStatus: 'active',
+        $set: { accountStatus: 'active' },
         $unset: { suspendedAt: 1, suspendedReason: 1 },
       },
       { new: true }
@@ -417,7 +673,7 @@ router.post('/users/:id/activate', async (req, res) => {
       .lean()
 
     if (!user) return res.status(404).json({ error: 'User not found' })
-    await writeAudit(req, 'user_activated', 'user', user._id)
+    await writeAudit(req, 'user_activated', 'user', user._id, { reason })
     res.json({ ok: true, data: user })
   } catch (err) {
     res.status(500).json({ error: err.message })

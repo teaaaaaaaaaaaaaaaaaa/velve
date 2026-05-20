@@ -6,7 +6,7 @@ const adminAuditLogSchema = new mongoose.Schema(
     action: { type: String, required: true, maxlength: 120 },
     targetType: {
       type: String,
-      enum: ['item', 'user', 'report', 'system', 'guest_feed'],
+      enum: ['item', 'user', 'report', 'system', 'guest_feed', 'trade'],
       required: true,
     },
     targetId: { type: mongoose.Schema.Types.ObjectId },
