@@ -16,10 +16,9 @@ type AdminItem = {
   brand?: string
   category?: string
   size?: string
-  status?: string
   health?: string
   primaryImage?: string | null
-  owner?: { _id: string; displayName?: string; email?: string } | null
+  owner?: { displayName?: string; email?: string } | null
 }
 type GuestSlot = { _id: string; rank: number; itemId: string; health: string; item: AdminItem | null }
 type AnalyticsSummary = {
@@ -27,18 +26,9 @@ type AnalyticsSummary = {
   sessions: number
   topItems: Array<{ itemId: string; count: number; item: AdminItem | null }>
 }
-type Report = {
-  _id: string
-  targetType: string
-  reason: string
-  createdAt: string
-}
-type AuditEntry = {
-  _id: string
-  action: string
-  targetType: string
-  createdAt: string
-}
+type Report = { _id: string; targetType: string; reason: string; createdAt: string }
+type AuditEntry = { _id: string; action: string; targetType: string; createdAt: string }
+type AuthView = 'checking' | 'signed-out' | 'authorized' | 'denied'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const firebaseConfig = {
@@ -85,17 +75,48 @@ function ItemRow({
       <div className="thumb">{item.primaryImage ? <img src={item.primaryImage} alt="" /> : null}</div>
       <div className="item-copy">
         <strong>{item.title}</strong>
-        <span>{[item.brand, item.category, item.size].filter(Boolean).join(' · ') || 'Bez detalja'}</span>
+        <span>{[item.brand, item.category, item.size].filter(Boolean).join(' - ') || 'Bez detalja'}</span>
         <small>{item.owner?.displayName || item.owner?.email || 'Nepoznat owner'}</small>
       </div>
-      <div className="check">{selected ? '✓' : '+'}</div>
+      <div className="check">{selected ? 'OK' : '+'}</div>
     </button>
+  )
+}
+
+function LoginShell({
+  mode,
+  onSignIn,
+  onSignOut,
+}: {
+  mode: AuthView
+  onSignIn: () => void
+  onSignOut: () => void
+}) {
+  const isChecking = mode === 'checking'
+  const isDenied = mode === 'denied'
+
+  return (
+    <main className="login-shell">
+      <div className="login-logo">Velve</div>
+      <div className="login-actions">
+        {isDenied ? <span className="denied-label">Access denied</span> : null}
+        <button
+          className={isDenied ? 'secondary login-button' : 'primary login-button'}
+          disabled={isChecking}
+          onClick={isDenied ? onSignOut : onSignIn}
+          type="button"
+        >
+          {isChecking ? 'Checking access' : isDenied ? 'Sign out' : 'Sign in with Google'}
+        </button>
+      </div>
+    </main>
   )
 }
 
 export default function App() {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null)
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null)
+  const [authView, setAuthView] = useState<AuthView>('checking')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [slots, setSlots] = useState<GuestSlot[]>([])
@@ -122,81 +143,116 @@ export default function App() {
         },
       })
       const payload = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(payload.error || `Request failed with ${response.status}`)
+      if (!response.ok) {
+        const requestError = new Error(payload.error || `Request failed with ${response.status}`)
+        ;(requestError as Error & { status?: number }).status = response.status
+        throw requestError
+      }
       return payload
     },
     [firebaseUser]
   )
 
+  const resetAdminData = useCallback(() => {
+    setAdminUser(null)
+    setSlots([])
+    setCandidates([])
+    setAnalytics(null)
+    setReports([])
+    setAudit([])
+  }, [])
+
   const loadAdminData = useCallback(async () => {
     if (!firebaseUser) return
     setLoading(true)
     setError('')
+    setAuthView('checking')
+
     try {
-      const [me, guestFeed, analyticsSummary, openReports, auditLog] = await Promise.all([
-        apiFetch('/api/admin/me'),
+      const me = await apiFetch('/api/admin/me')
+      if (me.data?.role !== 'admin') {
+        throw Object.assign(new Error('Admin access required'), { status: 403 })
+      }
+
+      const [guestFeed, analyticsSummary, openReports, auditLog] = await Promise.all([
         apiFetch('/api/admin/guest-feed'),
         apiFetch('/api/admin/guest-analytics/summary?days=7'),
         apiFetch('/api/admin/reports?status=open'),
         apiFetch('/api/admin/audit-log?limit=20'),
       ])
+
       setAdminUser(me.data)
       setSlots(guestFeed.data)
       setAnalytics(analyticsSummary.data)
       setReports(openReports.data)
       setAudit(auditLog.data)
+      setAuthView('authorized')
     } catch (err: any) {
-      setError(err.message || 'Admin panel nije dostupan')
-      setAdminUser(null)
+      resetAdminData()
+      if (err?.status === 401 || err?.status === 403) {
+        setAuthView('denied')
+        setError('')
+      } else {
+        setAuthView('signed-out')
+        setError(err.message || 'Admin panel nije dostupan')
+      }
     } finally {
       setLoading(false)
     }
-  }, [apiFetch, firebaseUser])
+  }, [apiFetch, firebaseUser, resetAdminData])
 
   const loadCandidates = useCallback(async () => {
-    if (!firebaseUser) return
+    if (!firebaseUser || authView !== 'authorized') return
     const query = new URLSearchParams({
       limit: '60',
       ...(search.trim() ? { search: search.trim() } : {}),
     })
     const payload = await apiFetch(`/api/admin/guest-feed/candidates?${query.toString()}`)
     setCandidates(payload.data)
-  }, [apiFetch, firebaseUser, search])
+  }, [apiFetch, authView, firebaseUser, search])
 
   useEffect(() => {
     if (!auth) {
+      setAuthView('signed-out')
       setLoading(false)
       return
     }
     return onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user)
       if (!user) {
-        setAdminUser(null)
+        resetAdminData()
+        setAuthView('signed-out')
         setLoading(false)
+        return
       }
+      setAuthView('checking')
+      setLoading(true)
     })
-  }, [])
+  }, [resetAdminData])
 
   useEffect(() => {
     if (firebaseUser) loadAdminData()
   }, [firebaseUser, loadAdminData])
 
   useEffect(() => {
-    if (!firebaseUser || !adminUser) return
+    if (!firebaseUser || authView !== 'authorized') return
     const timeout = window.setTimeout(() => {
       loadCandidates().catch((err) => setError(err.message))
     }, 200)
     return () => window.clearTimeout(timeout)
-  }, [adminUser, firebaseUser, loadCandidates])
+  }, [authView, firebaseUser, loadCandidates])
 
   async function handleSignIn() {
     if (!auth) return
     setError('')
+    setAuthView('checking')
     await signInWithPopup(auth, googleProvider)
   }
 
   async function handleSignOut() {
     if (!auth) return
+    resetAdminData()
+    setAuthView('signed-out')
     await signOut(auth)
   }
 
@@ -249,28 +305,16 @@ export default function App() {
 
   if (!hasFirebaseConfig) {
     return (
-      <main className="auth-shell">
-        <section className="auth-panel">
-          <p className="eyebrow">Velve Admin</p>
-          <h1>Firebase config nije postavljen.</h1>
-          <p>Popuni `apps/admin/.env` vrednosti iz Firebase web app konfiguracije.</p>
-        </section>
+      <main className="login-shell">
+        <div className="login-logo">Velve</div>
+        <span className="denied-label">Missing Firebase config</span>
       </main>
     )
   }
 
-  if (!firebaseUser) {
+  if (authView !== 'authorized' || !firebaseUser || !adminUser || loading) {
     return (
-      <main className="auth-shell">
-        <section className="auth-panel">
-          <p className="eyebrow">Velve Admin</p>
-          <h1>Interni panel za operativu.</h1>
-          <p>Prijava je dozvoljena samo admin nalozima. Backend uvek proverava rolu.</p>
-          <button className="primary" onClick={handleSignIn} type="button">
-            Sign in with Google
-          </button>
-        </section>
-      </main>
+      <LoginShell mode={authView} onSignIn={handleSignIn} onSignOut={handleSignOut} />
     )
   }
 
@@ -288,8 +332,8 @@ export default function App() {
           <a href="#security">Security</a>
         </nav>
         <div className="admin-card">
-          <strong>{adminUser?.displayName || firebaseUser.email}</strong>
-          <span>{adminUser?.role || 'checking role'}</span>
+          <strong>{adminUser.displayName || firebaseUser.email}</strong>
+          <span>{adminUser.role}</span>
           <button className="secondary" onClick={handleSignOut} type="button">
             Sign out
           </button>
@@ -344,7 +388,7 @@ export default function App() {
             <div className="selected-list">
               <div className="selected-head">
                 <strong>Selected order</strong>
-                <span>{slots.length} total · {Math.min(slots.length, 20)} visible</span>
+                <span>{slots.length} total - {Math.min(slots.length, 20)} visible</span>
               </div>
               {slots.map((slot, index) => (
                 <div className={`slot-row ${index < 20 ? 'visible' : ''}`} key={slot._id}>
@@ -393,7 +437,7 @@ export default function App() {
               {reports.slice(0, 8).map((report) => (
                 <div key={report._id} className="simple-row">
                   <strong>{report.reason}</strong>
-                  <span>{report.targetType} · {formatDate(report.createdAt)}</span>
+                  <span>{report.targetType} - {formatDate(report.createdAt)}</span>
                 </div>
               ))}
             </div>
@@ -409,8 +453,8 @@ export default function App() {
               </div>
             </div>
             <ul className="checklist">
-              <li>Backend `requireAdmin` is mandatory for admin APIs.</li>
-              <li>Cloudflare Access should protect `admin.velveapp.com`.</li>
+              <li>Backend requireAdmin is mandatory for admin APIs.</li>
+              <li>Cloudflare Access should protect admin.velveapp.com.</li>
               <li>Admin Google accounts must use MFA/passkeys.</li>
               <li>Every mutation writes an audit log.</li>
             </ul>
@@ -427,7 +471,7 @@ export default function App() {
               {audit.map((entry) => (
                 <div key={entry._id} className="simple-row">
                   <strong>{entry.action}</strong>
-                  <span>{entry.targetType} · {formatDate(entry.createdAt)}</span>
+                  <span>{entry.targetType} - {formatDate(entry.createdAt)}</span>
                 </div>
               ))}
             </div>

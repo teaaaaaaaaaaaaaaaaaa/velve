@@ -33,7 +33,7 @@
 
 body {
   margin: 0;
-  background: var(--canvas);
+  background: #ffffff;
   color: var(--ink);
   font-family: Inter, system-ui, sans-serif;
 }
@@ -57,6 +57,41 @@ button:disabled {
   display: grid;
   place-items: center;
   padding: 24px;
+}
+
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 24px;
+  background: #ffffff;
+  padding: 48px;
+}
+
+.login-logo {
+  color: var(--ink);
+  font-family: 'Alte Haas Grotesk', Inter, sans-serif;
+  font-size: clamp(42px, 7vw, 112px);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.login-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.login-button {
+  min-width: 176px;
+}
+
+.denied-label {
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .auth-panel {
@@ -423,5 +458,19 @@ button:disabled {
   .two,
   .editor-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .login-shell {
+    grid-template-columns: 1fr;
+    align-content: center;
+    justify-items: start;
+    padding: 28px;
+  }
+
+  .login-actions {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
