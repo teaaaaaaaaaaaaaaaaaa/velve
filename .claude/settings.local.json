@@ -45,7 +45,18 @@
       "Bash(gh auth *)",
       "Bash(git config *)",
       "WebSearch",
-      "PowerShell(head *)"
+      "PowerShell(head *)",
+      "Skill(figma-use)",
+      "mcp__plugin_figma_figma__get_metadata",
+      "mcp__plugin_figma_figma__get_screenshot",
+      "mcp__plugin_figma_figma__use_figma",
+      "Bash(curl -s -o /tmp/velveid_pun.png \"https://www.figma.com/api/mcp/asset/8c278929-35c7-4ce6-8ba6-bb83f9c2fd50\")",
+      "Bash(curl -s -o \"C:/Users/Tea/velve/.tmp_velveid_pun.png\" \"https://www.figma.com/api/mcp/asset/8c278929-35c7-4ce6-8ba6-bb83f9c2fd50\")",
+      "Bash(curl -s -o \"C:/Users/Tea/velve/.tmp_velveid_prazan.png\" \"https://www.figma.com/api/mcp/asset/46f91598-27a8-4d5c-840f-eb1ce1424ad1\")",
+      "Bash(curl -s -o \"C:/Users/Tea/velve/.tmp_velveid_lokacija.png\" \"https://www.figma.com/api/mcp/asset/fb9bdd47-6b99-4745-a404-6ffadd0579ad\")",
+      "Bash(curl -s -o \"C:/Users/Tea/velve/.tmp_velveid_pun_hi.png\" \"https://www.figma.com/api/mcp/asset/8c278929-35c7-4ce6-8ba6-bb83f9c2fd50\")",
+      "Bash(curl *)",
+      "mcp__plugin_figma_figma__upload_assets"
     ]
   }
 }
