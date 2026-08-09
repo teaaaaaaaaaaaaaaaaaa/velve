@@ -4,7 +4,12 @@ const messageSchema = new mongoose.Schema({
   chatId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chat', required: true },
   senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   text: { type: String, required: true },
-  type: { type: String, enum: ['text', 'trade', 'buy', 'trade_update'], default: 'text' },
+  type: { type: String, enum: ['text', 'trade', 'buy', 'trade_update', 'item'], default: 'text' },
+  itemData: {
+    itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
+    itemTitle: String,
+    itemImage: String,
+  },
   tradeData: {
     tradeRequestId: { type: mongoose.Schema.Types.ObjectId, ref: 'TradeRequest' },
     offeredItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },

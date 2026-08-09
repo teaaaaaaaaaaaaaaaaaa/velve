@@ -208,6 +208,37 @@ router.post('/:id/message', requireAuth, messageLimiter, async (req, res) => {
   }
 })
 
+// POST /api/chat/:id/share-item — podeli artikal u chatu (Instagram-style send)
+router.post('/:id/share-item', requireAuth, messageLimiter, async (req, res) => {
+  try {
+    const { itemId } = req.body || {}
+    if (!mongoose.Types.ObjectId.isValid(itemId || '')) {
+      return res.status(400).json({ error: 'Invalid item ID' })
+    }
+
+    const item = await Item.findOne({ _id: itemId, isDeleted: { $ne: true } })
+      .select('title images imageClean isDigitized')
+      .lean()
+    if (!item) return res.status(404).json({ error: 'Item not found' })
+
+    const message = await createChatMessage({
+      chatId: req.params.id,
+      sender: req.dbUser,
+      text: item.title || 'Artikal',
+      io: req.app.get('io'),
+      itemData: {
+        itemId: item._id,
+        itemTitle: item.title || '',
+        itemImage: getPrimaryImage(item) || '',
+      },
+    })
+
+    res.json({ ok: true, data: message })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message })
+  }
+})
+
 // POST /api/chat/:id/read - mark every inbound message in the chat as read
 router.post('/:id/read', requireAuth, async (req, res) => {
   try {

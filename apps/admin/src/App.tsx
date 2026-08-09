@@ -8,21 +8,16 @@ import {
   type User,
 } from 'firebase/auth'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { TradeRequest, User } from '@velve/shared'
 
-type AdminUser = {
+// Admin views compose the shared DTOs with moderation-only fields the API
+// attaches on top of the base User/Item shape for admin endpoints.
+type AdminUser = Partial<User> & {
   _id: string
   email: string
-  displayName?: string
-  photoURL?: string
   role: string
-  accountStatus?: string
-  emailVerified?: boolean
-  averageRating?: number
-  completedTrades?: number
-  onboardingCompleted?: boolean
   itemsCount?: number
   suspendedReason?: string
-  createdAt?: string
 }
 type AdminItem = {
   _id: string
@@ -62,10 +57,13 @@ type Report = {
   itemId?: AdminItem | null
   createdAt: string
 }
+// Populated admin view of a trade — sender/receiver/items are hydrated objects,
+// not the raw ObjectId refs TradeRequest models on the API side, so this stays
+// its own shape; only the status enum is reused from the shared DTO.
 type Trade = {
   _id: string
   type?: string
-  status: string
+  status: TradeRequest['status']
   offeredPrice?: number
   sender?: AdminUser | null
   receiver?: AdminUser | null

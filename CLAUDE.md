@@ -36,7 +36,8 @@ cd apps/ai-server && python -m venv .venv && .venv/Scripts/activate && pip insta
 ```
 
 ## Design sistem
-- Boje: brand-accent-deep (#431A43), brand-accent-light (#9DD3E4), brand-highlight (#CBDA63), base-canvas (#F6F8ED), ink-dark (#2B2A2B)
+- Boje: brand-accent-deep (#431A43), brand-accent-light (#9DD3E4), brand-highlight (#CBDA63), base-canvas (#FFFFFF), surface-panel (#FFFFFF), ink-dark (#2B2A2B)
+- base-canvas/surface-panel su namerno čisto bele (#FFFFFF) — ranija #F6F8ED/#FFFCF6 "prljavo bela" je zamenjena po eksplicitnom zahtevu; menjati samo u apps/mobile/src/design/tokens.ts i apps/mobile/tailwind.config.js zajedno
 - Fontovi: Ballet (logo), Alte Haas Grotesk (headings), Inter (UI)
 - Stilizacija: NativeWind v4 klase u mobile (nikad hardcoded boje/fontovi)
 - Tailwind config: apps/mobile/tailwind.config.js

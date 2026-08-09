@@ -14,6 +14,7 @@ const chatSchema = new mongoose.Schema(
 
 // Index for fetching user's chats sorted by recent activity
 chatSchema.index({ participants: 1, lastMessageAt: -1, updatedAt: -1 })
-chatSchema.index({ participants: 1, deletedFor: 1 })
+// NOTE: never add a compound index over two array fields (e.g. participants +
+// deletedFor) — MongoDB rejects every insert with "cannot index parallel arrays".
 
 module.exports = mongoose.model('Chat', chatSchema)

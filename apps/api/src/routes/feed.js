@@ -11,8 +11,6 @@ const {
   GUEST_EVENT_TYPES,
 } = require('../models/GuestAnalyticsEvent')
 const Item = require('../models/Item')
-const Like = require('../models/Like')
-const TradeRequest = require('../models/TradeRequest')
 const { enrichItems } = require('../lib/enrichItems')
 const { rankFeedItems } = require('../lib/feedRanking')
 const { getDiscoverySignals } = require('../lib/discovery')

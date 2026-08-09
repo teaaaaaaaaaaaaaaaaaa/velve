@@ -21,6 +21,11 @@ build/
 .gradle/
 .tmp-android-sdk/
 
+# Local temp artifacts (screenshots, browser profiles, scratch assets)
+.tmp*/
+.tmp*
+UsersTeavelve*.png
+
 # Expo / React Native
 .expo/
 *.jks

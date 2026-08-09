@@ -18,10 +18,6 @@ function getTradeExpiryDate(fromDate = new Date()) {
   return new Date(new Date(fromDate).getTime() + TRADE_EXPIRY_HOURS * 60 * 60 * 1000)
 }
 
-function isPendingTradeExpired(trade) {
-  return trade.status === 'pending' && trade.expiresAt && new Date(trade.expiresAt).getTime() <= Date.now()
-}
-
 function getTradeRole(trade, userId) {
   return String(trade.senderId?._id || trade.senderId) === String(userId) ? 'sender' : 'receiver'
 }

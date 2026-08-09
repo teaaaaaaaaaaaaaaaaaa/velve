@@ -4,6 +4,26 @@ const { imageUpload } = require('../lib/uploadMiddleware')
 const { getInternalAiHeaders } = require('../lib/aiClient')
 const { validateAndNormalizeImage } = require('../lib/uploadSecurity')
 const { assertR2PublicUrlWithPrefix } = require('../lib/imageSecurity')
+const Item = require('../models/Item')
+
+// The user may pass either a raw upload (items/<userId>/...) or a Clean Cut
+// asset (items/<itemId>/clean_*.png). The clean key is scoped by item id, not
+// user id, so a prefix check alone rejects it — fall back to verifying the URL
+// belongs to an item owned by this user.
+async function isOwnedImageUrl(imageUrl, userId) {
+  try {
+    assertR2PublicUrlWithPrefix(imageUrl, `items/${userId}`)
+    return true
+  } catch {
+    const ownedItem = await Item.findOne({
+      userId,
+      $or: [{ imageClean: imageUrl }, { images: imageUrl }],
+    })
+      .select('_id')
+      .lean()
+    return Boolean(ownedItem)
+  }
+}
 
 const router = express.Router()
 
@@ -50,14 +70,11 @@ router.post('/generate-description', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'category is required' })
     }
     if (image_url) {
-      try {
-        assertR2PublicUrlWithPrefix(
-          image_url,
-          `items/${req.dbUser._id}`,
-          'image_url must be an image uploaded by the current user'
-        )
-      } catch (error) {
-        return res.status(error.statusCode || 400).json({ error: error.message })
+      const allowed = await isOwnedImageUrl(image_url, req.dbUser._id)
+      if (!allowed) {
+        return res
+          .status(400)
+          .json({ error: 'image_url must be an image uploaded by the current user' })
       }
     }
 

@@ -42,6 +42,7 @@ async function createChatMessage({
   io = null,
   skipPushWhenRecipientInRoom = true,
   clientId = null,
+  itemData = null,
 }) {
   if (!mongoose.Types.ObjectId.isValid(chatId)) {
     const err = new Error('Invalid chat ID')
@@ -67,6 +68,7 @@ async function createChatMessage({
     chatId,
     senderId: sender._id,
     text: normalizedText,
+    ...(itemData ? { type: 'item', itemData } : {}),
     readBy: [{ userId: sender._id, readAt: new Date() }],
   })
 

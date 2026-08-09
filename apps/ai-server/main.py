@@ -84,6 +84,12 @@ clip_lock = threading.Lock()
 rembg_session = None
 rembg_remove = None
 rembg_lock = threading.Lock()
+# birefnet-general-lite is ~2x faster than birefnet-general with near-identical
+# quality on product/garment shots (see rembg model docs).
+REMBG_MODEL = os.getenv("REMBG_MODEL", "birefnet-general-lite")
+# Segmentation runs at ~1024px internally — larger inputs only pay decode,
+# mask-upsample and PNG-encode cost, so cap the working resolution.
+CLEAN_CUT_MAX_SIDE = int(os.getenv("CLEAN_CUT_MAX_SIDE", "1600"))
 
 ollama_model_name = None
 ollama_lock = threading.Lock()
@@ -409,7 +415,7 @@ def get_rembg():
                 from rembg import new_session, remove
 
                 rembg_remove = remove
-                rembg_session = new_session("birefnet-general")
+                rembg_session = new_session(REMBG_MODEL)
     return rembg_session, rembg_remove
 
 
@@ -547,7 +553,9 @@ def pil_to_cv_rgb(image: Image.Image) -> np.ndarray:
 
 def encode_png(image: Image.Image) -> bytes:
     buffer = io.BytesIO()
-    image.save(buffer, format="PNG")
+    # compress_level=2 encodes several times faster than the default (6) for a
+    # modest file-size increase — the bottleneck on large clean-cut outputs.
+    image.save(buffer, format="PNG", compress_level=2)
     return buffer.getvalue()
 
 
@@ -750,6 +758,20 @@ def build_body_scan_analysis(image: Image.Image) -> dict:
 
 
 def normalize_clean_cut_output(image_bytes: bytes) -> bytes:
+    # Downscale oversized phone photos (often 12MP+) before segmentation; keeps
+    # EXIF orientation baked in and cuts total processing time dramatically.
+    try:
+        source = bytes_to_pil(image_bytes, mode="RGB")
+        if max(source.size) > CLEAN_CUT_MAX_SIDE:
+            source.thumbnail((CLEAN_CUT_MAX_SIDE, CLEAN_CUT_MAX_SIDE), Image.LANCZOS)
+        preprocess_buffer = io.BytesIO()
+        source.save(preprocess_buffer, format="JPEG", quality=92)
+        image_bytes = preprocess_buffer.getvalue()
+    except HTTPException:
+        raise
+    except Exception as error:
+        print(f"[CleanCut] Preprocess skipped: {error}")
+
     raw_output = None
     try:
         session, remove_fn = get_rembg()
@@ -915,7 +937,7 @@ def startup_event():
     load_faiss_index()
     try:
         get_rembg()
-        print("[AI Server] rembg birefnet-general session loaded")
+        print(f"[AI Server] rembg {REMBG_MODEL} session loaded")
     except Exception as error:
         print(f"[AI Server] rembg session failed to load: {error}")
     print("[AI Server] Ready")

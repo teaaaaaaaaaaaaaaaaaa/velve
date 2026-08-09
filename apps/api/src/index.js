@@ -13,6 +13,7 @@ const { initSocket } = require('./lib/socket')
 const { updateEngagementScores } = require('./lib/updateEngagementScores')
 const { retryMissingEmbeddings } = require('./lib/retryMissingEmbeddings')
 const { rebuildAiIndex, pingAiServer } = require('./lib/aiClient')
+const logger = require('./lib/logger')
 
 const EMBEDDING_RETRY_INTERVAL_MS = 15 * 60 * 1000 // 15 min
 const FAISS_REINDEX_INTERVAL_MS = 60 * 60 * 1000 // 1 h
@@ -83,10 +84,10 @@ app.use(apiLimiter)
 
 app.use((req, res, next) => {
   const start = Date.now()
-  console.log(`[API] -> ${req.method} ${req.originalUrl} from ${req.ip}`)
+  logger.debug(`[API] -> ${req.method} ${req.originalUrl} from ${req.ip}`)
 
   res.on('finish', () => {
-    console.log(`[API] <- ${req.method} ${req.originalUrl} ${res.statusCode} ${Date.now() - start}ms`)
+    logger.debug(`[API] <- ${req.method} ${req.originalUrl} ${res.statusCode} ${Date.now() - start}ms`)
   })
 
   next()
@@ -109,7 +110,7 @@ app.get('/health', async (req, res) => {
     await mongoose.connection.db.admin().ping()
     checks.mongodb = true
   } catch (err) {
-    console.error('MongoDB health check failed:', err.message)
+    logger.error('MongoDB health check failed:', err.message)
   }
 
   // Check AI server connectivity
@@ -125,7 +126,7 @@ app.get('/health', async (req, res) => {
 
     checks.aiServer = response.ok
   } catch (err) {
-    console.error('AI server health check failed:', err.message)
+    logger.error('AI server health check failed:', err.message)
   }
 
   // Overall health status
@@ -191,7 +192,7 @@ app.use((err, req, res, _next) => {
       ? 'Internal server error'
       : err.message || 'Internal server error'
 
-  console.error('[API] Unhandled error', {
+  logger.error('[API] Unhandled error', {
     method: req.method,
     url: req.originalUrl,
     statusCode,
@@ -214,35 +215,44 @@ app.set('io', io) // make io accessible in routes via req.app.get('io')
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(async () => {
-    console.log('MongoDB connected')
+    logger.info('MongoDB connected')
+
+    // One-time cleanup: the old {participants, deletedFor} compound index broke
+    // every chat insert (MongoDB cannot index two parallel arrays). Drop it if
+    // it still exists; ignore "index not found" once it is gone.
+    mongoose.connection.db
+      .collection('chats')
+      .dropIndex('participants_1_deletedFor_1')
+      .then(() => logger.info('[Migration] Dropped invalid chats index participants_1_deletedFor_1'))
+      .catch(() => {})
 
     // Initial engagement score update on startup
-    console.log('Running initial engagement score update...')
+    logger.info('Running initial engagement score update...')
     updateEngagementScores().catch((err) => {
-      console.error('Initial score update failed:', err.message)
+      logger.error('Initial score update failed:', err.message)
     })
 
     // Initial embedding retry on startup
-    console.log('Running initial embedding retry...')
+    logger.info('Running initial embedding retry...')
     retryMissingEmbeddings().catch((err) => {
-      console.error('Initial embedding retry failed:', err.message)
+      logger.error('Initial embedding retry failed:', err.message)
     })
 
     // Initial FAISS index sync on startup (so /similar works after restart)
     pingAiServer().then((up) => {
       if (!up) {
-        console.warn('[FAISS] AI server down on boot - skipping initial reindex')
+        logger.warn('[FAISS] AI server down on boot - skipping initial reindex')
         return
       }
       rebuildAiIndex()
-        .then((data) => console.log(`[FAISS] Initial reindex done: ${JSON.stringify(data)}`))
-        .catch((err) => console.error('[FAISS] Initial reindex failed:', err.message))
+        .then((data) => logger.info(`[FAISS] Initial reindex done: ${JSON.stringify(data)}`))
+        .catch((err) => logger.error('[FAISS] Initial reindex failed:', err.message))
     })
 
     // Periodic background workers
     setInterval(() => {
       retryMissingEmbeddings().catch((err) =>
-        console.error('[Embeddings] Periodic retry failed:', err.message)
+        logger.error('[Embeddings] Periodic retry failed:', err.message)
       )
     }, EMBEDDING_RETRY_INTERVAL_MS).unref()
 
@@ -250,20 +260,20 @@ mongoose
       pingAiServer().then((up) => {
         if (!up) return
         rebuildAiIndex()
-          .then((data) => console.log(`[FAISS] Periodic reindex done: ${JSON.stringify(data)}`))
-          .catch((err) => console.error('[FAISS] Periodic reindex failed:', err.message))
+          .then((data) => logger.info(`[FAISS] Periodic reindex done: ${JSON.stringify(data)}`))
+          .catch((err) => logger.error('[FAISS] Periodic reindex failed:', err.message))
       })
     }, FAISS_REINDEX_INTERVAL_MS).unref()
 
     server.listen(PORT, () => {
       const lanIp = getLocalLanIp()
-      console.log(`Velve API running on http://localhost:${PORT}`)
+      logger.info(`Velve API running on http://localhost:${PORT}`)
       if (lanIp) {
-        console.log(`Velve API running on http://${lanIp}:${PORT}`)
+        logger.info(`Velve API running on http://${lanIp}:${PORT}`)
       }
     })
   })
   .catch((err) => {
-    console.error('MongoDB connection error:', err.message)
+    logger.error('MongoDB connection error:', err.message)
     process.exit(1)
   })
