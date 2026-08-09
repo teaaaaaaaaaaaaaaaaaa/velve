@@ -8,6 +8,8 @@ module.exports = {
         'brand-accent-deep': '#431A43',
         'brand-accent-light': '#9DD3E4',
         'brand-highlight': '#CBDA63',
+        'nav-dark': '#121214',
+        'nav-pink': '#F6A8C6',
         'base-canvas': '#FFFFFF',
         'ink-dark': '#2B2A2B',
         'surface-panel': '#FFFFFF',

@@ -1,13 +1,12 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
 import { io, Socket } from 'socket.io-client';
 
 import client from '@/api/client';
+import { VelveTabBar } from '@/components/VelveTabBar';
 import { API_URL } from '@/config/api';
 import { auth as firebaseAuth, getAuthToken } from '@/config/firebase';
-import { colors, fonts, shadows } from '@/design/tokens';
+import { colors } from '@/design/tokens';
 import { useAuth } from '@/hooks/useAuth';
 import { useI18n } from '@/i18n';
 import { trackGuestEvent } from '@/lib/guestAnalytics';
@@ -153,12 +152,6 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarHideOnKeyboard: true,
-        tabBarBackground: () => (
-          <View
-            className="mx-3 mb-3 flex-1 rounded-editorial border border-base-canvas/70 bg-base-canvas/80"
-            style={shadows.floating}
-          />
-        ),
         tabBarStyle: {
           display: hideFloatingBar ? 'none' : 'flex',
           position: 'absolute',
@@ -172,31 +165,33 @@ export default function TabsLayout() {
           paddingBottom: 16,
           paddingTop: 10,
         },
-        tabBarActiveTintColor: colors.accentDeep,
-        tabBarInactiveTintColor: colors.mutedText,
-        tabBarLabelStyle: {
-          fontFamily: fonts.sans,
-          fontSize: 11,
-          fontWeight: '500',
-        },
+        tabBarShowLabel: false,
       }}
+      tabBar={(props) => (hideFloatingBar ? null : <VelveTabBar {...props} />)}
     >
       <Tabs.Screen
         name="feed"
         options={{
           title: t('tabs.feed'),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
-          ),
+        }}
+      />
+      <Tabs.Screen
+        name="wishlist"
+        options={{
+          title: t('tabs.wishlist'),
+        }}
+        listeners={{
+          tabPress: (event) => {
+            if (!isGuest) return;
+            event.preventDefault();
+            requireSignedIn('wishlist_tab');
+          },
         }}
       />
       <Tabs.Screen
         name="upload"
         options={{
           title: t('tabs.upload'),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle-outline" size={size} color={color} />
-          ),
         }}
         listeners={{
           tabPress: (event) => {
@@ -223,9 +218,6 @@ export default function TabsLayout() {
             color: colors.baseCanvas,
             fontSize: 10,
           },
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubble-outline" size={size} color={color} />
-          ),
         }}
         listeners={{
           tabPress: (event) => {
@@ -245,9 +237,6 @@ export default function TabsLayout() {
             color: colors.inkDark,
             fontSize: 10,
           },
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
-          ),
         }}
         listeners={{
           tabPress: (event) => {
@@ -258,7 +247,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen name="closet" options={{ href: null }} />
-      <Tabs.Screen name="wishlist" options={{ href: null }} />
       <Tabs.Screen name="chat/[id]" options={{ href: null }} />
     </Tabs>
   );
