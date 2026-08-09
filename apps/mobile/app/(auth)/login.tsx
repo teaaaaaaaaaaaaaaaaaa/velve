@@ -24,6 +24,7 @@ import {
   getAuthValidationFeedback,
   getGoogleSignInFeedback,
   isExpectedAuthError,
+  type FirebaseErrorLike,
   type InlineAuthFeedback,
 } from '@/lib/authFeedback';
 import { Alert } from '@/lib/velveAlert';
@@ -111,7 +112,8 @@ export default function LoginScreen() {
       await signInWithEmail(normalizedEmail, password);
       setBlockedUntil(null);
       console.log('[LoginScreen] Email login request resolved successfully');
-    } catch (e: any) {
+    } catch (unknownError: unknown) {
+      const e = unknownError as FirebaseErrorLike;
       const logger = isExpectedAuthError(e) ? console.warn : console.error;
       logger('[LoginScreen] Email login failed', {
         code: e?.code,
@@ -139,7 +141,8 @@ export default function LoginScreen() {
       console.log('[LoginScreen] Google login pressed');
       await signInWithGoogle();
       console.log('[LoginScreen] Google login request resolved successfully');
-    } catch (e: any) {
+    } catch (unknownError: unknown) {
+      const e = unknownError as FirebaseErrorLike;
       const logger = e?.message === 'USER_CANCELLED' ? console.warn : console.error;
       logger('[LoginScreen] Google login failed', {
         code: e?.code,

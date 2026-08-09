@@ -4,6 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import { API_URL } from '@/config/api';
 import { auth, getAuthToken } from '@/config/firebase';
 import { useAuth } from '@/hooks/useAuth';
+import { logger } from '@/lib/logger';
 
 export function useSocket() {
   const { currentUser } = useAuth();
@@ -19,7 +20,7 @@ export function useSocket() {
 
       try {
         const token = await getAuthToken(user);
-        console.log('[Socket] Connecting to:', API_URL);
+        logger.debug('[Socket] Connecting to:', API_URL);
 
         socket = io(API_URL, {
           auth: { token },
@@ -30,23 +31,24 @@ export function useSocket() {
         });
 
         socket.on('connect', () => {
-          console.log('[Socket] Connected');
+          logger.debug('[Socket] Connected');
           setConnected(true);
         });
 
         socket.on('disconnect', () => {
-          console.log('[Socket] Disconnected');
+          logger.debug('[Socket] Disconnected');
           setConnected(false);
         });
 
         socket.on('connect_error', (err) => {
-          console.log('[Socket] Connection error:', err.message);
+          logger.warn('[Socket] Connection error:', err.message);
           setConnected(false);
         });
 
         socketRef.current = socket;
-      } catch (error: any) {
-        console.warn('[Socket] Skipping connection', {
+      } catch (unknownError: unknown) {
+        const error = unknownError as { message?: string };
+        logger.warn('[Socket] Skipping connection', {
           message: error?.message,
           currentUserUid: auth.currentUser?.uid ?? null,
         });

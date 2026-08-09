@@ -51,16 +51,23 @@ type StatusData = {
   label: string;
 };
 
+type ItemShareData = {
+  itemId: string;
+  itemTitle?: string;
+  itemImage?: string;
+};
+
 type MessageRecord = {
   _id: string;
   clientId?: string;
   chatId: string;
   senderId: { _id: string; displayName: string; photoURL?: string } | string;
   text: string;
-  type?: 'text' | 'trade' | 'buy' | 'trade_update';
+  type?: 'text' | 'trade' | 'buy' | 'trade_update' | 'item';
   tradeData?: TradeData;
   buyData?: BuyData;
   statusData?: StatusData;
+  itemData?: ItemShareData;
   createdAt: string;
   deliveryStatus?: 'pending' | 'sent' | 'failed';
 };
@@ -240,7 +247,7 @@ const ProposalMessageCard = memo(function ProposalMessageCard({
             imageUri={tradeData.offeredItemImage}
             label={offeredLabel || 'Korisnik'}
             eyebrow="Nudi"
-            onPress={onOpenOfferedItem || onOpenRequestedItem}
+            onPress={onOpenOfferedItem ?? onOpenRequestedItem}
           />
           <View className="mt-16 h-10 w-10 items-center justify-center rounded-full bg-brand-accent-deep/8">
             <Ionicons name="swap-horizontal" size={18} color={colors.accentDeep} />
@@ -366,13 +373,13 @@ export default function ChatScreen() {
     if (response.data.ok) {
       const data = response.data.data as ChatPayload;
       setMessages(data.messages || []);
-      setTradeRequest(data.tradeRequestId || null);
+      setTradeRequest(data.tradeRequestId ?? null);
       client.post(`/api/chat/${chatId}/read`).catch(() => undefined);
 
       if (data.participants && dbUser) {
         const participant =
-          data.participants.find((entry) => entry._id !== dbUser._id) ||
-          data.participants[0] ||
+          data.participants.find((entry) => entry._id !== dbUser._id) ??
+          data.participants[0] ??
           null;
         setOtherUser(participant);
       }
@@ -422,13 +429,6 @@ export default function ChatScreen() {
           socket?.emit('mark_read', chatId);
         });
 
-        socket.on(
-          'messages_read',
-          (payload: { chatId: string; userId: string; readAt: string }) => {
-            if (payload.chatId !== chatId) return;
-          }
-        );
-
         socket.on('user_typing', (payload: { chatId: string; displayName: string }) => {
           if (payload.chatId !== chatId) return;
 
@@ -443,7 +443,8 @@ export default function ChatScreen() {
         });
 
         socketRef.current = socket;
-      } catch (error: any) {
+      } catch (unknownError: unknown) {
+        const error = unknownError as { message?: string };
         console.warn('[ChatScreen] Socket connection skipped', {
           chatId,
           message: error?.message,
@@ -479,7 +480,7 @@ export default function ChatScreen() {
       clientId,
       chatId,
       senderId: {
-        _id: dbUser?._id || '',
+        _id: dbUser?._id ?? '',
         displayName: dbUser?.displayName || 'Ti',
         photoURL: dbUser?.photoURL,
       },
@@ -633,7 +634,7 @@ export default function ChatScreen() {
 
   const deleteMessage = useCallback(
     async (message: MessageRecord) => {
-      if (deletingMessageId || message.deliveryStatus === 'pending') return;
+      if (deletingMessageId ?? message.deliveryStatus === 'pending') return;
 
       if (message.deliveryStatus === 'failed') {
         setMessages((prev) => prev.filter((entry) => entry._id !== message._id));
@@ -644,7 +645,11 @@ export default function ChatScreen() {
         setDeletingMessageId(message._id);
         await client.delete(`/api/chat/${chatId}/messages/${message._id}`);
         setMessages((prev) => prev.filter((entry) => entry._id !== message._id));
-      } catch (error: any) {
+      } catch (unknownError: unknown) {
+        const error = unknownError as {
+          message?: string;
+          response?: { data?: { error?: string } };
+        };
         Alert.alert(
           'Poruka nije obrisana',
           error?.response?.data?.error || error?.message || 'Pokusaj ponovo.'
@@ -683,7 +688,7 @@ export default function ChatScreen() {
       const isMine = getSenderId(item) === dbUser?._id;
       const showDate =
         index === 0 || !isSameDay(item.createdAt, messagesRef.current[index - 1]?.createdAt);
-      const proposalId = item.tradeData?.tradeRequestId || item.buyData?.tradeRequestId;
+      const proposalId = item.tradeData?.tradeRequestId ?? item.buyData?.tradeRequestId;
       const showDecisionActions =
         canRespondToTrade && !!activeTradeId && proposalId === activeTradeId && !isMine;
       const senderDisplayName = getSenderDisplayName(item, isMine, otherUser);
@@ -751,6 +756,43 @@ export default function ChatScreen() {
             />
           ) : item.type === 'trade_update' && item.statusData ? (
             <TradeStatusTicket statusData={item.statusData} />
+          ) : item.type === 'item' && item.itemData ? (
+            <View className={`mb-1 px-4 ${isMine ? 'items-end' : 'items-start'}`}>
+              <TouchableOpacity
+                activeOpacity={0.88}
+                onPress={() => router.push(`/items/${item.itemData!.itemId}`)}
+                className="w-[224px] overflow-hidden rounded-[22px] bg-surface-panel"
+                style={{
+                  shadowColor: colors.inkDark,
+                  shadowOpacity: 0.08,
+                  shadowRadius: 10,
+                  shadowOffset: { width: 0, height: 4 },
+                  elevation: 3,
+                }}
+              >
+                <RemoteImage
+                  uri={item.itemData.itemImage}
+                  className="h-[224px] w-full bg-base-canvas"
+                  contentFit="cover"
+                  fallback={
+                    <View className="h-full w-full items-center justify-center bg-base-canvas">
+                      <Ionicons name="shirt-outline" size={36} color={colors.accentDeep} />
+                    </View>
+                  }
+                />
+                <View className="px-3 py-3">
+                  <Text numberOfLines={1} className="font-sans text-sm font-semibold text-ink-dark">
+                    {item.itemData.itemTitle || 'Artikal'}
+                  </Text>
+                  <Text className="mt-0.5 font-sans text-[11px] text-ink-dark/45">
+                    Podeljen artikal · dodirni da otvoris
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              <Text className="mt-1 px-1 font-sans text-[10px] text-ink-dark/30">
+                {formatTime(item.createdAt)}
+              </Text>
+            </View>
           ) : (
             <View className={`mb-1 px-4 ${isMine ? 'items-end' : 'items-start'}`}>
               <TouchableOpacity

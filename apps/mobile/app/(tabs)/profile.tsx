@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Alert } from '@/lib/velveAlert';
+import type { User } from '@velve/shared';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
@@ -25,6 +25,7 @@ import { colors } from '@/design/tokens';
 import { useI18n } from '@/i18n';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import { getPrimaryItemImage } from '@/lib/itemImages';
+import { Alert } from '@/lib/velveAlert';
 
 type ClosetCounts = {
   live: number;
@@ -32,15 +33,9 @@ type ClosetCounts = {
   archive: number;
 };
 
-type UserProfile = {
-  _id: string;
-  email: string;
-  displayName: string;
-  photoURL: string;
-  bio: string;
-  emailVerified: boolean;
-  averageRating: number;
-  completedTrades: number;
+// Extends the shared User DTO with the profile-screen-only aggregate fields
+// the /api/users/me route attaches (counts, VTO state, onboarding prefs).
+type UserProfile = User & {
   followersCount: number;
   followingCount: number;
   itemsCount: number;
@@ -53,7 +48,6 @@ type UserProfile = {
   bodyScanCreatedAt?: string | null;
   stylePreferences?: string[];
   favoriteBrands?: string[];
-  location?: { city?: string; region?: string };
 };
 
 const ProfileGridItem = memo(function ProfileGridItem({
@@ -148,7 +142,7 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<'posts' | 'saved'>('posts');
-  const [closetItems, setClosetItems] = useState<any[]>([]);
+  const [closetItems, setClosetItems] = useState<DiscoveryCardItem[]>([]);
   const [wishlistItems, setWishlistItems] = useState<DiscoveryCardItem[]>([]);
   const [tabLoading, setTabLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -156,15 +150,15 @@ export default function ProfileScreen() {
   const [editBio, setEditBio] = useState('');
   const [editPhotoURL, setEditPhotoURL] = useState('');
 
+  const locationLabel = useMemo(() => {
+    if (!profile?.location?.city) return null;
+    return `${profile.location.city}${profile.location.region ? `, ${profile.location.region}` : ''}`;
+  }, [profile]);
+
   const identityChips = useMemo(() => {
     if (!profile) return [];
 
-    return [
-      profile.location?.city
-        ? `${profile.location.city}${profile.location.region ? `, ${profile.location.region}` : ''}`
-        : null,
-      profile.emailVerified ? t('profile.emailVerified') : null,
-    ].filter(Boolean) as string[];
+    return [profile.emailVerified ? t('profile.emailVerified') : null].filter(Boolean) as string[];
   }, [profile, t]);
 
   const hydrateEditState = useCallback((nextProfile: UserProfile) => {
@@ -321,8 +315,6 @@ export default function ProfileScreen() {
     );
   }
 
-  const hasBodyScan = Boolean(profile.bodyScanUrl);
-
   return (
     <>
       <ScrollView
@@ -385,6 +377,17 @@ export default function ProfileScreen() {
 
               <View className="ml-4 flex-1">
                 <Text className="font-display text-4xl text-ink-dark">{profile.displayName}</Text>
+                {locationLabel ? (
+                  <View className="mt-2 self-start flex-row items-center rounded-full border border-brand-highlight px-3 py-1.5">
+                    <Ionicons name="location-outline" size={13} color={colors.inkDark} />
+                    <Text
+                      className="ml-1.5 font-sans text-[12px] font-semibold text-ink-dark"
+                      numberOfLines={1}
+                    >
+                      {locationLabel}
+                    </Text>
+                  </View>
+                ) : null}
                 <Text className="mt-2 font-sans text-sm text-brand-accent-deep">
                   {formatJoinedDate(
                     profile.joinedAt,
@@ -528,22 +531,7 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            <View className="mt-4 rounded-[26px] bg-brand-accent-deep px-4 py-4">
-              <Text className="font-display text-[28px] text-base-canvas">
-                {hasBodyScan ? t('profile.vtoReadyTitle') : t('profile.vtoSetupTitle')}
-              </Text>
-              <Text className="mt-2 font-sans text-sm leading-6 text-base-canvas/80">
-                {hasBodyScan ? t('profile.vtoReadyDescription') : t('profile.vtoSetupDescription')}
-              </Text>
-              <TouchableOpacity
-                onPress={() => router.push(hasBodyScan ? '/vto/hub' : '/vto/body-scan')}
-                className="mt-4 items-center rounded-full bg-base-canvas px-4 py-4"
-              >
-                <Text className="font-sans text-sm font-semibold text-brand-accent-deep">
-                  {hasBodyScan ? t('profile.openVtoHub') : t('profile.createBodyScan')}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            {/* VTO/body-scan card hidden for MVP — feature code kept, entry point removed. */}
           </View>
 
           <View className="mt-6">
@@ -590,7 +578,7 @@ export default function ProfileScreen() {
                 />
               ) : (
                 <View className="mt-3 flex-row flex-wrap gap-2">
-                  {closetItems.map((item: any) => (
+                  {closetItems.map((item) => (
                     <ProfileGridItem
                       key={item._id}
                       item={item}
@@ -609,7 +597,7 @@ export default function ProfileScreen() {
               />
             ) : (
               <View className="mt-3 flex-row flex-wrap gap-2">
-                {wishlistItems.map((item: any) => (
+                {wishlistItems.map((item) => (
                   <ProfileGridItem
                     key={item._id}
                     item={item}

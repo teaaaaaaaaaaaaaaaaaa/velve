@@ -1,18 +1,18 @@
-import { Ionicons } from '@expo/vector-icons'
-import { memo, ReactNode } from 'react'
-import { TouchableOpacity, View, Text } from 'react-native'
+import { Ionicons } from '@expo/vector-icons';
+import { memo, ReactNode } from 'react';
+import { TouchableOpacity, View, Text } from 'react-native';
 
-import { BrandWordmark } from '@/components/BrandWordmark'
-import { colors } from '@/design/tokens'
+import { BrandWordmark } from '@/components/BrandWordmark';
+import { colors } from '@/design/tokens';
 
 type Props = {
-  icon: keyof typeof Ionicons.glyphMap
-  title: string
-  description: string
-  actionLabel?: string
-  onAction?: () => void
-  footer?: ReactNode
-}
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  description: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  footer?: ReactNode;
+};
 
 export const EditorialEmptyState = memo(function EditorialEmptyState({
   icon,
@@ -30,9 +30,7 @@ export const EditorialEmptyState = memo(function EditorialEmptyState({
         <Ionicons name={icon} size={26} color={colors.accentDeep} />
       </View>
 
-      <Text className="mb-2 text-center font-display text-2xl text-ink-dark">
-        {title}
-      </Text>
+      <Text className="mb-2 text-center font-display text-2xl text-ink-dark">{title}</Text>
       <Text className="mb-6 text-center font-sans text-sm leading-6 text-ink-dark/60">
         {description}
       </Text>
@@ -43,13 +41,11 @@ export const EditorialEmptyState = memo(function EditorialEmptyState({
           activeOpacity={0.85}
           onPress={onAction}
         >
-          <Text className="font-sans text-sm font-semibold text-base-canvas">
-            {actionLabel}
-          </Text>
+          <Text className="font-sans text-sm font-semibold text-base-canvas">{actionLabel}</Text>
         </TouchableOpacity>
       ) : null}
 
       {footer ? <View className="mt-4">{footer}</View> : null}
     </View>
-  )
-})
+  );
+});

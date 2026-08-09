@@ -11,6 +11,7 @@ import { colors, fonts, shadows } from '@/design/tokens';
 import { useAuth } from '@/hooks/useAuth';
 import { useI18n } from '@/i18n';
 import { trackGuestEvent } from '@/lib/guestAnalytics';
+import { logger } from '@/lib/logger';
 
 export default function TabsLayout() {
   const { dbUser } = useAuth();
@@ -74,7 +75,8 @@ export default function TabsLayout() {
             response.data.unreadCount || response.data.data?.unreadCount || 0
           );
         }
-      } catch (error: any) {
+      } catch (unknownError: unknown) {
+        const error = unknownError as { response?: { status?: number } };
         if (error?.response?.status === 429) {
           lastNotificationBadgeFetchRef.current = Date.now() + 60000;
         }
@@ -129,8 +131,9 @@ export default function TabsLayout() {
         });
 
         socketRef.current = socket;
-      } catch (error: any) {
-        console.warn('[TabsLayout] Badge socket skipped', {
+      } catch (unknownError: unknown) {
+        const error = unknownError as { message?: string };
+        logger.warn('[TabsLayout] Badge socket skipped', {
           message: error?.message,
           currentUserUid: firebaseAuth.currentUser?.uid ?? null,
         });

@@ -1,67 +1,65 @@
-﻿import { Ionicons } from '@expo/vector-icons'
-import { Alert } from '@/lib/velveAlert'
-import { useRouter } from 'expo-router'
-import { memo, useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  FlatList,
-  RefreshControl,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native'
+﻿import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
 
-import client from '@/api/client'
-import { EditorialEmptyState } from '@/components/EditorialEmptyState'
-import { RemoteImage } from '@/components/RemoteImage'
-import { colors } from '@/design/tokens'
-import { useI18n } from '@/i18n'
-import { getPrimaryItemImage, hasDigitizedImage } from '@/lib/itemImages'
+import client from '@/api/client';
+import { EditorialEmptyState } from '@/components/EditorialEmptyState';
+import { RemoteImage } from '@/components/RemoteImage';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
+import { getPrimaryItemImage } from '@/lib/itemImages';
+import { Alert } from '@/lib/velveAlert';
 
-type ClosetBucket = 'live' | 'drafts' | 'archive'
+type ClosetBucket = 'live' | 'drafts' | 'archive';
 
 type ClosetItem = {
-  _id: string
-  title: string
-  images?: string[]
-  imageClean?: string | null
-  primaryImage?: string | null
-  isDigitized?: boolean
-  brand?: string
-  size?: string
-  status: string
-  archiveStatus?: string | null
-  listingType?: 'sell' | 'trade' | 'both'
-}
+  _id: string;
+  title: string;
+  images?: string[];
+  imageClean?: string | null;
+  primaryImage?: string | null;
+  isDigitized?: boolean;
+  brand?: string;
+  size?: string;
+  status: string;
+  archiveStatus?: string | null;
+  listingType?: 'sell' | 'trade' | 'both';
+};
 
 type ClosetPayload = {
-  live: ClosetItem[]
-  drafts: ClosetItem[]
-  archive: ClosetItem[]
-}
+  live: ClosetItem[];
+  drafts: ClosetItem[];
+  archive: ClosetItem[];
+};
 
 function getStatusLabel(item: ClosetItem) {
-  if (item.archiveStatus === 'deleted') return 'Deleted'
-  if (item.archiveStatus === 'sold') return 'Sold'
-  if (item.archiveStatus === 'swapped') return 'Swapped'
-  if (item.status === 'pending_trade') return 'Pending'
-  if (item.status === 'unavailable') return 'Paused'
-  if (item.status === 'draft') return 'Draft'
-  if (item.status === 'archived') return 'Archived'
-  return 'Available'
+  if (item.archiveStatus === 'deleted') return 'Deleted';
+  if (item.archiveStatus === 'sold') return 'Sold';
+  if (item.archiveStatus === 'swapped') return 'Swapped';
+  if (item.status === 'pending_trade') return 'Pending';
+  if (item.status === 'unavailable') return 'Paused';
+  if (item.status === 'draft') return 'Draft';
+  if (item.status === 'archived') return 'Archived';
+  return 'Available';
 }
 
 function getStatusTone(item: ClosetItem) {
   if (item.archiveStatus === 'sold' || item.archiveStatus === 'swapped') {
-    return 'bg-brand-highlight text-ink-dark'
+    return 'bg-brand-highlight text-ink-dark';
   }
 
-  if (item.status === 'pending_trade') return 'bg-brand-accent-light/30 text-brand-accent-deep'
-  if (item.status === 'draft') return 'bg-base-canvas text-ink-dark'
-  if (item.status === 'unavailable' || item.status === 'archived' || item.archiveStatus === 'deleted') {
-    return 'bg-surface-panel text-ink-dark'
+  if (item.status === 'pending_trade') return 'bg-brand-accent-light/30 text-brand-accent-deep';
+  if (item.status === 'draft') return 'bg-base-canvas text-ink-dark';
+  if (
+    item.status === 'unavailable' ||
+    item.status === 'archived' ||
+    item.archiveStatus === 'deleted'
+  ) {
+    return 'bg-surface-panel text-ink-dark';
   }
 
-  return 'bg-brand-highlight text-ink-dark'
+  return 'bg-brand-highlight text-ink-dark';
 }
 
 const ClosetCard = memo(function ClosetCard({
@@ -74,16 +72,16 @@ const ClosetCard = memo(function ClosetCard({
   onDigitize,
   onDelete,
 }: {
-  item: ClosetItem
-  onOpen: () => void
-  onQuickAction?: () => void
-  quickActionLabel?: string | null
-  noDetailsLabel: string
-  openLabel: string
-  onDigitize?: () => void
-  onDelete?: () => void
+  item: ClosetItem;
+  onOpen: () => void;
+  onQuickAction?: () => void;
+  quickActionLabel?: string | null;
+  noDetailsLabel: string;
+  openLabel: string;
+  onDigitize?: () => void;
+  onDelete?: () => void;
 }) {
-  const tone = getStatusTone(item).split(' ')
+  const tone = getStatusTone(item).split(' ');
 
   return (
     <TouchableOpacity
@@ -102,7 +100,7 @@ const ClosetCard = memo(function ClosetCard({
         <View className="mr-4 h-28 w-24 overflow-hidden rounded-[20px] bg-base-canvas">
           {getPrimaryItemImage(item) ? (
             <RemoteImage
-              uri={getPrimaryItemImage(item) || undefined}
+              uri={getPrimaryItemImage(item) ?? undefined}
               className="h-full w-full"
               fallback={
                 <View className="h-full w-full items-center justify-center bg-brand-accent-light/20">
@@ -181,9 +179,7 @@ const ClosetCard = memo(function ClosetCard({
                 onPress={onDigitize}
                 className="rounded-full bg-brand-highlight px-3 py-2"
               >
-                <Text className="font-sans text-xs font-semibold text-ink-dark">
-                  Clean Cut
-                </Text>
+                <Text className="font-sans text-xs font-semibold text-ink-dark">Clean Cut</Text>
               </TouchableOpacity>
             ) : null}
 
@@ -199,8 +195,8 @@ const ClosetCard = memo(function ClosetCard({
         </View>
       </View>
     </TouchableOpacity>
-  )
-})
+  );
+});
 
 function ClosetSkeleton() {
   return (
@@ -232,69 +228,65 @@ function ClosetSkeleton() {
         </View>
       ))}
     </View>
-  )
+  );
 }
 
 export default function ClosetScreen() {
-  const router = useRouter()
-  const { t } = useI18n()
+  const router = useRouter();
+  const { t } = useI18n();
 
   const [closet, setCloset] = useState<ClosetPayload>({
     live: [],
     drafts: [],
     archive: [],
-  })
-  const [activeBucket, setActiveBucket] = useState<ClosetBucket>('live')
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [digitizingItemId, setDigitizingItemId] = useState<string | null>(null)
+  });
+  const [activeBucket, setActiveBucket] = useState<ClosetBucket>('live');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [digitizingItemId, setDigitizingItemId] = useState<string | null>(null);
 
-  const visibleItems = closet[activeBucket]
-  const hasReadyForVto = useMemo(
-    () => [...closet.live, ...closet.drafts].some((item) => hasDigitizedImage(item)),
-    [closet]
-  )
+  const visibleItems = closet[activeBucket];
 
   const loadCloset = useCallback(async () => {
-    const response = await client.get('/api/items/closet')
+    const response = await client.get('/api/items/closet');
     if (response.data.ok) {
-      setCloset(response.data.data as ClosetPayload)
+      setCloset(response.data.data as ClosetPayload);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
     loadCloset()
       .catch(() => {
-        Alert.alert(t('common.error'), t('closet.loadError'))
+        Alert.alert(t('common.error'), t('closet.loadError'));
       })
-      .finally(() => setLoading(false))
-  }, [loadCloset, t])
+      .finally(() => setLoading(false));
+  }, [loadCloset, t]);
 
   const onRefresh = useCallback(async () => {
     try {
-      setRefreshing(true)
-      await loadCloset()
+      setRefreshing(true);
+      await loadCloset();
     } finally {
-      setRefreshing(false)
+      setRefreshing(false);
     }
-  }, [loadCloset])
+  }, [loadCloset]);
 
   const withMutation = useCallback(
     async (callback: () => Promise<void>) => {
       try {
-        setSubmitting(true)
-        await callback()
-        await loadCloset()
+        setSubmitting(true);
+        await callback();
+        await loadCloset();
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : t('closet.mutationError')
-        Alert.alert(t('common.error'), message)
+        const message = error instanceof Error ? error.message : t('closet.mutationError');
+        Alert.alert(t('common.error'), message);
       } finally {
-        setSubmitting(false)
+        setSubmitting(false);
       }
     },
     [loadCloset, t]
-  )
+  );
 
   const bucketCounts = useMemo(
     () => ({
@@ -303,14 +295,18 @@ export default function ClosetScreen() {
       archive: closet.archive.length,
     }),
     [closet]
-  )
+  );
 
-  const quickActionLabel = useCallback((item: ClosetItem) => {
-    if (item.status === 'draft') return t('closet.publish')
-    if (item.status === 'available') return t('closet.pause')
-    if (item.status === 'unavailable' || item.status === 'archived') return t('closet.restoreLive')
-    return null
-  }, [t])
+  const quickActionLabel = useCallback(
+    (item: ClosetItem) => {
+      if (item.status === 'draft') return t('closet.publish');
+      if (item.status === 'available') return t('closet.pause');
+      if (item.status === 'unavailable' || item.status === 'archived')
+        return t('closet.restoreLive');
+      return null;
+    },
+    [t]
+  );
 
   const handleQuickAction = useCallback(
     async (item: ClosetItem) => {
@@ -320,31 +316,35 @@ export default function ClosetScreen() {
             ? 'available'
             : item.status === 'available'
               ? 'unavailable'
-              : 'available'
+              : 'available';
 
-        await client.put(`/api/items/${item._id}/status`, { status: nextStatus })
-      })
+        await client.put(`/api/items/${item._id}/status`, { status: nextStatus });
+      });
     },
     [withMutation]
-  )
+  );
 
   const handleDigitize = useCallback(
     async (item: ClosetItem) => {
       try {
-        setDigitizingItemId(item._id)
-        await client.post(`/api/items/${item._id}/digitize`)
-        await loadCloset()
-      } catch (error: any) {
+        setDigitizingItemId(item._id);
+        await client.post(`/api/items/${item._id}/digitize`);
+        await loadCloset();
+      } catch (unknownError: unknown) {
+        const error = unknownError as {
+          message?: string;
+          response?: { data?: { error?: string } };
+        };
         Alert.alert(
           t('closet.cleanCutFailedTitle'),
           error?.response?.data?.error || error?.message || t('closet.cleanCutRetry')
-        )
+        );
       } finally {
-        setDigitizingItemId(null)
+        setDigitizingItemId(null);
       }
     },
     [loadCloset, t]
-  )
+  );
 
   const handleDelete = useCallback(
     (item: ClosetItem) => {
@@ -355,13 +355,13 @@ export default function ClosetScreen() {
           style: 'destructive',
           onPress: () =>
             withMutation(async () => {
-              await client.delete(`/api/items/${item._id}`)
+              await client.delete(`/api/items/${item._id}`);
             }),
         },
-      ])
+      ]);
     },
     [t, withMutation]
-  )
+  );
 
   const renderClosetItem = useCallback(
     ({ item }: { item: ClosetItem }) => (
@@ -377,13 +377,15 @@ export default function ClosetScreen() {
           quickActionLabel={quickActionLabel(item)}
           noDetailsLabel={t('closet.noDetails')}
           openLabel={t('closet.open')}
-          onDigitize={!item.isDigitized && !digitizingItemId ? () => handleDigitize(item) : undefined}
+          onDigitize={
+            !item.isDigitized && !digitizingItemId ? () => handleDigitize(item) : undefined
+          }
           onDelete={item.status === 'draft' ? () => handleDelete(item) : undefined}
         />
       </View>
     ),
     [digitizingItemId, handleDelete, handleDigitize, handleQuickAction, quickActionLabel, router, t]
-  )
+  );
 
   const closetHeader = useMemo(
     () => (
@@ -422,17 +424,11 @@ export default function ClosetScreen() {
               className="flex-1 items-center rounded-full bg-brand-accent-deep px-4 py-3"
               onPress={() => router.push('/(tabs)/upload')}
             >
-              <Text className="font-sans text-sm font-semibold text-base-canvas">{t('closet.newListing')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              className={`flex-1 items-center rounded-full bg-brand-highlight px-4 py-3 ${hasReadyForVto ? '' : 'opacity-40'}`}
-              disabled={!hasReadyForVto}
-              onPress={() => router.push('/vto/archive')}
-            >
-              <Text className="font-sans text-sm font-semibold text-ink-dark">
-                {t('closet.magicTryOn')}
+              <Text className="font-sans text-sm font-semibold text-base-canvas">
+                {t('closet.newListing')}
               </Text>
             </TouchableOpacity>
+            {/* VTO archive button hidden for MVP — feature code kept, entry point removed. */}
           </View>
         </View>
 
@@ -476,11 +472,11 @@ export default function ClosetScreen() {
         </View>
       </View>
     ),
-    [activeBucket, bucketCounts, hasReadyForVto, router, t]
-  )
+    [activeBucket, bucketCounts, router, t]
+  );
 
   if (loading) {
-    return <ClosetSkeleton />
+    return <ClosetSkeleton />;
   }
 
   return (
@@ -529,6 +525,5 @@ export default function ClosetScreen() {
       windowSize={5}
       removeClippedSubviews
     />
-  )
+  );
 }
-

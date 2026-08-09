@@ -1,41 +1,49 @@
-import { Ionicons } from '@expo/vector-icons'
-import { Alert } from '@/lib/velveAlert'
-import * as FileSystem from 'expo-file-system/legacy'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
-import { Animated, PanResponder, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native'
-import * as Sharing from 'expo-sharing'
+import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system/legacy';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as Sharing from 'expo-sharing';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  PanResponder,
+  ScrollView,
+  Share,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-import client from '@/api/client'
-import { BrandWordmark } from '@/components/BrandWordmark'
-import { RemoteImage } from '@/components/RemoteImage'
-import { colors } from '@/design/tokens'
-import { hasSkippedBodyScanThisSession } from '@/lib/vtoSession'
+import client from '@/api/client';
+import { BrandWordmark } from '@/components/BrandWordmark';
+import { RemoteImage } from '@/components/RemoteImage';
+import { colors } from '@/design/tokens';
+import { Alert } from '@/lib/velveAlert';
+import { hasSkippedBodyScanThisSession } from '@/lib/vtoSession';
 
 type BodyScanPayload = {
-  exists: boolean
-  url: string | null
-}
+  exists: boolean;
+  url: string | null;
+};
 
 type OutfitPayload = {
-  _id: string
-  name: string
-  vtoImageUrl: string
-  isChainRender?: boolean
-  chainSteps?: number
-}
+  _id: string;
+  name: string;
+  vtoImageUrl: string;
+  isChainRender?: boolean;
+  chainSteps?: number;
+};
 
 function OutfitRow({
   outfit,
   deleting,
   onDelete,
 }: {
-  outfit: OutfitPayload
-  deleting: boolean
-  onDelete: () => void
+  outfit: OutfitPayload;
+  deleting: boolean;
+  onDelete: () => void;
 }) {
-  const translateX = useRef(new Animated.Value(0)).current
-  const openedRef = useRef(false)
+  const translateX = useRef(new Animated.Value(0)).current;
+  const openedRef = useRef(false);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -43,19 +51,19 @@ function OutfitRow({
         Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
       onPanResponderMove: (_, gesture) => {
         if (gesture.dx < 0) {
-          translateX.setValue(Math.max(gesture.dx, -86))
+          translateX.setValue(Math.max(gesture.dx, -86));
         }
       },
       onPanResponderRelease: (_, gesture) => {
-        const shouldOpen = gesture.dx < -54
-        openedRef.current = shouldOpen
+        const shouldOpen = gesture.dx < -54;
+        openedRef.current = shouldOpen;
         Animated.spring(translateX, {
           toValue: shouldOpen ? -72 : 0,
           useNativeDriver: true,
-        }).start()
+        }).start();
       },
     })
-  ).current
+  ).current;
 
   return (
     <View className="overflow-hidden rounded-[24px] bg-signal-danger/10">
@@ -65,7 +73,11 @@ function OutfitRow({
           disabled={deleting}
           className="h-11 w-11 items-center justify-center rounded-full bg-signal-danger"
         >
-          <Ionicons name={deleting ? 'hourglass-outline' : 'trash-outline'} size={18} color={colors.baseCanvas} />
+          <Ionicons
+            name={deleting ? 'hourglass-outline' : 'trash-outline'}
+            size={18}
+            color={colors.baseCanvas}
+          />
         </TouchableOpacity>
       </View>
       <Animated.View
@@ -77,7 +89,9 @@ function OutfitRow({
         <View className="ml-3 flex-1">
           <Text className="font-display text-2xl text-ink-dark">{outfit.name}</Text>
           <Text className="mt-1 font-sans text-xs text-ink-dark/55">
-            {outfit.isChainRender ? `Chain render u ${outfit.chainSteps || 1} koraka` : 'Prevuci ulevo za brisanje'}
+            {outfit.isChainRender
+              ? `Chain render u ${outfit.chainSteps || 1} koraka`
+              : 'Prevuci ulevo za brisanje'}
           </Text>
         </View>
         <TouchableOpacity
@@ -85,11 +99,15 @@ function OutfitRow({
           disabled={deleting}
           className="ml-3 h-11 w-11 items-center justify-center rounded-full bg-base-canvas"
         >
-          <Ionicons name={deleting ? 'hourglass-outline' : 'trash-outline'} size={18} color={colors.inkDark} />
+          <Ionicons
+            name={deleting ? 'hourglass-outline' : 'trash-outline'}
+            size={18}
+            color={colors.inkDark}
+          />
         </TouchableOpacity>
       </Animated.View>
     </View>
-  )
+  );
 }
 
 function VtoHubSkeleton() {
@@ -114,66 +132,66 @@ function VtoHubSkeleton() {
       <View className="mt-5 h-14 rounded-full bg-surface-panel" />
       <View className="mt-7 h-28 rounded-[28px] bg-surface-panel" />
     </ScrollView>
-  )
+  );
 }
 
 export default function VtoHubScreen() {
-  const router = useRouter()
-  const params = useLocalSearchParams<{ vtoImageUrl?: string }>()
-  const [loading, setLoading] = useState(true)
-  const [bodyScan, setBodyScan] = useState<BodyScanPayload>({ exists: false, url: null })
-  const [outfits, setOutfits] = useState<OutfitPayload[]>([])
-  const [exporting, setExporting] = useState(false)
-  const [deletingOutfitId, setDeletingOutfitId] = useState<string | null>(null)
+  const router = useRouter();
+  const params = useLocalSearchParams<{ vtoImageUrl?: string }>();
+  const [loading, setLoading] = useState(true);
+  const [bodyScan, setBodyScan] = useState<BodyScanPayload>({ exists: false, url: null });
+  const [outfits, setOutfits] = useState<OutfitPayload[]>([]);
+  const [exporting, setExporting] = useState(false);
+  const [deletingOutfitId, setDeletingOutfitId] = useState<string | null>(null);
 
   async function loadAll() {
     const [bodyScanResponse, outfitsResponse] = await Promise.all([
       client.get('/api/users/body-scan'),
       client.get('/api/vto/outfits'),
-    ])
+    ]);
 
-    setBodyScan(bodyScanResponse.data?.data || { exists: false, url: null })
-    setOutfits(outfitsResponse.data?.data || [])
+    setBodyScan(bodyScanResponse.data?.data || { exists: false, url: null });
+    setOutfits(outfitsResponse.data?.data || []);
   }
 
   useEffect(() => {
     loadAll()
       .catch(() => undefined)
-      .finally(() => setLoading(false))
-  }, [params.vtoImageUrl])
+      .finally(() => setLoading(false));
+  }, [params.vtoImageUrl]);
 
   async function shareImage() {
-    const url = params.vtoImageUrl || bodyScan.url
-    if (!url) return
+    const url = params.vtoImageUrl ?? bodyScan.url;
+    if (!url) return;
 
     async function shareUrlFallback() {
-      await Share.share({ message: `Velve Virtual Try-On\n${url}` })
+      await Share.share({ message: `Velve Virtual Try-On\n${url}` });
     }
 
     try {
-      setExporting(true)
-      const sharingAvailable = await Sharing.isAvailableAsync()
-      const cacheDirectory = FileSystem.cacheDirectory || ''
+      setExporting(true);
+      const sharingAvailable = await Sharing.isAvailableAsync();
+      const cacheDirectory = FileSystem.cacheDirectory ?? '';
 
       if (!sharingAvailable || !cacheDirectory) {
-        await shareUrlFallback()
-        return
+        await shareUrlFallback();
+        return;
       }
 
-      const extensionMatch = url.match(/\.(png|jpg|jpeg|webp)(?:\?|$)/i)
-      const fileExtension = extensionMatch ? `.${extensionMatch[1].toLowerCase()}` : '.png'
-      const localUri = `${cacheDirectory}velve-vto-${Date.now()}${fileExtension}`
+      const extensionMatch = url.match(/\.(png|jpg|jpeg|webp)(?:\?|$)/i);
+      const fileExtension = extensionMatch ? `.${extensionMatch[1].toLowerCase()}` : '.png';
+      const localUri = `${cacheDirectory}velve-vto-${Date.now()}${fileExtension}`;
 
-      await FileSystem.downloadAsync(url, localUri)
-      await Sharing.shareAsync(localUri)
+      await FileSystem.downloadAsync(url, localUri);
+      await Sharing.shareAsync(localUri);
     } catch {
       try {
-        await shareUrlFallback()
+        await shareUrlFallback();
       } catch {
-        Alert.alert('Greska', 'Deljenje nije uspelo.')
+        Alert.alert('Greska', 'Deljenje nije uspelo.');
       }
     } finally {
-      setExporting(false)
+      setExporting(false);
     }
   }
 
@@ -185,30 +203,34 @@ export default function VtoHubScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            setDeletingOutfitId(outfitId)
-            await client.delete(`/api/vto/outfits/${outfitId}`)
-            setOutfits((prev) => prev.filter((outfit) => outfit._id !== outfitId))
-          } catch (error: any) {
+            setDeletingOutfitId(outfitId);
+            await client.delete(`/api/vto/outfits/${outfitId}`);
+            setOutfits((prev) => prev.filter((outfit) => outfit._id !== outfitId));
+          } catch (unknownError: unknown) {
+            const error = unknownError as {
+              message?: string;
+              response?: { data?: { error?: string } };
+            };
             Alert.alert(
               'Brisanje nije uspelo',
               error?.response?.data?.error || error?.message || 'Pokusaj ponovo.'
-            )
+            );
           } finally {
-            setDeletingOutfitId(null)
+            setDeletingOutfitId(null);
           }
         },
       },
-    ])
+    ]);
   }
 
   if (loading) {
-    return <VtoHubSkeleton />
+    return <VtoHubSkeleton />;
   }
 
-  const hasBodyScan = Boolean(bodyScan.exists && bodyScan.url)
-  const skippedBodyScan = hasSkippedBodyScanThisSession()
-  const currentImage = params.vtoImageUrl || bodyScan.url || null
-  const hasRender = !!params.vtoImageUrl
+  const hasBodyScan = Boolean(bodyScan.exists && bodyScan.url);
+  const skippedBodyScan = hasSkippedBodyScanThisSession();
+  const currentImage = params.vtoImageUrl ?? bodyScan.url ?? null;
+  const hasRender = !!params.vtoImageUrl;
   const openOverflowMenu = () => {
     const actions = [
       ...(hasRender
@@ -220,10 +242,16 @@ export default function VtoHubScreen() {
       },
       { text: 'Body scan', onPress: () => router.push('/vto/body-scan') },
       { text: 'Odustani', style: 'cancel' as const },
-    ]
+    ];
 
-    Alert.alert('VTO opcije', hasRender ? 'Izaberi akciju za trenutni render.' : 'Prvo napravi outfit, pa ce deljenje biti dostupno.', actions)
-  }
+    Alert.alert(
+      'VTO opcije',
+      hasRender
+        ? 'Izaberi akciju za trenutni render.'
+        : 'Prvo napravi outfit, pa ce deljenje biti dostupno.',
+      actions
+    );
+  };
 
   return (
     <ScrollView
@@ -251,10 +279,7 @@ export default function VtoHubScreen() {
 
       {currentImage ? (
         <View collapsable={false} className="overflow-hidden rounded-[34px] bg-white">
-          <RemoteImage
-            uri={currentImage}
-            className="h-[560px] w-full"
-          />
+          <RemoteImage uri={currentImage} className="h-[560px] w-full" />
           {hasRender ? (
             <View className="absolute bottom-5 right-5 rounded-full bg-base-canvas/90 px-4 py-2">
               <BrandWordmark width={78} />
@@ -276,7 +301,9 @@ export default function VtoHubScreen() {
             onPress={() => router.push('/vto/body-scan')}
             className="mt-6 items-center rounded-full bg-brand-accent-deep px-4 py-4"
           >
-            <Text className="font-sans text-base font-semibold text-base-canvas">Napravi body scan</Text>
+            <Text className="font-sans text-base font-semibold text-base-canvas">
+              Napravi body scan
+            </Text>
           </TouchableOpacity>
         </View>
       )}
@@ -294,7 +321,9 @@ export default function VtoHubScreen() {
         onPress={() => router.push(hasBodyScan ? '/vto/select' : '/vto/body-scan')}
         className={`mt-5 items-center rounded-full px-4 py-4 ${hasBodyScan ? 'bg-brand-accent-deep' : 'bg-brand-highlight'}`}
       >
-        <Text className={`font-sans text-base font-semibold ${hasBodyScan ? 'text-base-canvas' : 'text-ink-dark'}`}>
+        <Text
+          className={`font-sans text-base font-semibold ${hasBodyScan ? 'text-base-canvas' : 'text-ink-dark'}`}
+        >
           {hasBodyScan ? 'Odaberi artikal' : 'Dodaj body scan'}
         </Text>
       </TouchableOpacity>
@@ -323,8 +352,15 @@ export default function VtoHubScreen() {
             Kolekcija je prazna dok ne sacuvas prvi render. Kreni kroz tri kratka koraka.
           </Text>
           <View className="mt-4 gap-3">
-            {['Izaberi digitalizovan komad', 'Pokreni Virtual Try-On render', 'Sacuvaj rezultat u kolekciju'].map((step, index) => (
-              <View key={step} className="flex-row items-center rounded-[18px] bg-base-canvas px-4 py-3">
+            {[
+              'Izaberi digitalizovan komad',
+              'Pokreni Virtual Try-On render',
+              'Sacuvaj rezultat u kolekciju',
+            ].map((step, index) => (
+              <View
+                key={step}
+                className="flex-row items-center rounded-[18px] bg-base-canvas px-4 py-3"
+              >
                 <Text className="font-display text-xl text-brand-accent-deep">{index + 1}</Text>
                 <Text className="ml-3 flex-1 font-sans text-sm text-ink-dark/70">{step}</Text>
               </View>
@@ -341,5 +377,5 @@ export default function VtoHubScreen() {
         </View>
       )}
     </ScrollView>
-  )
+  );
 }

@@ -1,6 +1,6 @@
-import { Ionicons } from '@expo/vector-icons'
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Ionicons } from '@expo/vector-icons';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,26 +11,26 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
-} from 'react-native'
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+} from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import client from '@/api/client'
-import { EditorialEmptyState } from '@/components/EditorialEmptyState'
-import { ImmersiveFeedCard, ImmersiveFeedItem } from '@/components/ImmersiveFeedCard'
-import { VelveTextInput } from '@/components/VelveTextInput'
-import { colors } from '@/design/tokens'
-import { useI18n } from '@/i18n'
-import { getApiErrorMessage } from '@/lib/apiErrors'
-import { getStorage } from '@/lib/storage'
-import { showVelveToast } from '@/lib/velveAlert'
+import client from '@/api/client';
+import { EditorialEmptyState } from '@/components/EditorialEmptyState';
+import { ImmersiveFeedCard, ImmersiveFeedItem } from '@/components/ImmersiveFeedCard';
+import { VelveTextInput } from '@/components/VelveTextInput';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
+import { getApiErrorMessage } from '@/lib/apiErrors';
+import { getStorage } from '@/lib/storage';
+import { showVelveToast } from '@/lib/velveAlert';
 
 type SearchFilters = {
-  category: string
-  size: string
-  city: string
-  priceMin: string
-  priceMax: string
-}
+  category: string;
+  size: string;
+  city: string;
+  priceMin: string;
+  priceMax: string;
+};
 
 const EMPTY_FILTERS: SearchFilters = {
   category: '',
@@ -38,17 +38,17 @@ const EMPTY_FILTERS: SearchFilters = {
   city: '',
   priceMin: '',
   priceMax: '',
-}
+};
 
-const SIZE_FILTERS = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
-const SEARCH_HISTORY_KEY = '@velve:search-history'
+const SIZE_FILTERS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+const SEARCH_HISTORY_KEY = '@velve:search-history';
 
 export default function SearchScreen() {
-  const router = useRouter()
-  const params = useLocalSearchParams<{ category?: string; q?: string }>()
-  const insets = useSafeAreaInsets()
-  const { height: windowHeight } = useWindowDimensions()
-  const { locale, t } = useI18n()
+  const router = useRouter();
+  const params = useLocalSearchParams<{ category?: string; q?: string }>();
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const { locale, t } = useI18n();
   const categoryFilters = [
     t('search.categoryTops'),
     t('search.categoryDresses'),
@@ -56,7 +56,7 @@ export default function SearchScreen() {
     t('search.categoryOuterwear'),
     t('search.categoryShoes'),
     t('search.categoryAccessories'),
-  ]
+  ];
   const trendingTags = [
     t('search.trendingLeather'),
     t('search.trendingDenim'),
@@ -64,74 +64,79 @@ export default function SearchScreen() {
     t('search.trendingCoat'),
     t('search.trendingBlackBag'),
     t('search.trendingBlazer'),
-  ]
+  ];
 
-  const [query, setQuery] = useState(params.q || '')
-  const [items, setItems] = useState<ImmersiveFeedItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
-  const [hasMore, setHasMore] = useState(false)
-  const initialFilters = { ...EMPTY_FILTERS, category: params.category || '' }
-  const [filters, setFilters] = useState<SearchFilters>(initialFilters)
-  const [draftFilters, setDraftFilters] = useState<SearchFilters>(initialFilters)
-  const [filterOpen, setFilterOpen] = useState(false)
-  const [searchHistory, setSearchHistory] = useState<string[]>([])
+  const [query, setQuery] = useState(params.q ?? '');
+  const [items, setItems] = useState<ImmersiveFeedItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const initialFilters = { ...EMPTY_FILTERS, category: params.category ?? '' };
+  const [filters, setFilters] = useState<SearchFilters>(initialFilters);
+  const [draftFilters, setDraftFilters] = useState<SearchFilters>(initialFilters);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
 
-  const pageHeight = Math.max(windowHeight, 1)
+  const pageHeight = Math.max(windowHeight, 1);
 
-  const updateItem = useCallback((itemId: string, updater: (item: ImmersiveFeedItem) => ImmersiveFeedItem) => {
-    setItems((prev) => prev.map((item) => (item._id === itemId ? updater(item) : item)))
-  }, [])
+  const updateItem = useCallback(
+    (itemId: string, updater: (item: ImmersiveFeedItem) => ImmersiveFeedItem) => {
+      setItems((prev) => prev.map((item) => (item._id === itemId ? updater(item) : item)));
+    },
+    []
+  );
 
   useEffect(() => {
     getStorage()
       .getItem(SEARCH_HISTORY_KEY)
       .then((value) => {
-        if (!value) return
-        const parsed = JSON.parse(value)
+        if (!value) return;
+        const parsed = JSON.parse(value);
         if (Array.isArray(parsed)) {
-          setSearchHistory(parsed.filter((entry) => typeof entry === 'string').slice(0, 8))
+          setSearchHistory(parsed.filter((entry) => typeof entry === 'string').slice(0, 8));
         }
       })
-      .catch(() => undefined)
-  }, [])
+      .catch(() => undefined);
+  }, []);
 
   const persistSearchHistory = useCallback((nextHistory: string[]) => {
-    setSearchHistory(nextHistory)
-    getStorage().setItem(SEARCH_HISTORY_KEY, JSON.stringify(nextHistory)).catch(() => undefined)
-  }, [])
+    setSearchHistory(nextHistory);
+    getStorage()
+      .setItem(SEARCH_HISTORY_KEY, JSON.stringify(nextHistory))
+      .catch(() => undefined);
+  }, []);
 
   const recordSearchQuery = useCallback(
     (value: string) => {
-      const normalized = value.trim()
-      if (normalized.length < 2) return
+      const normalized = value.trim();
+      if (normalized.length < 2) return;
       const nextHistory = [
         normalized,
         ...searchHistory.filter((entry) => entry.toLowerCase() !== normalized.toLowerCase()),
-      ].slice(0, 8)
-      persistSearchHistory(nextHistory)
+      ].slice(0, 8);
+      persistSearchHistory(nextHistory);
     },
     [persistSearchHistory, searchHistory]
-  )
+  );
 
-  const useSuggestion = useCallback(
+  const applySuggestion = useCallback(
     (value: string) => {
-      setQuery(value)
-      recordSearchQuery(value)
+      setQuery(value);
+      recordSearchQuery(value);
     },
     [recordSearchQuery]
-  )
+  );
 
   const loadResults = useCallback(
     async (mode: 'replace' | 'append' = 'replace') => {
       try {
         if (mode === 'replace') {
-          setLoading(true)
+          setLoading(true);
         } else {
-          setLoadingMore(true)
+          setLoadingMore(true);
         }
 
         const response = await client.get('/api/items', {
@@ -143,133 +148,133 @@ export default function SearchScreen() {
             city: filters.city.trim() || undefined,
             priceMin: filters.priceMin.trim() || undefined,
             priceMax: filters.priceMax.trim() || undefined,
-            cursor: mode === 'append' ? nextCursor || undefined : undefined,
+            cursor: mode === 'append' ? (nextCursor ?? undefined) : undefined,
           },
-        })
+        });
 
         if (response.data.ok) {
-          const nextItems = response.data.data as ImmersiveFeedItem[]
-          setItems((prev) => (mode === 'append' ? [...prev, ...nextItems] : nextItems))
-          setNextCursor(response.data.nextCursor ? String(response.data.nextCursor) : null)
-          setHasMore(Boolean(response.data.hasMore))
-          setErrorMessage('')
-          return
+          const nextItems = response.data.data as ImmersiveFeedItem[];
+          setItems((prev) => (mode === 'append' ? [...prev, ...nextItems] : nextItems));
+          setNextCursor(response.data.nextCursor ? String(response.data.nextCursor) : null);
+          setHasMore(Boolean(response.data.hasMore));
+          setErrorMessage('');
+          return;
         }
 
-        throw new Error('INVALID_SEARCH_RESPONSE')
+        throw new Error('INVALID_SEARCH_RESPONSE');
       } catch (error) {
         if (mode === 'replace') {
-          setItems([])
-          setErrorMessage(getApiErrorMessage(error, t('search.loadError')))
+          setItems([]);
+          setErrorMessage(getApiErrorMessage(error, t('search.loadError')));
         } else {
           showVelveToast({
             title: t('search.loadMoreErrorTitle'),
             message: getApiErrorMessage(error, t('search.loadMoreErrorDescription')),
             tone: 'error',
-          })
+          });
         }
       } finally {
-        setLoading(false)
-        setLoadingMore(false)
-        setRefreshing(false)
+        setLoading(false);
+        setLoadingMore(false);
+        setRefreshing(false);
       }
     },
     [filters, nextCursor, query, t]
-  )
+  );
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      loadResults('replace')
-    }, 250)
+      loadResults('replace');
+    }, 250);
 
-    return () => clearTimeout(timeout)
-  }, [loadResults])
+    return () => clearTimeout(timeout);
+  }, [loadResults]);
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true)
-    await loadResults('replace')
-  }, [loadResults])
+    setRefreshing(true);
+    await loadResults('replace');
+  }, [loadResults]);
 
   const onLoadMore = useCallback(() => {
-    if (!hasMore || loadingMore || !nextCursor) return
-    loadResults('append')
-  }, [hasMore, loadResults, loadingMore, nextCursor])
+    if (!hasMore || loadingMore || !nextCursor) return;
+    loadResults('append');
+  }, [hasMore, loadResults, loadingMore, nextCursor]);
 
   const handleLike = useCallback(
     async (itemId: string, isLiked: boolean) => {
-      let previousCount = 0
+      let previousCount = 0;
 
       updateItem(itemId, (item) => {
-        previousCount = item.likesCount ?? 0
+        previousCount = item.likesCount ?? 0;
         return {
           ...item,
           isLiked: !isLiked,
           likesCount: (item.likesCount ?? 0) + (isLiked ? -1 : 1),
-        }
-      })
+        };
+      });
 
       try {
         const response = isLiked
           ? await client.delete(`/api/items/${itemId}/like`)
-          : await client.post(`/api/items/${itemId}/like`)
+          : await client.post(`/api/items/${itemId}/like`);
 
         if (!isLiked && response.data.ok) {
           updateItem(itemId, (item) => ({
             ...item,
             isLiked: response.data.isLiked,
             likesCount: response.data.likesCount,
-          }))
+          }));
         }
       } catch {
         updateItem(itemId, (item) => ({
           ...item,
           isLiked,
           likesCount: previousCount,
-        }))
+        }));
         showVelveToast({
           title: t('search.likeErrorTitle'),
           message: t('search.likeErrorDescription'),
           tone: 'error',
-        })
+        });
       }
     },
     [t, updateItem]
-  )
+  );
 
   const handleWishlist = useCallback(
     async (itemId: string, isWishlisted: boolean) => {
-      let previousCount = 0
+      let previousCount = 0;
 
       updateItem(itemId, (item) => {
-        previousCount = item.wishlistCount ?? 0
+        previousCount = item.wishlistCount ?? 0;
         return {
           ...item,
           isWishlisted: !isWishlisted,
           wishlistCount: (item.wishlistCount ?? 0) + (isWishlisted ? -1 : 1),
-        }
-      })
+        };
+      });
 
       try {
         if (isWishlisted) {
-          await client.delete(`/api/wishlist/${itemId}`)
+          await client.delete(`/api/wishlist/${itemId}`);
         } else {
-          await client.post(`/api/wishlist/${itemId}`)
+          await client.post(`/api/wishlist/${itemId}`);
         }
       } catch {
         updateItem(itemId, (item) => ({
           ...item,
           isWishlisted,
           wishlistCount: previousCount,
-        }))
+        }));
         showVelveToast({
           title: t('search.saveErrorTitle'),
           message: t('search.saveErrorDescription'),
           tone: 'error',
-        })
+        });
       }
     },
     [t, updateItem]
-  )
+  );
 
   const renderSearchItem = useCallback(
     ({ item }: { item: ImmersiveFeedItem }) => (
@@ -278,29 +283,28 @@ export default function SearchScreen() {
         height={pageHeight}
         locale={locale}
         topInset={insets.top}
-        bottomInset={insets.bottom}
         onLike={handleLike}
         onWishlist={handleWishlist}
       />
     ),
     [handleLike, handleWishlist, insets.bottom, insets.top, locale, pageHeight]
-  )
+  );
 
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 })
-  const activeFilterCount = Object.values(filters).filter((value) => value.trim()).length
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 });
+  const activeFilterCount = Object.values(filters).filter((value) => value.trim()).length;
 
   const applyFilters = useCallback(() => {
-    setFilters(draftFilters)
-    setFilterOpen(false)
-    setNextCursor(null)
-  }, [draftFilters])
+    setFilters(draftFilters);
+    setFilterOpen(false);
+    setNextCursor(null);
+  }, [draftFilters]);
 
   const clearFilters = useCallback(() => {
-    setDraftFilters(EMPTY_FILTERS)
-    setFilters(EMPTY_FILTERS)
-    setFilterOpen(false)
-    setNextCursor(null)
-  }, [])
+    setDraftFilters(EMPTY_FILTERS);
+    setFilters(EMPTY_FILTERS);
+    setFilterOpen(false);
+    setNextCursor(null);
+  }, []);
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
@@ -361,7 +365,9 @@ export default function SearchScreen() {
             loadingMore ? (
               <View className="py-8">
                 <View className="mx-auto rounded-full border border-ink-dark/8 bg-ink-dark/4 px-5 py-3">
-                  <Text className="font-sans text-sm text-ink-dark/62">{t('common.loadingMore')}</Text>
+                  <Text className="font-sans text-sm text-ink-dark/62">
+                    {t('common.loadingMore')}
+                  </Text>
                 </View>
               </View>
             ) : null
@@ -391,8 +397,8 @@ export default function SearchScreen() {
           </View>
           <TouchableOpacity
             onPress={() => {
-              setDraftFilters(filters)
-              setFilterOpen(true)
+              setDraftFilters(filters);
+              setFilterOpen(true);
             }}
             className={`h-11 w-11 items-center justify-center rounded-full ${
               activeFilterCount ? 'bg-brand-accent-deep' : 'bg-ink-dark/6'
@@ -426,7 +432,9 @@ export default function SearchScreen() {
             </Text>
             {searchHistory.length > 0 ? (
               <TouchableOpacity onPress={() => persistSearchHistory([])}>
-                <Text className="font-sans text-xs font-semibold text-brand-accent-deep">{t('search.clearHistory')}</Text>
+                <Text className="font-sans text-xs font-semibold text-brand-accent-deep">
+                  {t('search.clearHistory')}
+                </Text>
               </TouchableOpacity>
             ) : null}
           </View>
@@ -434,7 +442,7 @@ export default function SearchScreen() {
             {trendingTags.map((tag) => (
               <TouchableOpacity
                 key={tag}
-                onPress={() => useSuggestion(tag)}
+                onPress={() => applySuggestion(tag)}
                 className="rounded-full bg-brand-highlight/35 px-3 py-2"
               >
                 <Text className="font-sans text-xs font-semibold text-ink-dark">{tag}</Text>
@@ -450,7 +458,7 @@ export default function SearchScreen() {
                 {searchHistory.slice(0, 4).map((entry) => (
                   <TouchableOpacity
                     key={entry}
-                    onPress={() => useSuggestion(entry)}
+                    onPress={() => applySuggestion(entry)}
                     className="flex-row items-center rounded-[18px] bg-surface-panel px-3 py-3"
                   >
                     <Ionicons name="time-outline" size={16} color={colors.mutedText} />
@@ -464,7 +472,12 @@ export default function SearchScreen() {
         </View>
       ) : null}
 
-      <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
+      <Modal
+        visible={filterOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFilterOpen(false)}
+      >
         <View className="flex-1 justify-end bg-ink-dark/30">
           <View className="rounded-t-[32px] bg-base-canvas px-5 pb-8 pt-5">
             <View className="mb-5 flex-row items-center justify-between">
@@ -561,18 +574,22 @@ export default function SearchScreen() {
                 onPress={clearFilters}
                 className="flex-1 items-center rounded-full bg-surface-panel px-4 py-4"
               >
-                <Text className="font-sans text-sm font-semibold text-ink-dark">{t('common.clear')}</Text>
+                <Text className="font-sans text-sm font-semibold text-ink-dark">
+                  {t('common.clear')}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={applyFilters}
                 className="flex-1 items-center rounded-full bg-brand-accent-deep px-4 py-4"
               >
-                <Text className="font-sans text-sm font-semibold text-base-canvas">{t('common.apply')}</Text>
+                <Text className="font-sans text-sm font-semibold text-base-canvas">
+                  {t('common.apply')}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
     </SafeAreaView>
-  )
+  );
 }

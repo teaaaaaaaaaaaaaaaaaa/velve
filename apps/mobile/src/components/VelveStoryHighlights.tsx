@@ -1,40 +1,40 @@
-import { Ionicons } from '@expo/vector-icons'
-import { useMemo, useState } from 'react'
-import { Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons';
+import { useMemo, useState } from 'react';
+import { Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
-import { colors } from '@/design/tokens'
+import { colors } from '@/design/tokens';
 
 type HighlightProfile = {
-  displayName?: string
-  bio?: string
-  stylePreferences?: string[]
-  favoriteBrands?: string[]
-  completedTrades?: number
-  successfulSwaps?: number
-  averageRating?: number
-}
+  displayName?: string;
+  bio?: string;
+  stylePreferences?: string[];
+  favoriteBrands?: string[];
+  completedTrades?: number;
+  successfulSwaps?: number;
+  averageRating?: number;
+};
 
 type Highlight = {
-  id: string
-  label: string
-  title: string
-  body: string
-  icon: keyof typeof Ionicons.glyphMap
-  pills: string[]
-}
+  id: string;
+  label: string;
+  title: string;
+  body: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  pills: string[];
+};
 
 function fallbackStyle(profile: HighlightProfile) {
-  if (profile.bio) return profile.bio
-  return 'Profil jos gradi svoj stil potpis. Prvi komadi i sacuvani brendovi ce ovde brzo napraviti jasniju pricu.'
+  if (profile.bio) return profile.bio;
+  return 'Profil jos gradi svoj stil potpis. Prvi komadi i sacuvani brendovi ce ovde brzo napraviti jasniju pricu.';
 }
 
 export function VelveStoryHighlights({ profile }: { profile: HighlightProfile }) {
-  const [activeHighlight, setActiveHighlight] = useState<Highlight | null>(null)
+  const [activeHighlight, setActiveHighlight] = useState<Highlight | null>(null);
 
   const highlights = useMemo<Highlight[]>(() => {
-    const stylePills = profile.stylePreferences?.length ? profile.stylePreferences.slice(0, 5) : []
-    const brandPills = profile.favoriteBrands?.length ? profile.favoriteBrands.slice(0, 6) : []
-    const swaps = profile.successfulSwaps || profile.completedTrades || 0
+    const stylePills = profile.stylePreferences?.length ? profile.stylePreferences.slice(0, 5) : [];
+    const brandPills = profile.favoriteBrands?.length ? profile.favoriteBrands.slice(0, 6) : [];
+    const swaps = profile.successfulSwaps || profile.completedTrades || 0;
 
     return [
       {
@@ -61,9 +61,10 @@ export function VelveStoryHighlights({ profile }: { profile: HighlightProfile })
         id: 'trades',
         label: 'Razmene',
         title: 'Uspesne razmene',
-        body: swaps > 0
-          ? `${swaps} uspesnih razmena gradi poverenje ovog profila.`
-          : 'Kada se zavrse prve razmene, ovde ce stajati trust signal profila.',
+        body:
+          swaps > 0
+            ? `${swaps} uspesnih razmena gradi poverenje ovog profila.`
+            : 'Kada se zavrse prve razmene, ovde ce stajati trust signal profila.',
         icon: 'repeat-outline',
         pills: [
           `${swaps} razmena`,
@@ -72,8 +73,8 @@ export function VelveStoryHighlights({ profile }: { profile: HighlightProfile })
             : 'Bez ocene',
         ],
       },
-    ]
-  }, [profile])
+    ];
+  }, [profile]);
 
   return (
     <>
@@ -95,7 +96,10 @@ export function VelveStoryHighlights({ profile }: { profile: HighlightProfile })
                 <Ionicons name={highlight.icon} size={25} color={colors.accentDeep} />
               </View>
             </View>
-            <Text className="mt-2 text-center font-sans text-xs font-semibold text-ink-dark" numberOfLines={1}>
+            <Text
+              className="mt-2 text-center font-sans text-xs font-semibold text-ink-dark"
+              numberOfLines={1}
+            >
               {highlight.label}
             </Text>
           </TouchableOpacity>
@@ -109,7 +113,11 @@ export function VelveStoryHighlights({ profile }: { profile: HighlightProfile })
         onRequestClose={() => setActiveHighlight(null)}
       >
         <View className="flex-1 justify-end bg-ink-dark/55">
-          <TouchableOpacity className="flex-1" activeOpacity={1} onPress={() => setActiveHighlight(null)} />
+          <TouchableOpacity
+            className="flex-1"
+            activeOpacity={1}
+            onPress={() => setActiveHighlight(null)}
+          />
           {activeHighlight ? (
             <View className="rounded-t-[32px] bg-base-canvas px-5 pb-8 pt-5">
               <View className="mb-5 h-1.5 w-12 self-center rounded-full bg-ink-dark/16" />
@@ -118,7 +126,9 @@ export function VelveStoryHighlights({ profile }: { profile: HighlightProfile })
                   <Ionicons name={activeHighlight.icon} size={24} color={colors.baseCanvas} />
                 </View>
                 <View className="ml-3 flex-1">
-                  <Text className="font-display text-3xl text-ink-dark">{activeHighlight.title}</Text>
+                  <Text className="font-display text-3xl text-ink-dark">
+                    {activeHighlight.title}
+                  </Text>
                   <Text className="mt-1 font-sans text-sm text-ink-dark/55">
                     {profile.displayName || 'Velve profil'}
                   </Text>
@@ -145,5 +155,5 @@ export function VelveStoryHighlights({ profile }: { profile: HighlightProfile })
         </View>
       </Modal>
     </>
-  )
+  );
 }

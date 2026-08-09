@@ -1,7 +1,6 @@
-import { Ionicons } from '@expo/vector-icons'
-import { Alert } from '@/lib/velveAlert'
-import { useRouter } from 'expo-router'
-import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -10,108 +9,109 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native'
+} from 'react-native';
 
-import client from '@/api/client'
-import { BrandBackground } from '@/components/BrandBackground'
-import { ChatSkeleton } from '@/components/BrandedLoader'
-import { EditorialEmptyState } from '@/components/EditorialEmptyState'
-import { RemoteImage } from '@/components/RemoteImage'
-import { colors } from '@/design/tokens'
-import { useAuth } from '@/hooks/useAuth'
-import { useSocket } from '@/hooks/useSocket'
-import { useI18n } from '@/i18n'
-import { getApiErrorMessage } from '@/lib/apiErrors'
+import client from '@/api/client';
+import { BrandBackground } from '@/components/BrandBackground';
+import { ChatSkeleton } from '@/components/BrandedLoader';
+import { EditorialEmptyState } from '@/components/EditorialEmptyState';
+import { RemoteImage } from '@/components/RemoteImage';
+import { colors } from '@/design/tokens';
+import { useAuth } from '@/hooks/useAuth';
+import { useSocket } from '@/hooks/useSocket';
+import { useI18n } from '@/i18n';
+import { getApiErrorMessage } from '@/lib/apiErrors';
+import { Alert } from '@/lib/velveAlert';
 
 type Participant = {
-  _id: string
-  displayName: string
-  photoURL?: string
-  email?: string
-}
+  _id: string;
+  displayName: string;
+  photoURL?: string;
+  email?: string;
+};
 
 type TradeMeta = {
-  _id: string
-  status: string
-}
+  _id: string;
+  status: string;
+};
 
 type LastMessage = {
-  _id: string
-  text: string
-  senderId?: { _id: string; displayName: string }
-  createdAt: string
-}
+  _id: string;
+  text: string;
+  senderId?: { _id: string; displayName: string };
+  createdAt: string;
+};
 
 type ChatRoom = {
-  _id: string
-  participants: Participant[]
-  tradeRequestId?: TradeMeta | null
-  lastMessage: LastMessage | null
-  messageCount: number
-  unreadCount?: number
-  updatedAt: string
-}
+  _id: string;
+  participants: Participant[];
+  tradeRequestId?: TradeMeta | null;
+  lastMessage: LastMessage | null;
+  messageCount: number;
+  unreadCount?: number;
+  updatedAt: string;
+};
 
 type TradeUser = {
-  _id: string
-  displayName: string
-  photoURL?: string
-  averageRating?: number
-  completedTrades?: number
-}
+  _id: string;
+  displayName: string;
+  photoURL?: string;
+  averageRating?: number;
+  completedTrades?: number;
+};
 
 type TradeItem = {
-  _id: string
-  title: string
-  primaryImage?: string
-  images?: string[]
-}
+  _id: string;
+  title: string;
+  primaryImage?: string;
+  images?: string[];
+};
 
 type TradeRecord = {
-  _id: string
-  kind: 'trade' | 'buy'
-  userRole: 'sender' | 'receiver'
-  status: 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'expired'
-  bucket: 'pending' | 'active' | 'history'
-  counterpart: TradeUser
-  offeredItemId?: TradeItem | null
-  requestedItemId?: TradeItem | null
-  offeredPrice?: number | null
-  updatedAt: string
-  createdAt: string
-  canAccept: boolean
-  canReject: boolean
-  canCancel: boolean
-  canComplete: boolean
-  canRate?: boolean
-}
+  _id: string;
+  kind: 'trade' | 'buy';
+  userRole: 'sender' | 'receiver';
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'expired';
+  bucket: 'pending' | 'active' | 'history';
+  counterpart: TradeUser;
+  offeredItemId?: TradeItem | null;
+  requestedItemId?: TradeItem | null;
+  offeredPrice?: number | null;
+  updatedAt: string;
+  createdAt: string;
+  canAccept: boolean;
+  canReject: boolean;
+  canCancel: boolean;
+  canComplete: boolean;
+  canRate?: boolean;
+};
 
 function formatTime(dateStr: string) {
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 1) return 'Sad'
-  if (diffMins < 60) return `${diffMins}m`
-  if (diffHours < 24) return `${diffHours}h`
-  if (diffDays < 7) return `${diffDays}d`
-  return date.toLocaleDateString('sr-Latn', { day: 'numeric', month: 'short' })
+  if (diffMins < 1) return 'Sad';
+  if (diffMins < 60) return `${diffMins}m`;
+  if (diffHours < 24) return `${diffHours}h`;
+  if (diffDays < 7) return `${diffDays}d`;
+  return date.toLocaleDateString('sr-Latn', { day: 'numeric', month: 'short' });
 }
 
 function getTradeLabel(status?: string | null) {
-  if (status === 'accepted') return 'Prihvaceno'
-  if (status === 'pending') return 'Ceka odgovor'
-  if (status === 'rejected') return 'Odbijeno'
-  if (status === 'cancelled') return 'Otkazano'
-  if (status === 'expired') return 'Isteklo'
-  return null
+  if (status === 'accepted') return 'Prihvaceno';
+  if (status === 'pending') return 'Ceka odgovor';
+  if (status === 'rejected') return 'Odbijeno';
+  if (status === 'cancelled') return 'Otkazano';
+  if (status === 'expired') return 'Isteklo';
+  return null;
 }
 
 function getTradeItemImage(item?: TradeItem | null) {
-  return item?.primaryImage || item?.images?.[0] || undefined
+  return item?.primaryImage ?? item?.images?.[0] ?? undefined;
 }
 
 const ChatRow = memo(function ChatRow({
@@ -121,11 +121,11 @@ const ChatRow = memo(function ChatRow({
   onPress,
   onDelete,
 }: {
-  chat: ChatRoom
-  other: Participant | undefined
-  tradeLabel: string | null
-  onPress: () => void
-  onDelete: () => void
+  chat: ChatRoom;
+  other: Participant | undefined;
+  tradeLabel: string | null;
+  onPress: () => void;
+  onDelete: () => void;
 }) {
   return (
     <TouchableOpacity
@@ -186,8 +186,8 @@ const ChatRow = memo(function ChatRow({
         </View>
       </View>
     </TouchableOpacity>
-  )
-})
+  );
+});
 
 const TradeRow = memo(function TradeRow({
   trade,
@@ -197,20 +197,20 @@ const TradeRow = memo(function TradeRow({
   onCancel,
   onComplete,
 }: {
-  trade: TradeRecord
-  busy: boolean
-  onAccept: () => void
-  onReject: () => void
-  onCancel: () => void
-  onComplete: () => void
+  trade: TradeRecord;
+  busy: boolean;
+  onAccept: () => void;
+  onReject: () => void;
+  onCancel: () => void;
+  onComplete: () => void;
 }) {
-  const tradeLabel = getTradeLabel(trade.status)
+  const tradeLabel = getTradeLabel(trade.status);
   const statusTone =
     trade.status === 'pending'
       ? 'bg-brand-highlight/35 text-ink-dark'
       : trade.status === 'accepted'
         ? 'bg-brand-accent-light/28 text-brand-accent-deep'
-        : 'bg-ink-dark/8 text-ink-dark/60'
+        : 'bg-ink-dark/8 text-ink-dark/60';
 
   return (
     <View className="mb-3 rounded-[26px] bg-surface-panel px-4 py-4">
@@ -261,7 +261,10 @@ const TradeRow = memo(function TradeRow({
                   </View>
                 )}
               </View>
-              <Text className="mt-2 font-sans text-sm font-semibold text-ink-dark" numberOfLines={2}>
+              <Text
+                className="mt-2 font-sans text-sm font-semibold text-ink-dark"
+                numberOfLines={2}
+              >
                 {trade.offeredItemId.title}
               </Text>
             </View>
@@ -348,169 +351,165 @@ const TradeRow = memo(function TradeRow({
         </View>
       ) : null}
     </View>
-  )
-})
+  );
+});
 
 export default function ChatListScreen() {
-  const router = useRouter()
-  const { currentUser, dbUser } = useAuth()
-  const { socket } = useSocket()
-  const { t } = useI18n()
+  const router = useRouter();
+  const { currentUser, dbUser } = useAuth();
+  const { socket } = useSocket();
+  const { t } = useI18n();
 
-  const [activeTab, setActiveTab] = useState<'messages' | 'trades'>('messages')
-  const [chats, setChats] = useState<ChatRoom[]>([])
-  const [trades, setTrades] = useState<TradeRecord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [tradeActionId, setTradeActionId] = useState<string | null>(null)
-  const [deletingChatId, setDeletingChatId] = useState<string | null>(null)
-  const [messagesError, setMessagesError] = useState<string | null>(null)
-  const [tradesError, setTradesError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'messages' | 'trades'>('messages');
+  const [chats, setChats] = useState<ChatRoom[]>([]);
+  const [trades, setTrades] = useState<TradeRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [tradeActionId, setTradeActionId] = useState<string | null>(null);
+  const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
+  const [tradesError, setTradesError] = useState<string | null>(null);
 
   const fetchChats = useCallback(async () => {
     if (!currentUser?.uid) {
-      setChats([])
-      setMessagesError('Sesija je zavrsena. Prijavi se ponovo.')
-      return
+      setChats([]);
+      setMessagesError('Sesija je zavrsena. Prijavi se ponovo.');
+      return;
     }
 
-    const response = await client.get('/api/chat')
+    const response = await client.get('/api/chat');
     if (response.data.ok) {
-      setChats(response.data.data as ChatRoom[])
-      setMessagesError(null)
-      return
+      setChats(response.data.data as ChatRoom[]);
+      setMessagesError(null);
+      return;
     }
 
-    throw new Error('INVALID_CHAT_RESPONSE')
-  }, [currentUser?.uid])
+    throw new Error('INVALID_CHAT_RESPONSE');
+  }, [currentUser?.uid]);
 
   const fetchTrades = useCallback(async () => {
     if (!currentUser?.uid) {
-      setTrades([])
-      setTradesError('Sesija je zavrsena. Prijavi se ponovo.')
-      return
+      setTrades([]);
+      setTradesError('Sesija je zavrsena. Prijavi se ponovo.');
+      return;
     }
 
-    const response = await client.get('/api/trades')
+    const response = await client.get('/api/trades');
     if (response.data.ok) {
       const nextTrades = (response.data.data as TradeRecord[])
         .filter((trade) => trade.bucket !== 'history')
         .sort((a, b) => {
-          const priorityA = a.bucket === 'pending' ? 0 : 1
-          const priorityB = b.bucket === 'pending' ? 0 : 1
-          if (priorityA !== priorityB) return priorityA - priorityB
-          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        })
+          const priorityA = a.bucket === 'pending' ? 0 : 1;
+          const priorityB = b.bucket === 'pending' ? 0 : 1;
+          if (priorityA !== priorityB) return priorityA - priorityB;
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        });
 
-      setTrades(nextTrades)
-      setTradesError(null)
-      return
+      setTrades(nextTrades);
+      setTradesError(null);
+      return;
     }
 
-    throw new Error('INVALID_TRADES_RESPONSE')
-  }, [currentUser?.uid])
+    throw new Error('INVALID_TRADES_RESPONSE');
+  }, [currentUser?.uid]);
 
   const loadAll = useCallback(async () => {
-    const [chatsResult, tradesResult] = await Promise.allSettled([fetchChats(), fetchTrades()])
+    const [chatsResult, tradesResult] = await Promise.allSettled([fetchChats(), fetchTrades()]);
 
     if (chatsResult.status === 'rejected') {
-      setMessagesError(getApiErrorMessage(chatsResult.reason, 'Inbox trenutno nije dostupan.'))
+      setMessagesError(getApiErrorMessage(chatsResult.reason, 'Inbox trenutno nije dostupan.'));
     }
 
     if (tradesResult.status === 'rejected') {
-      setTradesError(getApiErrorMessage(tradesResult.reason, 'Tradeovi trenutno nisu dostupni.'))
+      setTradesError(getApiErrorMessage(tradesResult.reason, 'Tradeovi trenutno nisu dostupni.'));
     }
-  }, [fetchChats, fetchTrades])
+  }, [fetchChats, fetchTrades]);
 
   useEffect(() => {
     if (!currentUser?.uid) {
-      setLoading(false)
-      return
+      setLoading(false);
+      return;
     }
 
-    loadAll()
-      .finally(() => setLoading(false))
-  }, [currentUser?.uid, loadAll])
+    loadAll().finally(() => setLoading(false));
+  }, [currentUser?.uid, loadAll]);
 
   useEffect(() => {
-    if (!socket) return
+    if (!socket) return;
 
     const refreshChats = () => {
       fetchChats().catch((error) => {
-        setMessagesError(getApiErrorMessage(error, 'Inbox trenutno nije dostupan.'))
-      })
-    }
+        setMessagesError(getApiErrorMessage(error, 'Inbox trenutno nije dostupan.'));
+      });
+    };
     const removeDeletedChat = ({ chatId }: { chatId: string }) => {
-      setChats((prev) => prev.filter((chat) => chat._id !== chatId))
-    }
+      setChats((prev) => prev.filter((chat) => chat._id !== chatId));
+    };
 
-    socket.on('chat_updated', refreshChats)
-    socket.on('badge_new_message', refreshChats)
-    socket.on('chat_deleted', removeDeletedChat)
+    socket.on('chat_updated', refreshChats);
+    socket.on('badge_new_message', refreshChats);
+    socket.on('chat_deleted', removeDeletedChat);
 
     return () => {
-      socket.off('chat_updated', refreshChats)
-      socket.off('badge_new_message', refreshChats)
-      socket.off('chat_deleted', removeDeletedChat)
-    }
-  }, [fetchChats, socket])
+      socket.off('chat_updated', refreshChats);
+      socket.off('badge_new_message', refreshChats);
+      socket.off('chat_deleted', removeDeletedChat);
+    };
+  }, [fetchChats, socket]);
 
   const onRefresh = useCallback(async () => {
     try {
-      setRefreshing(true)
-      await loadAll()
+      setRefreshing(true);
+      await loadAll();
     } finally {
-      setRefreshing(false)
+      setRefreshing(false);
     }
-  }, [loadAll])
+  }, [loadAll]);
 
   const getOtherParticipant = useCallback(
     (participants: Participant[]) => {
-      if (!dbUser) return participants[0]
-      return participants.find((participant) => participant._id !== dbUser._id) || participants[0]
+      if (!dbUser) return participants[0];
+      return participants.find((participant) => participant._id !== dbUser._id) ?? participants[0];
     },
     [dbUser]
-  )
+  );
 
   const runTradeAction = useCallback(
-    async (
-      tradeId: string,
-      action: 'accept' | 'reject' | 'cancel' | 'complete'
-    ) => {
+    async (tradeId: string, action: 'accept' | 'reject' | 'cancel' | 'complete') => {
       try {
-        setTradeActionId(tradeId)
+        setTradeActionId(tradeId);
 
-        let response
+        let response;
         if (action === 'accept') {
-          response = await client.put(`/api/trades/${tradeId}`, { status: 'accepted' })
+          response = await client.put(`/api/trades/${tradeId}`, { status: 'accepted' });
         } else if (action === 'reject') {
-          response = await client.put(`/api/trades/${tradeId}`, { status: 'rejected' })
+          response = await client.put(`/api/trades/${tradeId}`, { status: 'rejected' });
         } else if (action === 'cancel') {
-          response = await client.post(`/api/trades/${tradeId}/cancel`, {})
+          response = await client.post(`/api/trades/${tradeId}/cancel`, {});
         } else {
-          response = await client.put(`/api/trades/${tradeId}/complete`, {})
+          response = await client.put(`/api/trades/${tradeId}/complete`, {});
         }
 
-        await loadAll()
+        await loadAll();
         if (action === 'complete' && response?.data?.data?.canRate) {
-          router.push({ pathname: '/rate-trade', params: { tradeId } })
+          router.push({ pathname: '/rate-trade', params: { tradeId } });
         }
       } catch (error) {
         Alert.alert(
           'Trade nije azuriran',
           getApiErrorMessage(error, 'Pokusaj ponovo za nekoliko trenutaka.')
-        )
+        );
       } finally {
-        setTradeActionId(null)
+        setTradeActionId(null);
       }
     },
     [loadAll, router]
-  )
+  );
 
   const renderChatItem = useCallback(
     ({ item: chat, index }: { item: ChatRoom; index: number }) => {
-      const other = getOtherParticipant(chat.participants)
-      const tradeLabel = getTradeLabel(chat.tradeRequestId?.status)
+      const other = getOtherParticipant(chat.participants);
+      const tradeLabel = getTradeLabel(chat.tradeRequestId?.status);
 
       return (
         <View>
@@ -526,35 +525,35 @@ export default function ChatListScreen() {
                   text: 'Obrisi',
                   style: 'destructive',
                   onPress: async () => {
-                    const previousChats = chats
-                    setDeletingChatId(chat._id)
-                    setChats((prev) => prev.filter((entry) => entry._id !== chat._id))
+                    const previousChats = chats;
+                    setDeletingChatId(chat._id);
+                    setChats((prev) => prev.filter((entry) => entry._id !== chat._id));
 
                     try {
-                      await client.delete(`/api/chat/${chat._id}`)
+                      await client.delete(`/api/chat/${chat._id}`);
                     } catch (error) {
-                      setChats(previousChats)
+                      setChats(previousChats);
                       Alert.alert(
                         'Razgovor nije obrisan',
                         getApiErrorMessage(error, 'Pokusaj ponovo za nekoliko trenutaka.')
-                      )
+                      );
                     } finally {
-                      setDeletingChatId(null)
+                      setDeletingChatId(null);
                     }
                   },
                 },
-              ])
+              ]);
             }}
           />
           {index < chats.length - 1 ? <View className="mx-4 h-px bg-ink-dark/6" /> : null}
         </View>
-      )
+      );
     },
     [chats, getOtherParticipant, router]
-  )
+  );
 
-  const messageCount = chats.length
-  const pendingTradeCount = trades.filter((trade) => trade.bucket === 'pending').length
+  const messageCount = chats.length;
+  const pendingTradeCount = trades.filter((trade) => trade.bucket === 'pending').length;
 
   const topHeader = useMemo(
     () => (
@@ -601,10 +600,10 @@ export default function ChatListScreen() {
       </View>
     ),
     [activeTab, messageCount, pendingTradeCount, router, t]
-  )
+  );
 
   if (loading) {
-    return <ChatSkeleton />
+    return <ChatSkeleton />;
   }
 
   if (activeTab === 'messages') {
@@ -623,17 +622,17 @@ export default function ChatListScreen() {
               description={messagesError}
               actionLabel="Pokusaj ponovo"
               onAction={() => {
-                setLoading(true)
+                setLoading(true);
                 fetchChats()
                   .catch((error) => {
-                    setMessagesError(getApiErrorMessage(error, 'Inbox trenutno nije dostupan.'))
+                    setMessagesError(getApiErrorMessage(error, 'Inbox trenutno nije dostupan.'));
                   })
-                  .finally(() => setLoading(false))
+                  .finally(() => setLoading(false));
               }}
             />
           </View>
         </ScrollView>
-      )
+      );
     }
 
     return (
@@ -653,14 +652,14 @@ export default function ChatListScreen() {
               onAction={
                 messagesError
                   ? () => {
-                      setRefreshing(true)
+                      setRefreshing(true);
                       fetchChats()
                         .catch((error) => {
                           setMessagesError(
                             getApiErrorMessage(error, 'Inbox trenutno nije dostupan.')
-                          )
+                          );
                         })
-                        .finally(() => setRefreshing(false))
+                        .finally(() => setRefreshing(false));
                     }
                   : undefined
               }
@@ -676,7 +675,7 @@ export default function ChatListScreen() {
         windowSize={5}
         removeClippedSubviews
       />
-    )
+    );
   }
 
   return (
@@ -695,12 +694,12 @@ export default function ChatListScreen() {
             description={tradesError}
             actionLabel="Pokusaj ponovo"
             onAction={() => {
-              setRefreshing(true)
+              setRefreshing(true);
               fetchTrades()
                 .catch((error) => {
-                  setTradesError(getApiErrorMessage(error, 'Tradeovi trenutno nisu dostupni.'))
+                  setTradesError(getApiErrorMessage(error, 'Tradeovi trenutno nisu dostupni.'));
                 })
-                .finally(() => setRefreshing(false))
+                .finally(() => setRefreshing(false));
             }}
           />
         ) : trades.length === 0 ? (
@@ -716,20 +715,32 @@ export default function ChatListScreen() {
               trade={trade}
               busy={tradeActionId === trade._id}
               onAccept={() =>
-                Alert.alert('Prihvati trade', 'Prihvatas ovu razmenu? Ovo menja status oba komada.', [
-                  { text: 'Prihvati', onPress: () => runTradeAction(trade._id, 'accept') },
-                  { text: 'Odustani', style: 'cancel' },
-                ])
+                Alert.alert(
+                  'Prihvati trade',
+                  'Prihvatas ovu razmenu? Ovo menja status oba komada.',
+                  [
+                    { text: 'Prihvati', onPress: () => runTradeAction(trade._id, 'accept') },
+                    { text: 'Odustani', style: 'cancel' },
+                  ]
+                )
               }
               onReject={() =>
                 Alert.alert('Odbij trade', 'Odbijas ovu ponudu?', [
-                  { text: 'Odbij', style: 'destructive', onPress: () => runTradeAction(trade._id, 'reject') },
+                  {
+                    text: 'Odbij',
+                    style: 'destructive',
+                    onPress: () => runTradeAction(trade._id, 'reject'),
+                  },
                   { text: 'Odustani', style: 'cancel' },
                 ])
               }
               onCancel={() =>
                 Alert.alert('Otkazi trade', 'Ova ponuda ce biti otkazana za oba ucesnika.', [
-                  { text: 'Otkazi trade', style: 'destructive', onPress: () => runTradeAction(trade._id, 'cancel') },
+                  {
+                    text: 'Otkazi trade',
+                    style: 'destructive',
+                    onPress: () => runTradeAction(trade._id, 'cancel'),
+                  },
                   { text: 'Odustani', style: 'cancel' },
                 ])
               }
@@ -754,5 +765,5 @@ export default function ChatListScreen() {
         ) : null}
       </View>
     </ScrollView>
-  )
+  );
 }

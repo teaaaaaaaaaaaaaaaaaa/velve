@@ -1,47 +1,25 @@
-import { Ionicons } from '@expo/vector-icons'
-import { memo } from 'react'
-import { Text, TouchableOpacity, ViewStyle } from 'react-native'
+import { Ionicons } from '@expo/vector-icons';
+import { memo, useEffect, useRef } from 'react';
+import { Animated, Text, TouchableOpacity } from 'react-native';
 
-import { colors, shadows } from '@/design/tokens'
+import { colors } from '@/design/tokens';
 
 type Props = {
-  icon: keyof typeof Ionicons.glyphMap
-  onPress: () => void
-  count?: number
-  active?: boolean
-  disabled?: boolean
-  accessibilityLabel: string
-  tone?: 'light' | 'dark'
-}
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+  count?: number;
+  active?: boolean;
+  disabled?: boolean;
+  accessibilityLabel: string;
+  tone?: 'light' | 'dark';
+  /** Icon color when `active` — e.g. red for the like heart. Defaults to the base icon color. */
+  activeColor?: string;
+};
 
 function formatCount(value?: number) {
-  if (value == null) return null
-  if (value < 1000) return String(value)
-  return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`
-}
-
-const lightBase: ViewStyle = {
-  width: 58,
-  borderRadius: 22,
-  borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.24)',
-  backgroundColor: 'rgba(255,255,255,0.16)',
-}
-
-const lightActive: ViewStyle = {
-  backgroundColor: 'rgba(255,255,255,0.26)',
-}
-
-const darkBase: ViewStyle = {
-  width: 58,
-  borderRadius: 22,
-  borderWidth: 0,
-  borderColor: 'transparent',
-  backgroundColor: 'transparent',
-}
-
-const darkActive: ViewStyle = {
-  backgroundColor: 'rgba(43,42,43,0.08)',
+  if (value == null) return null;
+  if (value < 1000) return String(value);
+  return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`;
 }
 
 export const GlassCountActionButton = memo(function GlassCountActionButton({
@@ -52,10 +30,28 @@ export const GlassCountActionButton = memo(function GlassCountActionButton({
   disabled = false,
   accessibilityLabel,
   tone = 'light',
+  activeColor,
 }: Props) {
-  const countLabel = formatCount(count)
-  const isDark = tone === 'dark'
-  const iconColor = isDark ? colors.inkDark : colors.baseCanvas
+  const countLabel = formatCount(count);
+  const isDark = tone === 'dark';
+  const baseColor = isDark ? colors.inkDark : colors.baseCanvas;
+  const iconColor = active && activeColor ? activeColor : baseColor;
+
+  // Instagram-style pop when the action toggles on.
+  const popScale = useRef(new Animated.Value(1)).current;
+  const wasActiveRef = useRef(active);
+  useEffect(() => {
+    if (active && !wasActiveRef.current) {
+      popScale.setValue(0.6);
+      Animated.spring(popScale, {
+        toValue: 1,
+        friction: 3,
+        tension: 240,
+        useNativeDriver: true,
+      }).start();
+    }
+    wasActiveRef.current = active;
+  }, [active, popScale]);
 
   return (
     <TouchableOpacity
@@ -63,24 +59,18 @@ export const GlassCountActionButton = memo(function GlassCountActionButton({
       accessibilityLabel={accessibilityLabel}
       disabled={disabled}
       onPress={onPress}
-      activeOpacity={0.84}
-      className="items-center px-2 py-3"
-      style={[
-        isDark ? darkBase : lightBase,
-        isDark ? null : shadows.glass,
-        active ? (isDark ? darkActive : lightActive) : null,
-        disabled ? { opacity: 0.4 } : null,
-      ]}
+      activeOpacity={0.7}
+      className="w-[58px] items-center px-2 py-2"
+      style={disabled ? { opacity: 0.4 } : null}
     >
-      <Ionicons name={icon} size={26} color={iconColor} />
+      <Animated.View style={{ transform: [{ scale: popScale }] }}>
+        <Ionicons name={icon} size={27} color={iconColor} />
+      </Animated.View>
       {countLabel ? (
-        <Text
-          className="mt-1 font-sans text-xs font-semibold"
-          style={{ color: isDark ? colors.inkDark : colors.baseCanvas }}
-        >
+        <Text className="mt-1 font-sans text-xs font-semibold" style={{ color: baseColor }}>
           {countLabel}
         </Text>
       ) : null}
     </TouchableOpacity>
-  )
-})
+  );
+});

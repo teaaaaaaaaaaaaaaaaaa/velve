@@ -14,7 +14,8 @@ import {
   signOutUser,
   type AuthUser,
 } from '@/config/firebase';
-import { isExpectedAuthError } from '@/lib/authFeedback';
+import { isExpectedAuthError, type FirebaseErrorLike } from '@/lib/authFeedback';
+import { logger } from '@/lib/logger';
 
 export type AuthContextType = {
   currentUser: AuthUser | null;
@@ -25,8 +26,8 @@ export type AuthContextType = {
   googleSignInUnavailableReason: string | null;
   refreshDbUser: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
-  signInWithEmail: (email: string, password: string) => Promise<any>;
-  registerWithEmail: (email: string, password: string) => Promise<any>;
+  signInWithEmail: (email: string, password: string) => Promise<unknown>;
+  registerWithEmail: (email: string, password: string) => Promise<unknown>;
   logout: () => Promise<void>;
 };
 
@@ -81,9 +82,9 @@ const USER_CANCELLED = 'USER_CANCELLED';
 let cachedGoogleSignInModule: GoogleSignInModule | null | undefined;
 let hasConfiguredGoogleSignin = false;
 
-function logAuthFailure(scope: string, error: any) {
-  const logger = isExpectedAuthError(error) ? console.warn : console.error;
-  logger(scope, {
+function logAuthFailure(scope: string, error: FirebaseErrorLike) {
+  const logFn = isExpectedAuthError(error) ? logger.warn : logger.error;
+  logFn(scope, {
     code: error?.code,
     message: error?.message,
     nativeErrorCode: error?.nativeErrorCode,
@@ -114,7 +115,7 @@ function summarizeUser(user: AuthUser | null) {
 
 function getGoogleSignInSupport() {
   if (googleOAuthConfigError) {
-    console.warn('[Google Auth] Support unavailable because OAuth config is invalid');
+    logger.warn('[Google Auth] Support unavailable because OAuth config is invalid');
     return {
       available: false,
       module: null,
@@ -123,7 +124,7 @@ function getGoogleSignInSupport() {
   }
 
   if (isExpoGo) {
-    console.log('[Google Auth] Native Google Sign-In disabled in Expo Go');
+    logger.debug('[Google Auth] Native Google Sign-In disabled in Expo Go');
     return {
       available: false,
       module: null,
@@ -137,7 +138,7 @@ function getGoogleSignInSupport() {
       cachedGoogleSignInModule =
         require('@react-native-google-signin/google-signin') as GoogleSignInModule;
     } catch {
-      console.warn(
+      logger.warn(
         '[Google Auth] Native Google Sign-In module is unavailable in this binary. Rebuild the Android app or open a dev build.'
       );
       cachedGoogleSignInModule = null;
@@ -154,7 +155,7 @@ function getGoogleSignInSupport() {
   }
 
   if (!hasConfiguredGoogleSignin) {
-    console.log('[Google Auth] Configuring native Google Sign-In module');
+    logger.debug('[Google Auth] Configuring native Google Sign-In module');
     cachedGoogleSignInModule.GoogleSignin.configure({
       webClientId: googleClientId,
       scopes: ['profile', 'email'],
@@ -177,12 +178,12 @@ export function useAuthProvider() {
   const googleSignInSupport = getGoogleSignInSupport();
 
   async function loadDbUser(user: AuthUser) {
-    console.log('[Auth] loadDbUser:start', summarizeUser(user));
+    logger.debug('[Auth] loadDbUser:start', summarizeUser(user));
     setProfileError(null);
 
     try {
       const response = await client.get('/api/users/me');
-      console.log('[Auth] loadDbUser:response', {
+      logger.debug('[Auth] loadDbUser:response', {
         status: response.status,
         ok: response.data?.ok,
         dbUserId: response.data?.data?._id,
@@ -194,7 +195,7 @@ export function useAuthProvider() {
 
         // Validate Firebase UID matches MongoDB firebaseUid
         if (fetchedDbUser.firebaseUid !== user.uid) {
-          console.error('[Auth] User mismatch detected!', {
+          logger.error('[Auth] User mismatch detected!', {
             firebaseUid: user.uid,
             dbUserFirebaseUid: fetchedDbUser.firebaseUid,
           });
@@ -206,7 +207,7 @@ export function useAuthProvider() {
         }
 
         setDbUser(fetchedDbUser);
-        console.log('[Auth] loadDbUser:success', {
+        logger.debug('[Auth] loadDbUser:success', {
           dbUserId: fetchedDbUser._id,
           firebaseUid: fetchedDbUser.firebaseUid,
           onboardingCompleted: fetchedDbUser.onboardingCompleted,
@@ -214,13 +215,20 @@ export function useAuthProvider() {
         return;
       }
 
-      console.error('[Auth] Unexpected /api/users/me response:', response.data);
+      logger.error('[Auth] Unexpected /api/users/me response:', response.data);
       setDbUser(null);
       setProfileError('INVALID_PROFILE_RESPONSE');
-    } catch (error: any) {
-      const message = error?.response?.data?.error || error?.message || 'UNKNOWN_PROFILE_ERROR';
+    } catch (unknownError: unknown) {
+      const error = unknownError as {
+        message?: string;
+        response?: { status?: number; data?: unknown };
+      };
+      const message =
+        (error?.response?.data as { error?: string } | undefined)?.error ||
+        error?.message ||
+        'UNKNOWN_PROFILE_ERROR';
 
-      console.error('[Auth] loadDbUser:error', {
+      logger.error('[Auth] loadDbUser:error', {
         message,
         status: error?.response?.status,
         response: error?.response?.data,
@@ -233,22 +241,22 @@ export function useAuthProvider() {
   async function refreshDbUser() {
     const user = auth.currentUser;
     if (!user) {
-      console.log('[Auth] refreshDbUser skipped - no signed in user');
+      logger.debug('[Auth] refreshDbUser skipped - no signed in user');
       return;
     }
 
-    console.log('[Auth] refreshDbUser:start', summarizeUser(user));
+    logger.debug('[Auth] refreshDbUser:start', summarizeUser(user));
     setLoading(true);
     await loadDbUser(user);
     setLoading(false);
-    console.log('[Auth] refreshDbUser:done', {
+    logger.debug('[Auth] refreshDbUser:done', {
       currentUser: summarizeUser(auth.currentUser),
     });
   }
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log('[Auth] onAuthStateChanged', summarizeUser(user));
+      logger.debug('[Auth] onAuthStateChanged', summarizeUser(user));
       setCurrentUser(user);
       setLoading(true);
 
@@ -266,19 +274,19 @@ export function useAuthProvider() {
 
   async function signInWithGoogle() {
     if (!googleSignInSupport.available || !googleSignInSupport.module) {
-      console.warn('[Google Auth] signInWithGoogle blocked because support is unavailable');
+      logger.warn('[Google Auth] signInWithGoogle blocked because support is unavailable');
       throw new Error(GOOGLE_SIGNIN_UNAVAILABLE);
     }
 
     try {
-      console.log('[Google Auth] signInWithGoogle:start');
+      logger.debug('[Google Auth] signInWithGoogle:start');
       await googleSignInSupport.module.GoogleSignin.hasPlayServices({
         showPlayServicesUpdateDialog: true,
       });
-      console.log('[Google Auth] Play Services check passed');
+      logger.debug('[Google Auth] Play Services check passed');
 
       const userInfo = await googleSignInSupport.module.GoogleSignin.signIn();
-      console.log('[Google Auth] Native signIn result:', {
+      logger.debug('[Google Auth] Native signIn result:', {
         type: userInfo.type,
         hasIdToken: userInfo.type === 'success' ? Boolean(userInfo.data?.idToken) : false,
       });
@@ -294,18 +302,19 @@ export function useAuthProvider() {
 
       const credential = createGoogleCredential(idToken);
       const signedIn = await signInWithCredential(auth, credential);
-      console.log(
+      logger.debug(
         '[Google Auth] Firebase credential sign-in success',
         summarizeUser(signedIn.user)
       );
 
       // onAuthStateChanged will automatically fetch dbUser
-    } catch (error: any) {
-      const logger =
+    } catch (unknownError: unknown) {
+      const error = unknownError as FirebaseErrorLike;
+      const logFn =
         error?.message === USER_CANCELLED || error?.message === GOOGLE_SIGNIN_UNAVAILABLE
-          ? console.warn
-          : console.error;
-      logger('[Google Auth] Error:', {
+          ? logger.warn
+          : logger.error;
+      logFn('[Google Auth] Error:', {
         code: error?.code,
         message: error?.message,
       });
@@ -318,7 +327,7 @@ export function useAuthProvider() {
       }
 
       if (error?.message === GOOGLE_SIGNIN_UNAVAILABLE) {
-        throw error;
+        throw unknownError;
       }
 
       if (
@@ -328,44 +337,44 @@ export function useAuthProvider() {
         throw new Error(NETWORK_ERROR);
       }
 
-      throw error;
+      throw unknownError;
     }
   }
 
   async function signInWithEmail(email: string, password: string) {
-    console.log('[Auth] signInWithEmail:start', {
+    logger.debug('[Auth] signInWithEmail:start', {
       email: maskEmail(email),
       passwordLength: password.length,
     });
     try {
       const credential = await signInWithEmailAndPassword(auth, email, password);
-      console.log('[Auth] signInWithEmail:success', summarizeUser(credential.user));
+      logger.debug('[Auth] signInWithEmail:success', summarizeUser(credential.user));
       return credential;
-    } catch (error: any) {
-      logAuthFailure('[Auth] signInWithEmail:error', error);
-      throw error;
+    } catch (unknownError: unknown) {
+      logAuthFailure('[Auth] signInWithEmail:error', unknownError as FirebaseErrorLike);
+      throw unknownError;
     }
   }
 
   async function registerWithEmail(email: string, password: string) {
-    console.log('[Auth] registerWithEmail:start', {
+    logger.debug('[Auth] registerWithEmail:start', {
       email: maskEmail(email),
       passwordLength: password.length,
     });
     try {
       const credential = await createUserWithEmailAndPassword(auth, email, password);
-      console.log('[Auth] registerWithEmail:success', summarizeUser(credential.user));
+      logger.debug('[Auth] registerWithEmail:success', summarizeUser(credential.user));
       return credential;
-    } catch (error: any) {
-      logAuthFailure('[Auth] registerWithEmail:error', error);
-      throw error;
+    } catch (unknownError: unknown) {
+      logAuthFailure('[Auth] registerWithEmail:error', unknownError as FirebaseErrorLike);
+      throw unknownError;
     }
   }
 
   async function logout() {
-    console.log('[Auth] logout:start', summarizeUser(auth.currentUser));
+    logger.debug('[Auth] logout:start', summarizeUser(auth.currentUser));
     await signOutUser();
-    console.log('[Auth] logout:done');
+    logger.debug('[Auth] logout:done');
   }
 
   return {

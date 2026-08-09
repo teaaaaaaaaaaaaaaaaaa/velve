@@ -1,84 +1,84 @@
-import { Ionicons } from '@expo/vector-icons'
-import { useRouter } from 'expo-router'
-import { useEffect, useMemo, useState } from 'react'
-import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
-import client from '@/api/client'
-import { BrandedLoader } from '@/components/BrandedLoader'
-import { RemoteImage } from '@/components/RemoteImage'
-import { colors } from '@/design/tokens'
-import { getPrimaryItemImage, hasDigitizedImage } from '@/lib/itemImages'
+import client from '@/api/client';
+import { BrandedLoader } from '@/components/BrandedLoader';
+import { RemoteImage } from '@/components/RemoteImage';
+import { colors } from '@/design/tokens';
+import { getPrimaryItemImage, hasDigitizedImage } from '@/lib/itemImages';
 
 type ClosetItem = {
-  _id: string
-  title: string
-  brand?: string
-  images?: string[]
-  imageClean?: string | null
-  primaryImage?: string | null
-  isDigitized?: boolean
-}
+  _id: string;
+  title: string;
+  brand?: string;
+  images?: string[];
+  imageClean?: string | null;
+  primaryImage?: string | null;
+  isDigitized?: boolean;
+};
 
 type ClosetPayload = {
-  live: ClosetItem[]
-  drafts: ClosetItem[]
-  archive: ClosetItem[]
-}
+  live: ClosetItem[];
+  drafts: ClosetItem[];
+  archive: ClosetItem[];
+};
 
 type BodyScanPayload = {
-  exists: boolean
-  url: string | null
-}
+  exists: boolean;
+  url: string | null;
+};
 
 type OutfitPayload = {
-  _id: string
-  name: string
-  vtoImageUrl: string
-  itemIds: Array<{ _id: string; title: string; primaryImage?: string }>
-}
+  _id: string;
+  name: string;
+  vtoImageUrl: string;
+  itemIds: { _id: string; title: string; primaryImage?: string }[];
+};
 
 export default function VtoArchiveScreen() {
-  const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [closet, setCloset] = useState<ClosetPayload>({ live: [], drafts: [], archive: [] })
-  const [bodyScan, setBodyScan] = useState<BodyScanPayload>({ exists: false, url: null })
-  const [outfits, setOutfits] = useState<OutfitPayload[]>([])
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [closet, setCloset] = useState<ClosetPayload>({ live: [], drafts: [], archive: [] });
+  const [bodyScan, setBodyScan] = useState<BodyScanPayload>({ exists: false, url: null });
+  const [outfits, setOutfits] = useState<OutfitPayload[]>([]);
 
   const digitizedItems = useMemo(
     () => [...closet.live, ...closet.drafts].filter((item) => hasDigitizedImage(item)),
     [closet]
-  )
+  );
 
   async function loadAll() {
     const [closetResponse, bodyScanResponse, outfitsResponse] = await Promise.all([
       client.get('/api/items/closet'),
       client.get('/api/users/body-scan'),
       client.get('/api/vto/outfits'),
-    ])
+    ]);
 
-    setCloset(closetResponse.data?.data || { live: [], drafts: [], archive: [] })
-    setBodyScan(bodyScanResponse.data?.data || { exists: false, url: null })
-    setOutfits(outfitsResponse.data?.data || [])
+    setCloset(closetResponse.data?.data || { live: [], drafts: [], archive: [] });
+    setBodyScan(bodyScanResponse.data?.data || { exists: false, url: null });
+    setOutfits(outfitsResponse.data?.data || []);
   }
 
   useEffect(() => {
     loadAll()
       .catch(() => undefined)
-      .finally(() => setLoading(false))
-  }, [])
+      .finally(() => setLoading(false));
+  }, []);
 
   async function onRefresh() {
     try {
-      setRefreshing(true)
-      await loadAll()
+      setRefreshing(true);
+      await loadAll();
     } finally {
-      setRefreshing(false)
+      setRefreshing(false);
     }
   }
 
   if (loading) {
-    return <BrandedLoader />
+    return <BrandedLoader />;
   }
 
   return (
@@ -103,7 +103,8 @@ export default function VtoArchiveScreen() {
 
         <View className="mb-6 rounded-[28px] bg-surface-panel px-4 py-4">
           <Text className="font-sans text-sm leading-6 text-ink-dark/65">
-            Virtual Try-On koristi samo digitalizovane komade. {bodyScan.exists ? 'Tvoj body scan je spreman.' : 'Body scan jos nije sacuvan.'}
+            Virtual Try-On koristi samo digitalizovane komade.{' '}
+            {bodyScan.exists ? 'Tvoj body scan je spreman.' : 'Body scan jos nije sacuvan.'}
           </Text>
         </View>
 
@@ -116,7 +117,7 @@ export default function VtoArchiveScreen() {
               className="mb-4 overflow-hidden rounded-[26px] bg-surface-panel"
             >
               <RemoteImage
-                uri={getPrimaryItemImage(item) || undefined}
+                uri={getPrimaryItemImage(item) ?? undefined}
                 className="aspect-[0.8] w-full"
               />
               <View className="px-3 pb-4 pt-3">
@@ -145,11 +146,11 @@ export default function VtoArchiveScreen() {
             <Text className="font-display text-3xl text-ink-dark">Sacuvani fitovi</Text>
             <View className="mt-4 gap-3">
               {outfits.map((outfit) => (
-                <View key={outfit._id} className="flex-row items-center rounded-[24px] bg-surface-panel px-3 py-3">
-                  <RemoteImage
-                    uri={outfit.vtoImageUrl}
-                    className="h-20 w-16 rounded-[18px]"
-                  />
+                <View
+                  key={outfit._id}
+                  className="flex-row items-center rounded-[24px] bg-surface-panel px-3 py-3"
+                >
+                  <RemoteImage uri={outfit.vtoImageUrl} className="h-20 w-16 rounded-[18px]" />
                   <View className="ml-3 flex-1">
                     <Text className="font-display text-2xl text-ink-dark">{outfit.name}</Text>
                     <Text className="mt-1 font-sans text-xs text-ink-dark/55">
@@ -171,11 +172,9 @@ export default function VtoArchiveScreen() {
             digitizedItems.length > 0 ? '' : 'opacity-40'
           }`}
         >
-          <Text className="font-display text-xl text-base-canvas">
-            Magicno Isprobaj (VTO)
-          </Text>
+          <Text className="font-display text-xl text-base-canvas">Magicno Isprobaj (VTO)</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
-  )
+  );
 }

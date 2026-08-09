@@ -1,17 +1,22 @@
-import { forwardRef } from 'react'
-import { TextInput, type TextInputProps } from 'react-native'
+import { forwardRef } from 'react';
+import { TextInput, type TextInputProps } from 'react-native';
 
-import { colors } from '@/design/tokens'
+import { colors } from '@/design/tokens';
 
-export type VelveTextInputRef = TextInput
+export type VelveTextInputRef = TextInput;
 
 type VelveTextInputProps = TextInputProps & {
-  className?: string
-}
+  className?: string;
+};
 
 export const VelveTextInput = forwardRef<VelveTextInputRef, VelveTextInputProps>(
   function VelveTextInput(
-    { className, placeholderTextColor = colors.mutedText, selectionColor = colors.accentDeep, ...props },
+    {
+      className,
+      placeholderTextColor = colors.mutedText,
+      selectionColor = colors.accentDeep,
+      ...props
+    },
     ref
   ) {
     return (
@@ -22,6 +27,6 @@ export const VelveTextInput = forwardRef<VelveTextInputRef, VelveTextInputProps>
         className={className}
         {...props}
       />
-    )
+    );
   }
-)
+);

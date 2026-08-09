@@ -23,6 +23,7 @@
     "@react-native-firebase/auth": "^24.0.0",
     "@react-native-google-signin/google-signin": "^15.0.0",
     "@shopify/flash-list": "2.0.2",
+    "@velve/shared": "1.0.0",
     "axios": "^1.7.2",
     "expo": "~54.0.0",
     "expo-auth-session": "~7.0.10",

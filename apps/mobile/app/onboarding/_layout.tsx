@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router'
+import { Stack } from 'expo-router';
 
 export default function OnboardingLayout() {
   return (
@@ -17,5 +17,5 @@ export default function OnboardingLayout() {
       <Stack.Screen name="photo" />
       <Stack.Screen name="scan" />
     </Stack>
-  )
+  );
 }

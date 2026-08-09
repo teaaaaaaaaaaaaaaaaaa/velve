@@ -1,10 +1,10 @@
-import { KeyboardAvoidingView, Platform, type KeyboardAvoidingViewProps } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { KeyboardAvoidingView, Platform, type KeyboardAvoidingViewProps } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type KeyboardAwareScreenProps = KeyboardAvoidingViewProps & {
-  className?: string
-  offset?: number
-}
+  className?: string;
+  offset?: number;
+};
 
 export function KeyboardAwareScreen({
   children,
@@ -15,9 +15,9 @@ export function KeyboardAwareScreen({
   style,
   ...props
 }: KeyboardAwareScreenProps) {
-  const insets = useSafeAreaInsets()
+  const insets = useSafeAreaInsets();
   const resolvedOffset =
-    keyboardVerticalOffset ?? offset ?? (Platform.OS === 'ios' ? insets.top : 0)
+    keyboardVerticalOffset ?? offset ?? (Platform.OS === 'ios' ? insets.top : 0);
 
   return (
     <KeyboardAvoidingView
@@ -29,5 +29,5 @@ export function KeyboardAwareScreen({
     >
       {children}
     </KeyboardAvoidingView>
-  )
+  );
 }

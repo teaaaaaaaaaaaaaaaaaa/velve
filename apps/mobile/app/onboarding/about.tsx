@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Alert } from '@/lib/velveAlert'
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -7,28 +8,27 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+} from 'react-native';
+
+import client from '@/api/client';
+import { BrandBackground } from '@/components/BrandBackground';
+import { GlassSurface } from '@/components/GlassSurface';
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen';
+import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock';
+import { OnboardingProgressHeader } from '@/components/OnboardingProgressHeader';
+import { VelveTextInput } from '@/components/VelveTextInput';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
+import { Alert } from '@/lib/velveAlert';
 // expo-location requires a native module that may not be available in Expo Go
-let Location: typeof import('expo-location') | null = null
+let Location: typeof import('expo-location') | null = null;
 try {
-  Location = require('expo-location')
+  Location = require('expo-location');
 } catch {
   // native module unavailable — fall back to manual city picker
 }
 
-import client from '@/api/client'
-import { BrandBackground } from '@/components/BrandBackground'
-import { GlassSurface } from '@/components/GlassSurface'
-import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen'
-import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock'
-import { OnboardingProgressHeader } from '@/components/OnboardingProgressHeader'
-import { VelveTextInput } from '@/components/VelveTextInput'
-import { colors } from '@/design/tokens'
-import { useI18n } from '@/i18n'
-
-const CLOTHING_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'] as const
+const CLOTHING_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'] as const;
 
 const SERBIAN_CITIES = [
   'Beograd',
@@ -51,15 +51,14 @@ const SERBIAN_CITIES = [
   'Sremska Mitrovica',
   'Vrsac',
   'Vranje',
-] as const
+] as const;
 
 const COPY = {
   sr: {
     step: 'Korak 5 od 6',
     mood: 'final fit',
     title: 'Zavrsi profil detaljima koji cine trade smislenim.',
-    description:
-      'Velicine i grad drze discovery korisnim, a trade predloge realnim i brzim.',
+    description: 'Velicine i grad drze discovery korisnim, a trade predloge realnim i brzim.',
     clothing: 'Velicina odece',
     shoeSize: 'Broj obuce',
     shoePlaceholder: 'npr. 39',
@@ -87,8 +86,8 @@ const COPY = {
     city: 'Your city',
     detecting: 'Detecting your location...',
     detectedLabel: 'Are you in this city?',
-    detectedYes: 'Yes, that\'s my city',
-    detectedNo: 'No, I\'ll pick manually',
+    detectedYes: "Yes, that's my city",
+    detectedNo: "No, I'll pick manually",
     detectionFailed: 'Could not detect location. Please pick your city manually.',
     cta: 'Finish',
     errorTitle: 'Error',
@@ -114,23 +113,23 @@ const COPY = {
     errorTitle: 'Ошибка',
     errorFallback: 'Что-то пошло не так. Попробуй еще раз.',
   },
-} as const
+} as const;
 
 function parseJsonArray(value: string | string[] | undefined) {
-  if (!value || Array.isArray(value)) return []
+  if (!value || Array.isArray(value)) return [];
 
   try {
-    const parsed = JSON.parse(value)
-    return Array.isArray(parsed) ? parsed : []
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return []
+    return [];
   }
 }
 
 function matchCity(geocodedCity: string): string | null {
-  const normalized = geocodedCity.toLowerCase().trim()
+  const normalized = geocodedCity.toLowerCase().trim();
   for (const city of SERBIAN_CITIES) {
-    if (normalized.includes(city.toLowerCase())) return city
+    if (normalized.includes(city.toLowerCase())) return city;
   }
   // Common alternate names
   const aliases: Record<string, string> = {
@@ -144,103 +143,104 @@ function matchCity(geocodedCity: string): string | null {
     užice: 'Uzice',
     vršac: 'Vrsac',
     kruševac: 'Krusevac',
-  }
+  };
   for (const [alias, city] of Object.entries(aliases)) {
-    if (normalized.includes(alias)) return city
+    if (normalized.includes(alias)) return city;
   }
-  return null
+  return null;
 }
 
 export default function AboutScreen() {
-  const router = useRouter()
-  const params = useLocalSearchParams()
-  const { locale } = useI18n()
-  const [clothingSize, setClothingSize] = useState<string>('')
-  const [shoeSize, setShoeSize] = useState('')
-  const [selectedCity, setSelectedCity] = useState<string>('')
-  const [loading, setLoading] = useState(false)
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const { locale } = useI18n();
+  const [clothingSize, setClothingSize] = useState<string>('');
+  const [shoeSize, setShoeSize] = useState('');
+  const [selectedCity, setSelectedCity] = useState<string>('');
+  const [loading, setLoading] = useState(false);
 
   // Location auto-detect state
-  const [detectedCity, setDetectedCity] = useState<string | null>(null)
-  const [detectingLocation, setDetectingLocation] = useState(false)
-  const [showManualPicker, setShowManualPicker] = useState(false)
-  const [locationNotice, setLocationNotice] = useState('')
+  const [detectedCity, setDetectedCity] = useState<string | null>(null);
+  const [detectingLocation, setDetectingLocation] = useState(false);
+  const [showManualPicker, setShowManualPicker] = useState(false);
+  const [locationNotice, setLocationNotice] = useState('');
 
-  const copy = COPY[locale]
-  const unlockLabel = locale === 'sr' ? 'Otkljucan trade fit' : 'Trade fit unlocked'
-  const shoeValue = Number.parseInt(shoeSize, 10)
-  const hasValidShoeSize = Number.isFinite(shoeValue) && shoeValue >= 36 && shoeValue <= 47
-  const canShowShoeStep = Boolean(clothingSize)
-  const canShowCityStep = canShowShoeStep && hasValidShoeSize
-  const isValid =
-    Boolean(clothingSize) &&
-    hasValidShoeSize &&
-    Boolean(selectedCity)
+  const copy = COPY[locale];
+  const unlockLabel = locale === 'sr' ? 'Otkljucan trade fit' : 'Trade fit unlocked';
+  const shoeValue = Number.parseInt(shoeSize, 10);
+  const hasValidShoeSize = Number.isFinite(shoeValue) && shoeValue >= 36 && shoeValue <= 47;
+  const canShowShoeStep = Boolean(clothingSize);
+  const canShowCityStep = canShowShoeStep && hasValidShoeSize;
+  const isValid = Boolean(clothingSize) && hasValidShoeSize && Boolean(selectedCity);
 
   // Auto-detect location on mount
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
 
     async function detectLocation() {
       try {
         if (!Location) {
-          setDetectingLocation(false)
-          setShowManualPicker(true)
-          return
+          setDetectingLocation(false);
+          setShowManualPicker(true);
+          return;
         }
 
-        const { status } = await Location.requestForegroundPermissionsAsync()
+        const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted' || cancelled) {
-          setDetectingLocation(false)
-          setShowManualPicker(true)
-          setLocationNotice('Dozvola za lokaciju nije odobrena. Izaberi grad rucno.')
-          return
+          setDetectingLocation(false);
+          setShowManualPicker(true);
+          setLocationNotice('Dozvola za lokaciju nije odobrena. Izaberi grad rucno.');
+          return;
         }
 
         const position = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
-        })
+        });
 
-        if (cancelled) return
+        if (cancelled) return;
 
         const [geocode] = await Location.reverseGeocodeAsync({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-        })
+        });
 
-        if (cancelled) return
+        if (cancelled) return;
 
-        const cityName = geocode?.city || geocode?.subregion || geocode?.region || ''
-        const matched = matchCity(cityName)
+        const cityName = geocode?.city || geocode?.subregion || geocode?.region || '';
+        const matched = matchCity(cityName);
 
         if (matched) {
-          setDetectedCity(matched)
-          setLocationNotice('')
+          setDetectedCity(matched);
+          setLocationNotice('');
         } else {
-          setShowManualPicker(true)
-          setLocationNotice('Nismo prepoznali grad iz lokacije. Izaberi ga rucno.')
+          setShowManualPicker(true);
+          setLocationNotice('Nismo prepoznali grad iz lokacije. Izaberi ga rucno.');
         }
       } catch {
         if (!cancelled) {
-          setShowManualPicker(true)
-          setLocationNotice(copy.detectionFailed)
+          setShowManualPicker(true);
+          setLocationNotice(copy.detectionFailed);
         }
       } finally {
         if (!cancelled) {
-          setDetectingLocation(false)
+          setDetectingLocation(false);
         }
       }
     }
 
     if (!canShowCityStep) {
-      setDetectingLocation(false)
-      return () => { cancelled = true }
+      setDetectingLocation(false);
+      return () => {
+        cancelled = true;
+      };
     }
 
-    setDetectingLocation(true)
-    detectLocation()
-    return () => { cancelled = true }
-  }, [canShowCityStep])
+    setDetectingLocation(true);
+    detectLocation();
+    return () => {
+      cancelled = true;
+    };
+  }, [canShowCityStep]);
 
   const onboardingData = useMemo(
     () => ({
@@ -257,54 +257,57 @@ export default function AboutScreen() {
       },
     }),
     [clothingSize, params.brands, params.categories, params.styles, selectedCity, shoeSize]
-  )
+  );
 
   const submitOnboarding = async () => {
     try {
-      await client.put('/api/users/me/onboarding', onboardingData)
-    } catch (error: any) {
+      await client.put('/api/users/me/onboarding', onboardingData);
+    } catch (unknownError: unknown) {
+      const error = unknownError as { response?: { status?: number } };
       if (error.response?.status !== 404) {
-        throw error
+        throw unknownError;
       }
 
       try {
-        await client.post('/api/users/me/onboarding', onboardingData)
-      } catch (postError: any) {
+        await client.post('/api/users/me/onboarding', onboardingData);
+      } catch (unknownPostError: unknown) {
+        const postError = unknownPostError as { response?: { status?: number } };
         if (postError.response?.status !== 404) {
-          throw postError
+          throw unknownPostError;
         }
 
-        await client.put('/api/users/me', onboardingData)
+        await client.put('/api/users/me', onboardingData);
       }
     }
-  }
+  };
 
   const handleFinish = async () => {
-    if (!isValid) return
+    if (!isValid) return;
 
     try {
-      setLoading(true)
-      await submitOnboarding()
-      router.push('/onboarding/photo')
-    } catch (error: any) {
-      Alert.alert(copy.errorTitle, error.response?.data?.error || copy.errorFallback)
+      setLoading(true);
+      await submitOnboarding();
+      router.push('/onboarding/photo');
+    } catch (unknownError: unknown) {
+      const error = unknownError as { response?: { data?: { error?: string } } };
+      Alert.alert(copy.errorTitle, error.response?.data?.error || copy.errorFallback);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleAcceptDetected = () => {
     if (detectedCity) {
-      setSelectedCity(detectedCity)
-      setDetectedCity(null)
+      setSelectedCity(detectedCity);
+      setDetectedCity(null);
     }
-  }
+  };
 
   const handleRejectDetected = () => {
-    setDetectedCity(null)
-    setShowManualPicker(true)
-    setLocationNotice('Izaberi grad rucno.')
-  }
+    setDetectedCity(null);
+    setShowManualPicker(true);
+    setLocationNotice('Izaberi grad rucno.');
+  };
 
   return (
     <KeyboardAwareScreen className="bg-base-canvas">
@@ -342,7 +345,7 @@ export default function AboutScreen() {
           </Text>
           <View className="mt-4 flex-row flex-wrap justify-between">
             {CLOTHING_SIZES.map((size) => {
-              const isSelected = clothingSize === size
+              const isSelected = clothingSize === size;
               return (
                 <TouchableOpacity
                   key={size}
@@ -362,165 +365,166 @@ export default function AboutScreen() {
                     {size}
                   </Text>
                 </TouchableOpacity>
-              )
+              );
             })}
           </View>
         </GlassSurface>
 
         {canShowShoeStep ? (
-        <OnboardingAnimatedBlock delay={110}>
-        <GlassSurface className="mt-5 px-5 py-5">
-          <Text className="font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/44">
-            {copy.shoeSize}
-          </Text>
-          <View className="mt-3 flex-row items-center rounded-pill bg-base-canvas px-4 py-3">
-            <Ionicons name="footsteps-outline" size={18} color={colors.accentDeep} />
-            <VelveTextInput
-              value={shoeSize}
-              onChangeText={(nextValue) => setShoeSize(nextValue.replace(/[^0-9]/g, ''))}
-              placeholder={copy.shoePlaceholder}
-              className="ml-3 flex-1 font-sans text-sm text-ink-dark"
-              keyboardType="numeric"
-              maxLength={2}
-            />
-          </View>
-          <Text className="mt-3 font-sans text-sm text-ink-dark/52">{copy.shoeHint}</Text>
-        </GlassSurface>
-        </OnboardingAnimatedBlock>
+          <OnboardingAnimatedBlock delay={110}>
+            <GlassSurface className="mt-5 px-5 py-5">
+              <Text className="font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/44">
+                {copy.shoeSize}
+              </Text>
+              <View className="mt-3 flex-row items-center rounded-pill bg-base-canvas px-4 py-3">
+                <Ionicons name="footsteps-outline" size={18} color={colors.accentDeep} />
+                <VelveTextInput
+                  value={shoeSize}
+                  onChangeText={(nextValue) => setShoeSize(nextValue.replace(/[^0-9]/g, ''))}
+                  placeholder={copy.shoePlaceholder}
+                  className="ml-3 flex-1 font-sans text-sm text-ink-dark"
+                  keyboardType="numeric"
+                  maxLength={2}
+                />
+              </View>
+              <Text className="mt-3 font-sans text-sm text-ink-dark/52">{copy.shoeHint}</Text>
+            </GlassSurface>
+          </OnboardingAnimatedBlock>
         ) : null}
 
         {canShowCityStep ? (
-        <OnboardingAnimatedBlock delay={160}>
-        <GlassSurface className="mt-5 px-5 py-5">
-          <Text className="font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/44">
-            {copy.city}
-          </Text>
+          <OnboardingAnimatedBlock delay={160}>
+            <GlassSurface className="mt-5 px-5 py-5">
+              <Text className="font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/44">
+                {copy.city}
+              </Text>
 
-          {/* Location detecting state */}
-          {detectingLocation ? (
-            <View className="mt-4 flex-row items-center py-4">
-              <ActivityIndicator size="small" color={colors.accentDeep} />
-              <Text className="ml-3 font-sans text-sm text-ink-dark/60">{copy.detecting}</Text>
-            </View>
-          ) : null}
-
-          {/* Detected city confirmation */}
-          {!detectingLocation && detectedCity && !selectedCity ? (
-            <View className="mt-4">
-              <Text className="font-sans text-sm text-ink-dark/60">{copy.detectedLabel}</Text>
-              <View className="mt-3 flex-row items-center rounded-card border border-brand-highlight/50 bg-brand-highlight/20 px-4 py-4">
-                <Ionicons name="location" size={20} color={colors.accentDeep} />
-                <Text className="ml-3 flex-1 font-display text-[24px] text-ink-dark">
-                  {detectedCity}
-                </Text>
-              </View>
-              <View className="mt-3 flex-row justify-between">
-                <TouchableOpacity
-                  onPress={handleAcceptDetected}
-                  className="flex-1 mr-2 items-center rounded-pill bg-brand-accent-deep py-3"
-                >
-                  <Text className="font-sans text-sm font-semibold text-base-canvas">
-                    {copy.detectedYes}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleRejectDetected}
-                  className="flex-1 ml-2 items-center rounded-pill border border-ink-dark/12 bg-base-canvas py-3"
-                >
-                  <Text className="font-sans text-sm font-medium text-ink-dark">
-                    {copy.detectedNo}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : null}
-
-          {/* Already selected city display */}
-          {selectedCity && !showManualPicker ? (
-            <View className="mt-4">
-              <View className="flex-row items-center rounded-card border border-brand-accent-deep bg-brand-accent-deep px-4 py-4">
-                <Ionicons name="location" size={20} color={colors.baseCanvas} />
-                <Text className="ml-3 flex-1 font-display text-[24px] text-base-canvas">
-                  {selectedCity}
-                </Text>
-                <Ionicons name="checkmark-circle" size={20} color={colors.highlight} />
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  setSelectedCity('')
-                  setShowManualPicker(true)
-                }}
-                className="mt-2 self-start"
-              >
-                <Text className="font-sans text-sm text-brand-accent-deep underline">
-                  {copy.detectedNo}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
-
-          {/* Manual city picker fallback */}
-          {showManualPicker && !selectedCity ? (
-            <View className="mt-4">
-              {locationNotice ? (
-                <View className="mb-4 flex-row rounded-[18px] bg-brand-highlight/25 px-4 py-3">
-                  <Ionicons name="information-circle-outline" size={18} color={colors.inkDark} />
-                  <Text className="ml-2 flex-1 font-sans text-sm leading-5 text-ink-dark/70">
-                    {locationNotice}
-                  </Text>
+              {/* Location detecting state */}
+              {detectingLocation ? (
+                <View className="mt-4 flex-row items-center py-4">
+                  <ActivityIndicator size="small" color={colors.accentDeep} />
+                  <Text className="ml-3 font-sans text-sm text-ink-dark/60">{copy.detecting}</Text>
                 </View>
               ) : null}
-              <View className="flex-row flex-wrap justify-between">
-                {SERBIAN_CITIES.map((city) => {
-                  const isSelected = selectedCity === city
-                  return (
-                    <TouchableOpacity
-                      key={city}
-                      onPress={() => {
-                        setSelectedCity(city)
-                        setShowManualPicker(false)
-                        setLocationNotice('')
-                      }}
-                      className={`mb-3 flex-row items-center justify-between rounded-soft border px-4 py-4 ${
-                        isSelected
-                          ? 'border-brand-accent-deep bg-brand-accent-deep'
-                          : 'border-brand-accent-deep/10 bg-base-canvas'
-                      }`}
-                      style={{ width: '48%' }}
-                    >
-                      <Text
-                        className={`font-sans text-sm ${
-                          isSelected ? 'text-base-canvas' : 'text-ink-dark'
-                        }`}
-                      >
-                        {city}
-                      </Text>
-                      {isSelected ? (
-                        <Ionicons name="checkmark-circle" size={18} color={colors.highlight} />
-                      ) : null}
-                    </TouchableOpacity>
-                  )
-                })}
-              </View>
-            </View>
-          ) : null}
 
-          {/* Detection failed - show manual immediately */}
-          {!detectingLocation && !detectedCity && !showManualPicker && !selectedCity ? (
-            <View className="mt-4">
-              <Text className="font-sans text-sm text-ink-dark/52">{copy.detectionFailed}</Text>
-              <TouchableOpacity
-                onPress={() => setShowManualPicker(true)}
-                className="mt-3"
-              >
-                <Text className="font-sans text-sm font-semibold text-brand-accent-deep underline">
-                  {copy.detectedNo}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
-        </GlassSurface>
-        </OnboardingAnimatedBlock>
+              {/* Detected city confirmation */}
+              {!detectingLocation && detectedCity && !selectedCity ? (
+                <View className="mt-4">
+                  <Text className="font-sans text-sm text-ink-dark/60">{copy.detectedLabel}</Text>
+                  <View className="mt-3 flex-row items-center rounded-card border border-brand-highlight/50 bg-brand-highlight/20 px-4 py-4">
+                    <Ionicons name="location" size={20} color={colors.accentDeep} />
+                    <Text className="ml-3 flex-1 font-display text-[24px] text-ink-dark">
+                      {detectedCity}
+                    </Text>
+                  </View>
+                  <View className="mt-3 flex-row justify-between">
+                    <TouchableOpacity
+                      onPress={handleAcceptDetected}
+                      className="flex-1 mr-2 items-center rounded-pill bg-brand-accent-deep py-3"
+                    >
+                      <Text className="font-sans text-sm font-semibold text-base-canvas">
+                        {copy.detectedYes}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={handleRejectDetected}
+                      className="flex-1 ml-2 items-center rounded-pill border border-ink-dark/12 bg-base-canvas py-3"
+                    >
+                      <Text className="font-sans text-sm font-medium text-ink-dark">
+                        {copy.detectedNo}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : null}
+
+              {/* Already selected city display */}
+              {selectedCity && !showManualPicker ? (
+                <View className="mt-4">
+                  <View className="flex-row items-center rounded-card border border-brand-accent-deep bg-brand-accent-deep px-4 py-4">
+                    <Ionicons name="location" size={20} color={colors.baseCanvas} />
+                    <Text className="ml-3 flex-1 font-display text-[24px] text-base-canvas">
+                      {selectedCity}
+                    </Text>
+                    <Ionicons name="checkmark-circle" size={20} color={colors.highlight} />
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSelectedCity('');
+                      setShowManualPicker(true);
+                    }}
+                    className="mt-2 self-start"
+                  >
+                    <Text className="font-sans text-sm text-brand-accent-deep underline">
+                      {copy.detectedNo}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+              {/* Manual city picker fallback */}
+              {showManualPicker && !selectedCity ? (
+                <View className="mt-4">
+                  {locationNotice ? (
+                    <View className="mb-4 flex-row rounded-[18px] bg-brand-highlight/25 px-4 py-3">
+                      <Ionicons
+                        name="information-circle-outline"
+                        size={18}
+                        color={colors.inkDark}
+                      />
+                      <Text className="ml-2 flex-1 font-sans text-sm leading-5 text-ink-dark/70">
+                        {locationNotice}
+                      </Text>
+                    </View>
+                  ) : null}
+                  <View className="flex-row flex-wrap justify-between">
+                    {SERBIAN_CITIES.map((city) => {
+                      const isSelected = selectedCity === city;
+                      return (
+                        <TouchableOpacity
+                          key={city}
+                          onPress={() => {
+                            setSelectedCity(city);
+                            setShowManualPicker(false);
+                            setLocationNotice('');
+                          }}
+                          className={`mb-3 flex-row items-center justify-between rounded-soft border px-4 py-4 ${
+                            isSelected
+                              ? 'border-brand-accent-deep bg-brand-accent-deep'
+                              : 'border-brand-accent-deep/10 bg-base-canvas'
+                          }`}
+                          style={{ width: '48%' }}
+                        >
+                          <Text
+                            className={`font-sans text-sm ${
+                              isSelected ? 'text-base-canvas' : 'text-ink-dark'
+                            }`}
+                          >
+                            {city}
+                          </Text>
+                          {isSelected ? (
+                            <Ionicons name="checkmark-circle" size={18} color={colors.highlight} />
+                          ) : null}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null}
+
+              {/* Detection failed - show manual immediately */}
+              {!detectingLocation && !detectedCity && !showManualPicker && !selectedCity ? (
+                <View className="mt-4">
+                  <Text className="font-sans text-sm text-ink-dark/52">{copy.detectionFailed}</Text>
+                  <TouchableOpacity onPress={() => setShowManualPicker(true)} className="mt-3">
+                    <Text className="font-sans text-sm font-semibold text-brand-accent-deep underline">
+                      {copy.detectedNo}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+            </GlassSurface>
+          </OnboardingAnimatedBlock>
         ) : null}
       </ScrollView>
 
@@ -546,5 +550,5 @@ export default function AboutScreen() {
         </TouchableOpacity>
       </View>
     </KeyboardAwareScreen>
-  )
+  );
 }

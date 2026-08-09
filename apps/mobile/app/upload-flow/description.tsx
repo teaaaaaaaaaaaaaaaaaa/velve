@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Alert } from '@/lib/velveAlert';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -22,6 +21,7 @@ import { VelveTextInput } from '@/components/VelveTextInput';
 import { colors } from '@/design/tokens';
 import { useI18n } from '@/i18n';
 import { getPrimaryItemImage } from '@/lib/itemImages';
+import { Alert } from '@/lib/velveAlert';
 
 type ItemPayload = {
   _id: string;
@@ -192,7 +192,7 @@ export default function DescriptionScreen() {
       .get(`/api/items/${params.itemId}`)
       .then((res) => {
         const item = res.data?.data as ItemPayload;
-        const url = getPrimaryItemImage(item) || item?.images?.[0] || '';
+        const url = getPrimaryItemImage(item) ?? item?.images?.[0] ?? '';
         setImageUrl(url);
       })
       .catch(() => {});
@@ -225,7 +225,7 @@ export default function DescriptionScreen() {
       const payload = response.data?.data;
       if (payload?.description) setDescription(payload.description);
       setGenerated(true);
-    } catch (error: any) {
+    } catch {
       if (controller.signal.aborted) return;
       Alert.alert(t('upload.aiUnavailableTitle'), t('upload.aiUnavailableDescription'));
     } finally {
@@ -240,7 +240,7 @@ export default function DescriptionScreen() {
         description: description.trim() ? undefined : t('upload.descriptionRequired'),
       };
 
-      if (nextErrors.title || nextErrors.description) {
+      if (nextErrors.title ?? nextErrors.description) {
         setFieldErrors(nextErrors);
         return;
       }
@@ -268,7 +268,11 @@ export default function DescriptionScreen() {
 
         await client.put(`/api/items/${params.itemId}/status`, { status });
         router.replace('/(tabs)/closet');
-      } catch (error: any) {
+      } catch (unknownError: unknown) {
+        const error = unknownError as {
+          message?: string;
+          response?: { data?: { error?: string } };
+        };
         Alert.alert(
           t('common.error'),
           error?.response?.data?.error || error?.message || t('upload.saveError')
@@ -286,7 +290,7 @@ export default function DescriptionScreen() {
       description: description.trim() ? undefined : t('upload.descriptionRequired'),
     };
 
-    if (nextErrors.title || nextErrors.description) {
+    if (nextErrors.title ?? nextErrors.description) {
       setFieldErrors(nextErrors);
       return;
     }

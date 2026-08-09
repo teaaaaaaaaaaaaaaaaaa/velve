@@ -4,12 +4,9 @@ import { designPreviewAdapter } from '@/api/designPreviewAdapter';
 import { API_URL } from '@/config/api';
 import { isDesignPreviewMode } from '@/config/designPreview';
 import { auth, getAuthToken } from '@/config/firebase';
+import { logger } from '@/lib/logger';
 
-function debugLog(...args: unknown[]) {
-  if (__DEV__) {
-    console.log(...args);
-  }
-}
+const debugLog = logger.debug;
 
 debugLog('[APIClient] Using baseURL:', API_URL);
 
@@ -95,7 +92,8 @@ client.interceptors.response.use(
             uid: user.uid,
           });
           return client(originalConfig);
-        } catch (refreshError: any) {
+        } catch (unknownRefreshError: unknown) {
+          const refreshError = unknownRefreshError as { message?: string };
           debugLog('[APIClient] Failed to refresh auth token after 401', {
             message: refreshError?.message,
             currentUserUid: auth.currentUser?.uid ?? null,

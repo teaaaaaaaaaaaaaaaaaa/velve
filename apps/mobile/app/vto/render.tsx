@@ -170,14 +170,18 @@ export default function VtoRenderScreen() {
             ? payload.categoriesUsed.map((entry: unknown) => String(entry))
             : [],
         });
-      } catch (error: any) {
+      } catch (unknownError: unknown) {
+        const error = unknownError as {
+          message?: string;
+          response?: { status?: number; data?: { error?: string } };
+        };
         const message =
           error?.response?.data?.error || error?.message || 'Pokusaj ponovo za nekoliko trenutaka.';
         console.log('[VTO][Mobile] Render failed', {
           requestId,
           itemIds: selectedItemIds,
           message,
-          status: error?.response?.status || null,
+          status: error?.response?.status ?? null,
         });
 
         if (active) {
@@ -234,7 +238,11 @@ export default function VtoRenderScreen() {
         pathname: '/vto/hub',
         params: { vtoImageUrl: renderResult.vtoImageUrl },
       });
-    } catch (error: any) {
+    } catch (unknownError: unknown) {
+      const error = unknownError as {
+        message?: string;
+        response?: { data?: { error?: string } };
+      };
       Alert.alert(
         'Ne mogu da sacuvam fit',
         error?.response?.data?.error || error?.message || 'Pokusaj ponovo.'

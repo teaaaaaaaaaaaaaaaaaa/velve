@@ -1,7 +1,9 @@
-export type VtoGarmentCategory = 'tops' | 'bottoms' | 'one-pieces'
+export type VtoGarmentCategory = 'tops' | 'bottoms' | 'one-pieces';
 
 export function resolveVtoGarmentCategory(category?: string | null): VtoGarmentCategory {
-  const normalized = String(category || '').trim().toLowerCase()
+  const normalized = String(category ?? '')
+    .trim()
+    .toLowerCase();
 
   if (
     normalized.includes('dress') ||
@@ -12,7 +14,7 @@ export function resolveVtoGarmentCategory(category?: string | null): VtoGarmentC
     normalized.includes('one piece') ||
     normalized.includes('romper')
   ) {
-    return 'one-pieces'
+    return 'one-pieces';
   }
 
   if (
@@ -24,8 +26,8 @@ export function resolveVtoGarmentCategory(category?: string | null): VtoGarmentC
     normalized.includes('jean') ||
     normalized.includes('denim')
   ) {
-    return 'bottoms'
+    return 'bottoms';
   }
 
-  return 'tops'
+  return 'tops';
 }

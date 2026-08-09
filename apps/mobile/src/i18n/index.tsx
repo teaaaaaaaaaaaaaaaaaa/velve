@@ -424,8 +424,6 @@ const dictionaries = {
     'upload.galleryPermission': 'Potrebna je dozvola za galeriju.',
     'upload.pickerError': 'Ne mogu da otvorim izbor slike.',
     'upload.previewTitle': 'Pregled fotografije',
-    'upload.previewDescription':
-      'Proveri kadar, pa nastavi kada fotografija izgleda dobro. Ako nije idealna, vrati se i izaberi drugu.',
     'upload.next': 'Dalje',
     'upload.chooseAnotherPhoto': 'Izaberi drugu sliku',
     'upload.analyzeEyebrow': 'AI analiza',
@@ -946,8 +944,6 @@ const dictionaries = {
     'upload.galleryPermission': 'Gallery permission is required.',
     'upload.pickerError': 'Unable to open image selection.',
     'upload.previewTitle': 'Photo preview',
-    'upload.previewDescription':
-      'Check the frame, then continue once the photo looks right. If it is not ideal, go back and pick another one.',
     'upload.next': 'Next',
     'upload.chooseAnotherPhoto': 'Choose another photo',
     'upload.analyzeEyebrow': 'AI analysis',

@@ -1,14 +1,14 @@
-import { useState } from 'react'
-import { ScrollView, StatusBar, Text, TouchableOpacity, View } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { ScrollView, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 
-import { BrandBackground } from '@/components/BrandBackground'
-import { GlassSurface } from '@/components/GlassSurface'
-import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock'
-import { OnboardingProgressHeader } from '@/components/OnboardingProgressHeader'
-import { colors } from '@/design/tokens'
-import { useI18n } from '@/i18n'
+import { BrandBackground } from '@/components/BrandBackground';
+import { GlassSurface } from '@/components/GlassSurface';
+import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock';
+import { OnboardingProgressHeader } from '@/components/OnboardingProgressHeader';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
 
 const CATEGORY_OPTIONS = [
   {
@@ -91,15 +91,14 @@ const CATEGORY_OPTIONS = [
       ru: 'Практично, но с характером.',
     },
   },
-] as const
+] as const;
 
 const COPY = {
   sr: {
     step: 'Korak 3 od 5',
     mood: 'discovery map',
     title: 'Koje kategorije treba da nose tvoj discovery?',
-    description:
-      'Ovo pomaze da feed ne bude genericna masa, vec selekcija koja prati tvoj orman.',
+    description: 'Ovo pomaze da feed ne bude genericna masa, vec selekcija koja prati tvoj orman.',
     helper: 'Biraj komade koje zelis da otvaras iznova.',
     cta: 'Nastavi',
   },
@@ -121,22 +120,22 @@ const COPY = {
     helper: 'Выбери вещи, которые хочется открывать снова и снова.',
     cta: 'Продолжить',
   },
-} as const
+} as const;
 
 export default function CategoriesScreen() {
-  const router = useRouter()
-  const params = useLocalSearchParams()
-  const { locale } = useI18n()
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const { locale } = useI18n();
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
-  const copy = COPY[locale]
-  const unlockLabel = locale === 'sr' ? 'Otkljucana mapa feeda' : 'Feed map unlocked'
+  const copy = COPY[locale];
+  const unlockLabel = locale === 'sr' ? 'Otkljucana mapa feeda' : 'Feed map unlocked';
 
   const toggleCategory = (id: string) => {
     setSelectedCategories((prev) =>
       prev.includes(id) ? prev.filter((category) => category !== id) : [...prev, id]
-    )
-  }
+    );
+  };
 
   return (
     <View className="flex-1 bg-base-canvas">
@@ -175,7 +174,7 @@ export default function CategoriesScreen() {
 
         <OnboardingAnimatedBlock delay={160} className="mt-6 flex-row flex-wrap justify-between">
           {CATEGORY_OPTIONS.map((category) => {
-            const isSelected = selectedCategories.includes(category.id)
+            const isSelected = selectedCategories.includes(category.id);
 
             return (
               <TouchableOpacity
@@ -221,7 +220,7 @@ export default function CategoriesScreen() {
                   {category.note[locale]}
                 </Text>
               </TouchableOpacity>
-            )
+            );
           })}
         </OnboardingAnimatedBlock>
       </ScrollView>
@@ -252,5 +251,5 @@ export default function CategoriesScreen() {
         </TouchableOpacity>
       </View>
     </View>
-  )
+  );
 }

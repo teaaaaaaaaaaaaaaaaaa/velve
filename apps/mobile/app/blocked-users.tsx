@@ -1,93 +1,100 @@
-import { Ionicons } from '@expo/vector-icons'
-import { Alert } from '@/lib/velveAlert'
-import { useRouter } from 'expo-router'
-import { useCallback, useEffect, useState } from 'react'
-import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-import client from '@/api/client'
-import { BrandBackground } from '@/components/BrandBackground'
-import { EditorialEmptyState } from '@/components/EditorialEmptyState'
-import { RemoteImage } from '@/components/RemoteImage'
-import { colors } from '@/design/tokens'
-import { useI18n } from '@/i18n'
-import { getApiErrorMessage } from '@/lib/apiErrors'
+import client from '@/api/client';
+import { BrandBackground } from '@/components/BrandBackground';
+import { EditorialEmptyState } from '@/components/EditorialEmptyState';
+import { RemoteImage } from '@/components/RemoteImage';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
+import { getApiErrorMessage } from '@/lib/apiErrors';
+import { Alert } from '@/lib/velveAlert';
 
 type BlockedUserEntry = {
-  _id: string
-  createdAt: string
-  reason?: string
+  _id: string;
+  createdAt: string;
+  reason?: string;
   user: {
-    _id: string
-    displayName?: string
-    photoURL?: string
-    bio?: string
-    completedTrades?: number
-    averageRating?: number
-  }
-}
+    _id: string;
+    displayName?: string;
+    photoURL?: string;
+    bio?: string;
+    completedTrades?: number;
+    averageRating?: number;
+  };
+};
 
 export default function BlockedUsersScreen() {
-  const router = useRouter()
-  const { t } = useI18n()
-  const [entries, setEntries] = useState<BlockedUserEntry[]>([])
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [busyId, setBusyId] = useState<string | null>(null)
-  const [errorMessage, setErrorMessage] = useState('')
+  const router = useRouter();
+  const { t } = useI18n();
+  const [entries, setEntries] = useState<BlockedUserEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const loadBlockedUsers = useCallback(async () => {
     try {
-      const response = await client.get('/api/users/me/blocked-users')
+      const response = await client.get('/api/users/me/blocked-users');
       if (response.data.ok) {
-        setEntries(response.data.data || [])
-        setErrorMessage('')
+        setEntries(response.data.data || []);
+        setErrorMessage('');
       }
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, t('blocked.loadError')))
+      setErrorMessage(getApiErrorMessage(error, t('blocked.loadError')));
     }
-  }, [t])
+  }, [t]);
 
   useEffect(() => {
-    loadBlockedUsers().finally(() => setLoading(false))
-  }, [loadBlockedUsers])
+    loadBlockedUsers().finally(() => setLoading(false));
+  }, [loadBlockedUsers]);
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true)
-    await loadBlockedUsers()
-    setRefreshing(false)
-  }, [loadBlockedUsers])
+    setRefreshing(true);
+    await loadBlockedUsers();
+    setRefreshing(false);
+  }, [loadBlockedUsers]);
 
   const unblockUser = useCallback(
     (entry: BlockedUserEntry) => {
-      const name = entry.user.displayName || t('common.user')
+      const name = entry.user.displayName || t('common.user');
       Alert.alert(t('blocked.unblockTitle'), t('blocked.unblockDescription', { name }), [
         { text: t('common.cancel'), style: 'cancel' },
         {
           text: t('blocked.unblockCta'),
           onPress: async () => {
             try {
-              setBusyId(entry.user._id)
-              setEntries((prev) => prev.filter((item) => item.user._id !== entry.user._id))
-              await client.delete(`/api/users/${entry.user._id}/block`)
+              setBusyId(entry.user._id);
+              setEntries((prev) => prev.filter((item) => item.user._id !== entry.user._id));
+              await client.delete(`/api/users/${entry.user._id}/block`);
             } catch (error) {
-              Alert.alert(t('common.error'), getApiErrorMessage(error, t('blocked.unblockError')))
-              await loadBlockedUsers()
+              Alert.alert(t('common.error'), getApiErrorMessage(error, t('blocked.unblockError')));
+              await loadBlockedUsers();
             } finally {
-              setBusyId(null)
+              setBusyId(null);
             }
           },
         },
-      ])
+      ]);
     },
     [loadBlockedUsers, t]
-  )
+  );
 
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-base-canvas">
         <ActivityIndicator color={colors.accentDeep} />
       </View>
-    )
+    );
   }
 
   return (
@@ -136,9 +143,12 @@ export default function BlockedUsersScreen() {
         ) : (
           <View className="mt-6 gap-3">
             {entries.map((entry) => {
-              const name = entry.user.displayName || t('common.user')
+              const name = entry.user.displayName || t('common.user');
               return (
-                <View key={entry._id} className="flex-row items-center rounded-[24px] bg-surface-panel px-4 py-4">
+                <View
+                  key={entry._id}
+                  className="flex-row items-center rounded-[24px] bg-surface-panel px-4 py-4"
+                >
                   {entry.user.photoURL ? (
                     <RemoteImage uri={entry.user.photoURL} className="h-14 w-14 rounded-full" />
                   ) : (
@@ -151,7 +161,7 @@ export default function BlockedUsersScreen() {
                   <View className="ml-3 flex-1">
                     <Text className="font-sans text-sm font-semibold text-ink-dark">{name}</Text>
                     <Text className="mt-1 font-sans text-xs text-ink-dark/50">
-                      {t('blocked.tradesCount', { count: entry.user.completedTrades || 0 })}
+                      {t('blocked.tradesCount', { count: entry.user.completedTrades ?? 0 })}
                     </Text>
                   </View>
                   <TouchableOpacity
@@ -164,11 +174,11 @@ export default function BlockedUsersScreen() {
                     </Text>
                   </TouchableOpacity>
                 </View>
-              )
+              );
             })}
           </View>
         )}
       </View>
     </ScrollView>
-  )
+  );
 }

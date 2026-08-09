@@ -1,32 +1,32 @@
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Text, TouchableOpacity, View } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Text, TouchableOpacity, View } from 'react-native';
 
-import { BrandBackground } from '@/components/BrandBackground'
+import { BrandBackground } from '@/components/BrandBackground';
 
 type BodyScanReadyRouteParams = {
-  returnTo?: string | string[]
-  itemId?: string | string[]
-  itemIds?: string | string[]
-  mode?: string | string[]
-}
+  returnTo?: string | string[];
+  itemId?: string | string[];
+  itemIds?: string | string[];
+  mode?: string | string[];
+};
 
 function normalizeParam(value?: string | string[]) {
   if (Array.isArray(value)) {
-    return value[0]
+    return value[0];
   }
 
-  return value
+  return value;
 }
 
 export default function BodyScanReadyScreen() {
-  const router = useRouter()
-  const params = useLocalSearchParams<BodyScanReadyRouteParams>()
+  const router = useRouter();
+  const params = useLocalSearchParams<BodyScanReadyRouteParams>();
 
-  const returnTo = normalizeParam(params.returnTo)
-  const itemId = normalizeParam(params.itemId)
-  const itemIds = normalizeParam(params.itemIds)
-  const mode = normalizeParam(params.mode)
-  const canReturnToRender = returnTo === '/vto/render' && Boolean(itemId || itemIds)
+  const returnTo = normalizeParam(params.returnTo);
+  const itemId = normalizeParam(params.itemId);
+  const itemIds = normalizeParam(params.itemIds);
+  const mode = normalizeParam(params.mode);
+  const canReturnToRender = returnTo === '/vto/render' && Boolean(itemId ?? itemIds);
 
   return (
     <View className="flex-1 bg-base-canvas">
@@ -53,11 +53,11 @@ export default function BodyScanReadyScreen() {
                   ...(itemIds ? { itemIds } : {}),
                   ...(mode ? { mode } : { mode: 'quick' }),
                 },
-              })
-              return
+              });
+              return;
             }
 
-            router.replace('/vto/hub')
+            router.replace('/vto/hub');
           }}
           className="mt-8 items-center rounded-full bg-brand-accent-deep px-5 py-4"
         >
@@ -67,5 +67,5 @@ export default function BodyScanReadyScreen() {
         </TouchableOpacity>
       </View>
     </View>
-  )
+  );
 }

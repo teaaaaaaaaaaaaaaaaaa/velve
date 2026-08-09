@@ -1,19 +1,19 @@
-import { ReactNode } from 'react'
-import { StyleProp, View, ViewStyle } from 'react-native'
+import { ReactNode } from 'react';
+import { StyleProp, View, ViewStyle } from 'react-native';
 
-import { colors } from '@/design/tokens'
+import { colors } from '@/design/tokens';
 
 type Props = {
-  children: ReactNode
-  className?: string
-  style?: StyleProp<ViewStyle>
-  dark?: boolean
-}
+  children: ReactNode;
+  className?: string;
+  style?: StyleProp<ViewStyle>;
+  dark?: boolean;
+};
 
 export function GlassSurface({ children, className = '', style, dark = false }: Props) {
   const palette = dark
     ? 'border-base-canvas/10 bg-brand-accent-deep'
-    : 'border-ink-dark/6 bg-surface-panel'
+    : 'border-ink-dark/6 bg-surface-panel';
 
   const shadow: ViewStyle = dark
     ? {
@@ -29,7 +29,7 @@ export function GlassSurface({ children, className = '', style, dark = false }: 
         shadowRadius: 24,
         shadowOffset: { width: 0, height: 6 },
         elevation: 6,
-      }
+      };
 
   return (
     <View
@@ -38,5 +38,5 @@ export function GlassSurface({ children, className = '', style, dark = false }: 
     >
       {children}
     </View>
-  )
+  );
 }

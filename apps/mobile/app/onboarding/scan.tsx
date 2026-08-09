@@ -1,14 +1,14 @@
-import { StatusBar, Text, TouchableOpacity, View } from 'react-native'
-import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { StatusBar, Text, TouchableOpacity, View } from 'react-native';
 
-import { BrandBackground } from '@/components/BrandBackground'
-import { GlassSurface } from '@/components/GlassSurface'
-import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock'
-import { OnboardingProgressHeader } from '@/components/OnboardingProgressHeader'
-import { colors } from '@/design/tokens'
-import { useI18n } from '@/i18n'
-import { markBodyScanSkippedThisSession } from '@/lib/vtoSession'
+import { BrandBackground } from '@/components/BrandBackground';
+import { GlassSurface } from '@/components/GlassSurface';
+import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock';
+import { OnboardingProgressHeader } from '@/components/OnboardingProgressHeader';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
+import { markBodyScanSkippedThisSession } from '@/lib/vtoSession';
 
 const COPY = {
   sr: {
@@ -44,23 +44,23 @@ const COPY = {
     cta: 'Начать сканер',
     skip: 'Пропустить',
   },
-} as const
+} as const;
 
 export default function OnboardingScanScreen() {
-  const router = useRouter()
-  const { locale } = useI18n()
+  const router = useRouter();
+  const { locale } = useI18n();
 
-  const copy = COPY[locale]
-  const unlockLabel = locale === 'sr' ? 'Virtual Try-On spreman' : 'Virtual Try-On ready'
+  const copy = COPY[locale];
+  const unlockLabel = locale === 'sr' ? 'Virtual Try-On spreman' : 'Virtual Try-On ready';
 
   const handleSkip = () => {
-    markBodyScanSkippedThisSession()
-    router.replace('/(tabs)/feed')
-  }
+    markBodyScanSkippedThisSession();
+    router.replace('/(tabs)/feed');
+  };
 
   const handleStartScan = () => {
-    router.push('/vto/body-scan-camera')
-  }
+    router.push('/vto/body-scan-camera');
+  };
 
   return (
     <View className="flex-1 bg-base-canvas">
@@ -69,18 +69,12 @@ export default function OnboardingScanScreen() {
 
       <View className="flex-1 justify-between pb-10">
         <View>
-          <OnboardingProgressHeader
-            stepLabel="VTO setup"
-            progress={1}
-            unlockLabel={unlockLabel}
-          />
+          <OnboardingProgressHeader stepLabel="VTO setup" progress={1} unlockLabel={unlockLabel} />
           <TouchableOpacity
             onPress={handleSkip}
             className="absolute right-5 top-14 z-20 rounded-full bg-surface-panel px-4 py-2.5"
           >
-            <Text className="font-sans text-sm font-semibold text-ink-dark/60">
-              {copy.skip}
-            </Text>
+            <Text className="font-sans text-sm font-semibold text-ink-dark/60">{copy.skip}</Text>
           </TouchableOpacity>
           <OnboardingAnimatedBlock className="px-gutter">
             <View className="mb-4 self-start rounded-full bg-brand-highlight/30 px-3 py-1.5">
@@ -119,13 +113,10 @@ export default function OnboardingScanScreen() {
             onPress={handleStartScan}
             className="items-center rounded-pill bg-brand-accent-deep px-5 py-4"
           >
-            <Text className="font-sans text-base font-semibold text-base-canvas">
-              {copy.cta}
-            </Text>
+            <Text className="font-sans text-base font-semibold text-base-canvas">{copy.cta}</Text>
           </TouchableOpacity>
-
         </View>
       </View>
     </View>
-  )
+  );
 }

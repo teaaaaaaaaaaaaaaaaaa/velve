@@ -1,19 +1,19 @@
-import { Ionicons } from '@expo/vector-icons'
-import { Alert } from '@/lib/velveAlert'
-import * as ImagePicker from 'expo-image-picker'
-import { useRouter } from 'expo-router'
-import { useState } from 'react'
-import { ActivityIndicator, Image, StatusBar, Text, TouchableOpacity, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, Image, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 
-import client from '@/api/client'
-import { BrandBackground } from '@/components/BrandBackground'
-import { GlassSurface } from '@/components/GlassSurface'
-import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock'
-import { OnboardingProgressHeader } from '@/components/OnboardingProgressHeader'
-import { colors } from '@/design/tokens'
-import { useAuth } from '@/hooks/useAuth'
-import { useI18n } from '@/i18n'
-import { uploadImageUri } from '@/lib/imageRequests'
+import client from '@/api/client';
+import { BrandBackground } from '@/components/BrandBackground';
+import { GlassSurface } from '@/components/GlassSurface';
+import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock';
+import { OnboardingProgressHeader } from '@/components/OnboardingProgressHeader';
+import { colors } from '@/design/tokens';
+import { useAuth } from '@/hooks/useAuth';
+import { useI18n } from '@/i18n';
+import { uploadImageUri } from '@/lib/imageRequests';
+import { Alert } from '@/lib/velveAlert';
 
 const COPY = {
   sr: {
@@ -70,26 +70,26 @@ const COPY = {
     pickError: 'Не удалось открыть выбор фото.',
     saveError: 'Фото профиля не сохранено.',
   },
-} as const
+} as const;
 
 export default function OnboardingPhotoScreen() {
-  const router = useRouter()
-  const { refreshDbUser } = useAuth()
-  const { locale } = useI18n()
-  const [photoUri, setPhotoUri] = useState<string | null>(null)
-  const [busySource, setBusySource] = useState<'camera' | 'gallery' | 'save' | null>(null)
-  const copy = COPY[locale]
-  const unlockLabel = locale === 'sr' ? 'Otkljucan trust signal' : 'Trust signal unlocked'
+  const router = useRouter();
+  const { refreshDbUser } = useAuth();
+  const { locale } = useI18n();
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [busySource, setBusySource] = useState<'camera' | 'gallery' | 'save' | null>(null);
+  const copy = COPY[locale];
+  const unlockLabel = locale === 'sr' ? 'Otkljucan trust signal' : 'Trust signal unlocked';
 
   async function pickPhoto(source: 'camera' | 'gallery') {
     try {
-      setBusySource(source)
+      setBusySource(source);
 
       if (source === 'camera') {
-        const permission = await ImagePicker.requestCameraPermissionsAsync()
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
         if (!permission.granted) {
-          Alert.alert(copy.permissionTitle, copy.cameraPermission)
-          return
+          Alert.alert(copy.permissionTitle, copy.cameraPermission);
+          return;
         }
 
         const result = await ImagePicker.launchCameraAsync({
@@ -97,18 +97,18 @@ export default function OnboardingPhotoScreen() {
           allowsEditing: true,
           aspect: [1, 1],
           quality: 0.85,
-        })
+        });
 
         if (!result.canceled && result.assets[0]?.uri) {
-          setPhotoUri(result.assets[0].uri)
+          setPhotoUri(result.assets[0].uri);
         }
-        return
+        return;
       }
 
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert(copy.permissionTitle, copy.galleryPermission)
-        return
+        Alert.alert(copy.permissionTitle, copy.galleryPermission);
+        return;
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -116,31 +116,39 @@ export default function OnboardingPhotoScreen() {
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.85,
-      })
+      });
 
       if (!result.canceled && result.assets[0]?.uri) {
-        setPhotoUri(result.assets[0].uri)
+        setPhotoUri(result.assets[0].uri);
       }
     } catch {
-      Alert.alert(copy.errorTitle, copy.pickError)
+      Alert.alert(copy.errorTitle, copy.pickError);
     } finally {
-      setBusySource(null)
+      setBusySource(null);
     }
   }
 
   async function savePhoto() {
-    if (!photoUri) return
+    if (!photoUri) return;
 
     try {
-      setBusySource('save')
-      const upload = await uploadImageUri(photoUri)
-      await client.put('/api/users/me', { photoURL: upload.url })
-      await refreshDbUser()
-      router.push('/onboarding/scan')
-    } catch (error: any) {
-      Alert.alert(copy.errorTitle, error?.response?.data?.error || error?.message || copy.saveError)
+      setBusySource('save');
+      const upload = await uploadImageUri(photoUri);
+      await client.put('/api/users/me', { photoURL: upload.url });
+      await refreshDbUser();
+      // Body-scan onboarding step hidden for MVP — go straight to the feed.
+      router.replace('/(tabs)/feed');
+    } catch (unknownError: unknown) {
+      const error = unknownError as {
+        message?: string;
+        response?: { data?: { error?: string } };
+      };
+      Alert.alert(
+        copy.errorTitle,
+        error?.response?.data?.error || error?.message || copy.saveError
+      );
     } finally {
-      setBusySource(null)
+      setBusySource(null);
     }
   }
 
@@ -158,13 +166,11 @@ export default function OnboardingPhotoScreen() {
             onBack={() => router.back()}
           />
           <TouchableOpacity
-            onPress={() => router.push('/onboarding/scan')}
+            onPress={() => router.replace('/(tabs)/feed')}
             disabled={busySource === 'save'}
             className="absolute right-5 top-14 z-20 rounded-full bg-surface-panel px-4 py-2.5"
           >
-            <Text className="font-sans text-sm font-semibold text-ink-dark/60">
-              {copy.skip}
-            </Text>
+            <Text className="font-sans text-sm font-semibold text-ink-dark/60">{copy.skip}</Text>
           </TouchableOpacity>
 
           <OnboardingAnimatedBlock className="px-gutter">
@@ -243,14 +249,12 @@ export default function OnboardingPhotoScreen() {
               {busySource === 'save' ? (
                 <ActivityIndicator color={colors.inkDark} />
               ) : (
-                <Text className="font-sans text-base font-semibold text-ink-dark">
-                  {copy.save}
-                </Text>
+                <Text className="font-sans text-base font-semibold text-ink-dark">{copy.save}</Text>
               )}
             </TouchableOpacity>
           ) : null}
         </View>
       </View>
     </View>
-  )
+  );
 }

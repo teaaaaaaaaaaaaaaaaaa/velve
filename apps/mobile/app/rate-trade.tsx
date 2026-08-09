@@ -1,78 +1,80 @@
-import { Ionicons } from '@expo/vector-icons'
-import { Alert } from '@/lib/velveAlert'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useEffect, useState } from 'react'
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 
-import client from '@/api/client'
-import { BrandBackground } from '@/components/BrandBackground'
-import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen'
-import { RemoteImage } from '@/components/RemoteImage'
-import { VelveTextInput } from '@/components/VelveTextInput'
-import { colors } from '@/design/tokens'
-import { getApiErrorMessage } from '@/lib/apiErrors'
+import client from '@/api/client';
+import { BrandBackground } from '@/components/BrandBackground';
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen';
+import { RemoteImage } from '@/components/RemoteImage';
+import { VelveTextInput } from '@/components/VelveTextInput';
+import { colors } from '@/design/tokens';
+import { getApiErrorMessage } from '@/lib/apiErrors';
+import { Alert } from '@/lib/velveAlert';
 
 type TradeUser = {
-  _id: string
-  displayName?: string
-  photoURL?: string
-}
+  _id: string;
+  displayName?: string;
+  photoURL?: string;
+};
 
 type TradeRecord = {
-  _id: string
-  canRate?: boolean
-  counterpart?: TradeUser
-  completedAt?: string
-}
+  _id: string;
+  canRate?: boolean;
+  counterpart?: TradeUser;
+  completedAt?: string;
+};
 
 export default function RateTradeScreen() {
-  const router = useRouter()
-  const { tradeId } = useLocalSearchParams<{ tradeId?: string }>()
-  const [trade, setTrade] = useState<TradeRecord | null>(null)
-  const [rating, setRating] = useState(5)
-  const [review, setReview] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
+  const router = useRouter();
+  const { tradeId } = useLocalSearchParams<{ tradeId?: string }>();
+  const [trade, setTrade] = useState<TradeRecord | null>(null);
+  const [rating, setRating] = useState(5);
+  const [review, setReview] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   const loadTrade = useCallback(async () => {
-    const response = await client.get('/api/trades/history')
+    const response = await client.get('/api/trades/history');
     if (response.data.ok) {
-      const nextTrade = (response.data.data || []).find((entry: TradeRecord) => entry._id === tradeId)
-      setTrade(nextTrade || null)
+      const nextTrade = (response.data.data || []).find(
+        (entry: TradeRecord) => entry._id === tradeId
+      );
+      setTrade(nextTrade || null);
     }
-  }, [tradeId])
+  }, [tradeId]);
 
   useEffect(() => {
-    loadTrade().finally(() => setLoading(false))
-  }, [loadTrade])
+    loadTrade().finally(() => setLoading(false));
+  }, [loadTrade]);
 
   const submitRating = useCallback(async () => {
-    if (!tradeId || submitting) return
+    if (!tradeId || submitting) return;
     try {
-      setSubmitting(true)
+      setSubmitting(true);
       await client.post(`/api/trades/${tradeId}/rate`, {
         rating,
         review: review.trim(),
-      })
+      });
       Alert.alert('Hvala', 'Ocena je sacuvana.', [
         { text: 'U redu', onPress: () => router.replace('/trade-archive') },
-      ])
+      ]);
     } catch (error) {
-      Alert.alert('Greska', getApiErrorMessage(error, 'Ocena trenutno nije sacuvana.'))
+      Alert.alert('Greska', getApiErrorMessage(error, 'Ocena trenutno nije sacuvana.'));
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }, [rating, review, router, submitting, tradeId])
+  }, [rating, review, router, submitting, tradeId]);
 
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-base-canvas">
         <ActivityIndicator color={colors.accentDeep} />
       </View>
-    )
+    );
   }
 
-  const userName = trade?.counterpart?.displayName || 'korisnika'
+  const userName = trade?.counterpart?.displayName || 'korisnika';
 
   return (
     <KeyboardAwareScreen className="bg-base-canvas">
@@ -136,7 +138,9 @@ export default function RateTradeScreen() {
                 textAlignVertical="top"
                 className="mt-6 min-h-[130px] w-full rounded-[22px] bg-base-canvas px-4 py-4 font-sans text-sm leading-6 text-ink-dark"
               />
-              <Text className="mt-2 self-end font-sans text-xs text-ink-dark/35">{review.length}/300</Text>
+              <Text className="mt-2 self-end font-sans text-xs text-ink-dark/35">
+                {review.length}/300
+              </Text>
 
               <TouchableOpacity
                 onPress={submitRating}
@@ -156,5 +160,5 @@ export default function RateTradeScreen() {
         </View>
       </View>
     </KeyboardAwareScreen>
-  )
+  );
 }

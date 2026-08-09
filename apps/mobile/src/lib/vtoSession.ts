@@ -1,9 +1,9 @@
-let skippedBodyScanThisSession = false
+let skippedBodyScanThisSession = false;
 
 export function markBodyScanSkippedThisSession() {
-  skippedBodyScanThisSession = true
+  skippedBodyScanThisSession = true;
 }
 
 export function hasSkippedBodyScanThisSession() {
-  return skippedBodyScanThisSession
+  return skippedBodyScanThisSession;
 }

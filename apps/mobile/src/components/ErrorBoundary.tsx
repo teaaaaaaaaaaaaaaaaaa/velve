@@ -1,21 +1,21 @@
-import React from 'react'
-import { Text, TouchableOpacity, View } from 'react-native'
+import React from 'react';
+import { Text, TouchableOpacity, View } from 'react-native';
 
 export class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean }
 > {
   constructor(props: { children: React.ReactNode }) {
-    super(props)
-    this.state = { hasError: false }
+    super(props);
+    this.state = { hasError: false };
   }
 
   static getDerivedStateFromError() {
-    return { hasError: true }
+    return { hasError: true };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('[ErrorBoundary] Caught error:', error, errorInfo)
+    console.error('[ErrorBoundary] Caught error:', error, errorInfo);
   }
 
   render() {
@@ -33,9 +33,9 @@ export class ErrorBoundary extends React.Component<
             <Text className="font-sans text-base-canvas">Try again</Text>
           </TouchableOpacity>
         </View>
-      )
+      );
     }
 
-    return this.props.children
+    return this.props.children;
   }
 }

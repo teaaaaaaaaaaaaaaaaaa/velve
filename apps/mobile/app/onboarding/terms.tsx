@@ -1,13 +1,13 @@
-import { useState } from 'react'
-import { Linking, ScrollView, StatusBar, Text, TouchableOpacity, View } from 'react-native'
-import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Linking, ScrollView, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 
-import { BrandBackground } from '@/components/BrandBackground'
-import { BrandWordmark } from '@/components/BrandWordmark'
-import { GlassSurface } from '@/components/GlassSurface'
-import { colors } from '@/design/tokens'
-import { useI18n } from '@/i18n'
+import { BrandBackground } from '@/components/BrandBackground';
+import { BrandWordmark } from '@/components/BrandWordmark';
+import { GlassSurface } from '@/components/GlassSurface';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
 
 const COPY = {
   sr: {
@@ -16,11 +16,9 @@ const COPY = {
     description:
       'Velve je zajednica izgrađena na poverenju. Pre nego sto krenes, upoznaj se sa pravilima.',
     tosLabel: 'Uslovi koriscenja',
-    tosDescription:
-      'Kako funkcionise razmena, prava i obaveze korisnika, i pravila zajednice.',
+    tosDescription: 'Kako funkcionise razmena, prava i obaveze korisnika, i pravila zajednice.',
     privacyLabel: 'Politika privatnosti',
-    privacyDescription:
-      'Kako cuvamo tvoje podatke, slike i preferencije.',
+    privacyDescription: 'Kako cuvamo tvoje podatke, slike i preferencije.',
     accept: 'Prihvatam i nastavljam',
     checkboxLabel: 'Procitao/la sam i prihvatam uslove koriscenja i politiku privatnosti.',
   },
@@ -30,11 +28,9 @@ const COPY = {
     description:
       'Velve is a community built on trust. Before you start, get familiar with the rules.',
     tosLabel: 'Terms of Use',
-    tosDescription:
-      'How trading works, user rights and obligations, and community rules.',
+    tosDescription: 'How trading works, user rights and obligations, and community rules.',
     privacyLabel: 'Privacy Policy',
-    privacyDescription:
-      'How we store your data, images, and preferences.',
+    privacyDescription: 'How we store your data, images, and preferences.',
     accept: 'I accept and continue',
     checkboxLabel: 'I have read and accept the terms of use and privacy policy.',
   },
@@ -44,22 +40,20 @@ const COPY = {
     description:
       'Velve — сообщество, построенное на доверии. Перед началом ознакомься с правилами.',
     tosLabel: 'Условия использования',
-    tosDescription:
-      'Как работает обмен, права и обязанности пользователей, правила сообщества.',
+    tosDescription: 'Как работает обмен, права и обязанности пользователей, правила сообщества.',
     privacyLabel: 'Политика конфиденциальности',
-    privacyDescription:
-      'Как мы храним твои данные, изображения и предпочтения.',
+    privacyDescription: 'Как мы храним твои данные, изображения и предпочтения.',
     accept: 'Принимаю и продолжаю',
     checkboxLabel: 'Я прочитал(а) и принимаю условия использования и политику конфиденциальности.',
   },
-} as const
+} as const;
 
 export default function TermsScreen() {
-  const router = useRouter()
-  const { locale } = useI18n()
-  const [accepted, setAccepted] = useState(false)
+  const router = useRouter();
+  const { locale } = useI18n();
+  const [accepted, setAccepted] = useState(false);
 
-  const copy = COPY[locale]
+  const copy = COPY[locale];
 
   return (
     <View className="flex-1 bg-base-canvas">
@@ -98,7 +92,12 @@ export default function TermsScreen() {
                 {copy.tosDescription}
               </Text>
             </View>
-            <Ionicons name="open-outline" size={18} color={colors.accentDeep} style={{ marginTop: 4 }} />
+            <Ionicons
+              name="open-outline"
+              size={18}
+              color={colors.accentDeep}
+              style={{ marginTop: 4 }}
+            />
           </TouchableOpacity>
         </GlassSurface>
 
@@ -116,7 +115,12 @@ export default function TermsScreen() {
                 {copy.privacyDescription}
               </Text>
             </View>
-            <Ionicons name="open-outline" size={18} color={colors.accentDeep} style={{ marginTop: 4 }} />
+            <Ionicons
+              name="open-outline"
+              size={18}
+              color={colors.accentDeep}
+              style={{ marginTop: 4 }}
+            />
           </TouchableOpacity>
         </GlassSurface>
 
@@ -157,5 +161,5 @@ export default function TermsScreen() {
         </TouchableOpacity>
       </View>
     </View>
-  )
+  );
 }

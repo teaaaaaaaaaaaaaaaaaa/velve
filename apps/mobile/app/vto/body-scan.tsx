@@ -88,7 +88,11 @@ export default function BodyScanIntroScreen() {
             await client.delete('/api/users/body-scan');
             setBodyScan({ exists: false, url: null });
             Alert.alert('Obrisano', 'Body scan je uklonjen sa naloga.');
-          } catch (error: any) {
+          } catch (unknownError: unknown) {
+            const error = unknownError as {
+              message?: string;
+              response?: { data?: { error?: string } };
+            };
             Alert.alert(
               'Brisanje nije uspelo',
               error?.response?.data?.error || error?.message || 'Pokusaj ponovo.'

@@ -33,7 +33,11 @@ type Props = {
   badgeText?: string;
 };
 
-export const DiscoveryItemCard = memo(function DiscoveryItemCard({ item, onPress, badgeText }: Props) {
+export const DiscoveryItemCard = memo(function DiscoveryItemCard({
+  item,
+  onPress,
+  badgeText,
+}: Props) {
   const imageUri = getPrimaryItemImage(item);
   const owner = item.userId && typeof item.userId === 'object' ? item.userId.displayName : null;
 
@@ -42,7 +46,13 @@ export const DiscoveryItemCard = memo(function DiscoveryItemCard({ item, onPress
       onPress={onPress}
       activeOpacity={0.86}
       className="mb-4 flex-1 overflow-hidden rounded-[24px] border border-ink-dark/5 bg-surface-panel"
-      style={{ shadowColor: '#2B2A2B', shadowOpacity: 0.07, shadowRadius: 14, shadowOffset: { width: 0, height: 3 }, elevation: 4 }}
+      style={{
+        shadowColor: '#2B2A2B',
+        shadowOpacity: 0.07,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 4,
+      }}
     >
       <View className="relative aspect-[0.82] bg-brand-accent-light/15">
         {imageUri ? (
@@ -96,4 +106,4 @@ export const DiscoveryItemCard = memo(function DiscoveryItemCard({ item, onPress
       </View>
     </TouchableOpacity>
   );
-})
+});

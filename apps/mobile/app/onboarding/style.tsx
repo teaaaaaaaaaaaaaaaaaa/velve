@@ -1,14 +1,14 @@
-import { useMemo, useState } from 'react'
-import { ScrollView, StatusBar, Text, TouchableOpacity, View } from 'react-native'
-import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { ScrollView, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 
-import { BrandBackground } from '@/components/BrandBackground'
-import { GlassSurface } from '@/components/GlassSurface'
-import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock'
-import { OnboardingProgressHeader } from '@/components/OnboardingProgressHeader'
-import { colors } from '@/design/tokens'
-import { useI18n } from '@/i18n'
+import { BrandBackground } from '@/components/BrandBackground';
+import { GlassSurface } from '@/components/GlassSurface';
+import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock';
+import { OnboardingProgressHeader } from '@/components/OnboardingProgressHeader';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
 
 const STYLE_OPTIONS = [
   {
@@ -91,7 +91,7 @@ const STYLE_OPTIONS = [
       ru: 'Темные тона и raw характер.',
     },
   },
-] as const
+] as const;
 
 const COPY = {
   sr: {
@@ -121,22 +121,22 @@ const COPY = {
     footerHint: 'Выбери хотя бы один стиль, чтобы Velve поймал твой ритм.',
     cta: 'Продолжить',
   },
-} as const
+} as const;
 
 export default function StyleScreen() {
-  const router = useRouter()
-  const { locale } = useI18n()
-  const [selectedStyles, setSelectedStyles] = useState<string[]>([])
+  const router = useRouter();
+  const { locale } = useI18n();
+  const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
 
-  const copy = COPY[locale]
-  const unlockLabel = locale === 'sr' ? 'Otkljucan taste signal' : 'Taste signal unlocked'
-  const selectedCountLabel = useMemo(() => `${selectedStyles.length}/8`, [selectedStyles.length])
+  const copy = COPY[locale];
+  const unlockLabel = locale === 'sr' ? 'Otkljucan taste signal' : 'Taste signal unlocked';
+  const selectedCountLabel = useMemo(() => `${selectedStyles.length}/8`, [selectedStyles.length]);
 
   const toggleStyle = (id: string) => {
     setSelectedStyles((prev) =>
       prev.includes(id) ? prev.filter((style) => style !== id) : [...prev, id]
-    )
-  }
+    );
+  };
 
   return (
     <View className="flex-1 bg-base-canvas">
@@ -169,21 +169,21 @@ export default function StyleScreen() {
 
         <OnboardingAnimatedBlock delay={90}>
           <GlassSurface className="mt-6 flex-row items-center justify-between px-5 py-4">
-          <View>
-            <Text className="font-display text-2xl text-ink-dark">{selectedCountLabel}</Text>
-            <Text className="mt-1 font-sans text-sm text-ink-dark/58">{copy.footerHint}</Text>
-          </View>
-          <View className="rounded-pill bg-brand-highlight/38 px-4 py-2">
-            <Text className="font-sans text-xs uppercase tracking-[1px] text-ink-dark">
-              Velve
-            </Text>
-          </View>
+            <View>
+              <Text className="font-display text-2xl text-ink-dark">{selectedCountLabel}</Text>
+              <Text className="mt-1 font-sans text-sm text-ink-dark/58">{copy.footerHint}</Text>
+            </View>
+            <View className="rounded-pill bg-brand-highlight/38 px-4 py-2">
+              <Text className="font-sans text-xs uppercase tracking-[1px] text-ink-dark">
+                Velve
+              </Text>
+            </View>
           </GlassSurface>
         </OnboardingAnimatedBlock>
 
         <OnboardingAnimatedBlock delay={160} className="mt-6 flex-row flex-wrap justify-between">
           {STYLE_OPTIONS.map((style) => {
-            const isSelected = selectedStyles.includes(style.id)
+            const isSelected = selectedStyles.includes(style.id);
 
             return (
               <TouchableOpacity
@@ -229,7 +229,7 @@ export default function StyleScreen() {
                   {style.note[locale]}
                 </Text>
               </TouchableOpacity>
-            )
+            );
           })}
         </OnboardingAnimatedBlock>
       </ScrollView>
@@ -259,5 +259,5 @@ export default function StyleScreen() {
         </TouchableOpacity>
       </View>
     </View>
-  )
+  );
 }

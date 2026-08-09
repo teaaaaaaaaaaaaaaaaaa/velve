@@ -22,6 +22,7 @@ import {
   getAuthInlineFeedback,
   getAuthValidationFeedback,
   isExpectedAuthError,
+  type FirebaseErrorLike,
   type InlineAuthFeedback,
 } from '@/lib/authFeedback';
 
@@ -79,7 +80,8 @@ export default function RegisterScreen() {
     try {
       await registerWithEmail(normalizedEmail, password);
       console.log('[RegisterScreen] Registration request resolved successfully');
-    } catch (e: any) {
+    } catch (unknownError: unknown) {
+      const e = unknownError as FirebaseErrorLike;
       const logger = isExpectedAuthError(e) ? console.warn : console.error;
       logger('[RegisterScreen] Registration failed', {
         code: e?.code,

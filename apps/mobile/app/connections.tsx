@@ -1,85 +1,96 @@
-import { Ionicons } from '@expo/vector-icons'
-import { Alert } from '@/lib/velveAlert'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-import client from '@/api/client'
-import { BrandBackground } from '@/components/BrandBackground'
-import { EditorialEmptyState } from '@/components/EditorialEmptyState'
-import { RemoteImage } from '@/components/RemoteImage'
-import { colors } from '@/design/tokens'
-import { useAuth } from '@/hooks/useAuth'
-import { getApiErrorMessage } from '@/lib/apiErrors'
-import { showVelveToast } from '@/lib/velveAlert'
+import client from '@/api/client';
+import { BrandBackground } from '@/components/BrandBackground';
+import { EditorialEmptyState } from '@/components/EditorialEmptyState';
+import { RemoteImage } from '@/components/RemoteImage';
+import { colors } from '@/design/tokens';
+import { useAuth } from '@/hooks/useAuth';
+import { getApiErrorMessage } from '@/lib/apiErrors';
+import { Alert, showVelveToast } from '@/lib/velveAlert';
 
-type ConnectionTab = 'followers' | 'following'
+type ConnectionTab = 'followers' | 'following';
 
 type ConnectionUser = {
-  _id: string
-  displayName?: string
-  photoURL?: string
-  bio?: string
-  averageRating?: number
-  completedTrades?: number
-  isSelf?: boolean
-  isFollowing?: boolean
-  location?: { city?: string }
-}
+  _id: string;
+  displayName?: string;
+  photoURL?: string;
+  bio?: string;
+  averageRating?: number;
+  completedTrades?: number;
+  isSelf?: boolean;
+  isFollowing?: boolean;
+  location?: { city?: string };
+};
 
 type ConnectionProfile = {
-  _id: string
-  displayName?: string
-  photoURL?: string
-  bio?: string
-  followersCount?: number
-  followingCount?: number
-  completedTrades?: number
-  isSelf?: boolean
-  location?: { city?: string; region?: string }
-}
+  _id: string;
+  displayName?: string;
+  photoURL?: string;
+  bio?: string;
+  followersCount?: number;
+  followingCount?: number;
+  completedTrades?: number;
+  isSelf?: boolean;
+  location?: { city?: string; region?: string };
+};
 
 export default function ConnectionsScreen() {
-  const router = useRouter()
-  const { dbUser } = useAuth()
-  const params = useLocalSearchParams<{ userId?: string; tab?: ConnectionTab }>()
-  const userId = params.userId
-  const [activeTab, setActiveTab] = useState<ConnectionTab>(params.tab === 'following' ? 'following' : 'followers')
-  const [profileUser, setProfileUser] = useState<ConnectionProfile | null>(null)
-  const [users, setUsers] = useState<ConnectionUser[]>([])
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [busyId, setBusyId] = useState<string | null>(null)
-  const [errorMessage, setErrorMessage] = useState('')
+  const router = useRouter();
+  const { dbUser } = useAuth();
+  const params = useLocalSearchParams<{ userId?: string; tab?: ConnectionTab }>();
+  const userId = params.userId;
+  const [activeTab, setActiveTab] = useState<ConnectionTab>(
+    params.tab === 'following' ? 'following' : 'followers'
+  );
+  const [profileUser, setProfileUser] = useState<ConnectionProfile | null>(null);
+  const [users, setUsers] = useState<ConnectionUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const isOwnConnections = Boolean(userId && dbUser?._id && String(userId) === String(dbUser._id))
-  const profileName = profileUser?.displayName || (isOwnConnections ? dbUser?.displayName || 'Tvoj profil' : 'Profil')
-  const profileInitial = profileName.charAt(0).toUpperCase()
-  const title = activeTab === 'followers' ? 'Pratioci' : 'Prati'
-  const contextLabel = isOwnConnections ? 'Tvoj social closet' : `@${profileName}`
-  const emptyText = activeTab === 'followers'
-    ? isOwnConnections
-      ? 'Ne prati vas niko.'
-      : `Niko jos ne prati profil ${profileName}.`
-    : isOwnConnections
-      ? 'Ne pratite nikoga.'
-      : `${profileName} jos nikoga ne prati.`
+  const isOwnConnections = Boolean(userId && dbUser?._id && String(userId) === String(dbUser._id));
+  const profileName =
+    profileUser?.displayName ||
+    (isOwnConnections ? dbUser?.displayName || 'Tvoj profil' : 'Profil');
+  const profileInitial = profileName.charAt(0).toUpperCase();
+  const title = activeTab === 'followers' ? 'Pratioci' : 'Prati';
+  const contextLabel = isOwnConnections ? 'Tvoj social closet' : `@${profileName}`;
+  const emptyText =
+    activeTab === 'followers'
+      ? isOwnConnections
+        ? 'Ne prati vas niko.'
+        : `Niko jos ne prati profil ${profileName}.`
+      : isOwnConnections
+        ? 'Ne pratite nikoga.'
+        : `${profileName} jos nikoga ne prati.`;
 
   const endpoint = useMemo(() => {
-    if (!userId) return ''
-    return `/api/users/${userId}/${activeTab}`
-  }, [activeTab, userId])
+    if (!userId) return '';
+    return `/api/users/${userId}/${activeTab}`;
+  }, [activeTab, userId]);
 
   useEffect(() => {
-    setActiveTab(params.tab === 'following' ? 'following' : 'followers')
-  }, [params.tab])
+    setActiveTab(params.tab === 'following' ? 'following' : 'followers');
+  }, [params.tab]);
 
   const loadProfileUser = useCallback(async () => {
-    if (!userId) return
+    if (!userId) return;
     try {
-      const response = await client.get(`/api/users/${userId}`)
+      const response = await client.get(`/api/users/${userId}`);
       if (response.data.ok) {
-        setProfileUser(response.data.data || null)
+        setProfileUser(response.data.data || null);
       }
     } catch {
       if (isOwnConnections && dbUser) {
@@ -89,117 +100,127 @@ export default function ConnectionsScreen() {
           photoURL: dbUser.photoURL,
           followersCount: dbUser.followersCount,
           followingCount: dbUser.followingCount,
-        })
+        });
       }
     }
-  }, [dbUser, isOwnConnections, userId])
+  }, [dbUser, isOwnConnections, userId]);
 
   const loadConnections = useCallback(async () => {
-    if (!endpoint) return
+    if (!endpoint) return;
     try {
-      const response = await client.get(endpoint)
+      const response = await client.get(endpoint);
       if (response.data.ok) {
-        setUsers(response.data.data || [])
-        setErrorMessage('')
+        setUsers(response.data.data || []);
+        setErrorMessage('');
       }
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Lista trenutno nije dostupna.'))
+      setErrorMessage(getApiErrorMessage(error, 'Lista trenutno nije dostupna.'));
     }
-  }, [endpoint])
+  }, [endpoint]);
 
   useEffect(() => {
-    loadConnections().finally(() => setLoading(false))
-  }, [loadConnections])
+    loadConnections().finally(() => setLoading(false));
+  }, [loadConnections]);
 
   useEffect(() => {
-    loadProfileUser()
-  }, [loadProfileUser])
+    loadProfileUser();
+  }, [loadProfileUser]);
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true)
-    await Promise.all([loadProfileUser(), loadConnections()])
-    setRefreshing(false)
-  }, [loadConnections, loadProfileUser])
+    setRefreshing(true);
+    await Promise.all([loadProfileUser(), loadConnections()]);
+    setRefreshing(false);
+  }, [loadConnections, loadProfileUser]);
 
-  const toggleFollow = useCallback(async (connection: ConnectionUser) => {
-    if (connection.isSelf || busyId) return
-    const wasFollowing = Boolean(connection.isFollowing)
-    setBusyId(connection._id)
-    setUsers((prev) =>
-      prev.map((entry) =>
-        entry._id === connection._id ? { ...entry, isFollowing: !wasFollowing } : entry
-      )
-    )
-    try {
-      if (wasFollowing) {
-        await client.delete(`/api/users/${connection._id}/follow`)
-        showVelveToast({
-          title: 'Otpraceno',
-          message: `${connection.displayName || 'Korisnik'} vise nije u tvom social closetu.`,
-          tone: 'success',
-        })
-      } else {
-        await client.post(`/api/users/${connection._id}/follow`)
-        showVelveToast({
-          title: 'Zapraceno',
-          message: `${connection.displayName || 'Korisnik'} je dodat u tvoj social closet.`,
-          tone: 'success',
-        })
-      }
-    } catch (error) {
+  const toggleFollow = useCallback(
+    async (connection: ConnectionUser) => {
+      if (connection.isSelf || busyId) return;
+      const wasFollowing = Boolean(connection.isFollowing);
+      setBusyId(connection._id);
       setUsers((prev) =>
         prev.map((entry) =>
-          entry._id === connection._id ? { ...entry, isFollowing: wasFollowing } : entry
+          entry._id === connection._id ? { ...entry, isFollowing: !wasFollowing } : entry
         )
-      )
-      showVelveToast({
-        title: 'Pracenje nije azurirano',
-        message: getApiErrorMessage(error, 'Pokusaj ponovo za nekoliko trenutaka.'),
-        tone: 'error',
-      })
-    } finally {
-      setBusyId(null)
-    }
-  }, [busyId])
+      );
+      try {
+        if (wasFollowing) {
+          await client.delete(`/api/users/${connection._id}/follow`);
+          showVelveToast({
+            title: 'Otpraceno',
+            message: `${connection.displayName || 'Korisnik'} vise nije u tvom social closetu.`,
+            tone: 'success',
+          });
+        } else {
+          await client.post(`/api/users/${connection._id}/follow`);
+          showVelveToast({
+            title: 'Zapraceno',
+            message: `${connection.displayName || 'Korisnik'} je dodat u tvoj social closet.`,
+            tone: 'success',
+          });
+        }
+      } catch (error) {
+        setUsers((prev) =>
+          prev.map((entry) =>
+            entry._id === connection._id ? { ...entry, isFollowing: wasFollowing } : entry
+          )
+        );
+        showVelveToast({
+          title: 'Pracenje nije azurirano',
+          message: getApiErrorMessage(error, 'Pokusaj ponovo za nekoliko trenutaka.'),
+          tone: 'error',
+        });
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [busyId]
+  );
 
   const removeFollower = useCallback(
     (connection: ConnectionUser) => {
-      if (busyId) return
+      if (busyId) return;
 
-      Alert.alert('Ukloni pratioca', `${connection.displayName || 'Korisnik'} vise nece pratiti tvoj profil.`, [
-        { text: 'Odustani', style: 'cancel' },
-        {
-          text: 'Ukloni',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setBusyId(connection._id)
-              setUsers((prev) => prev.filter((entry) => entry._id !== connection._id))
-              await client.delete(`/api/users/${connection._id}/follower`)
-              showVelveToast({
-                title: 'Pratilac je uklonjen',
-                message: `${connection.displayName || 'Korisnik'} vise ne prati tvoj profil.`,
-                tone: 'success',
-              })
-            } catch (error) {
-              await loadConnections()
-              Alert.alert('Uklanjanje nije uspelo', getApiErrorMessage(error, 'Pokusaj ponovo za nekoliko trenutaka.'))
-            } finally {
-              setBusyId(null)
-            }
+      Alert.alert(
+        'Ukloni pratioca',
+        `${connection.displayName || 'Korisnik'} vise nece pratiti tvoj profil.`,
+        [
+          { text: 'Odustani', style: 'cancel' },
+          {
+            text: 'Ukloni',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                setBusyId(connection._id);
+                setUsers((prev) => prev.filter((entry) => entry._id !== connection._id));
+                await client.delete(`/api/users/${connection._id}/follower`);
+                showVelveToast({
+                  title: 'Pratilac je uklonjen',
+                  message: `${connection.displayName || 'Korisnik'} vise ne prati tvoj profil.`,
+                  tone: 'success',
+                });
+              } catch (error) {
+                await loadConnections();
+                Alert.alert(
+                  'Uklanjanje nije uspelo',
+                  getApiErrorMessage(error, 'Pokusaj ponovo za nekoliko trenutaka.')
+                );
+              } finally {
+                setBusyId(null);
+              }
+            },
           },
-        },
-      ])
+        ]
+      );
     },
     [busyId, loadConnections]
-  )
+  );
 
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-base-canvas">
         <ActivityIndicator color={colors.accentDeep} />
       </View>
-    )
+    );
   }
 
   return (
@@ -225,7 +246,9 @@ export default function ConnectionsScreen() {
               <RemoteImage uri={profileUser.photoURL} className="h-16 w-16 rounded-full" />
             ) : (
               <View className="h-16 w-16 items-center justify-center rounded-full bg-brand-accent-light/35">
-                <Text className="font-display text-3xl text-brand-accent-deep">{profileInitial}</Text>
+                <Text className="font-display text-3xl text-brand-accent-deep">
+                  {profileInitial}
+                </Text>
               </View>
             )}
             <View className="ml-3 flex-1">
@@ -265,9 +288,9 @@ export default function ConnectionsScreen() {
               key={tab}
               className={`flex-1 rounded-[18px] px-4 py-3 ${activeTab === tab ? 'bg-brand-accent-deep' : ''}`}
               onPress={() => {
-                if (activeTab === tab) return
-                setActiveTab(tab)
-                setLoading(true)
+                if (activeTab === tab) return;
+                setActiveTab(tab);
+                setLoading(true);
               }}
             >
               <Text
@@ -300,7 +323,7 @@ export default function ConnectionsScreen() {
         ) : (
           <View className="mt-5 gap-3">
             {users.map((connection) => {
-              const name = connection.displayName || 'Korisnik'
+              const name = connection.displayName || 'Korisnik';
               return (
                 <TouchableOpacity
                   key={connection._id}
@@ -321,8 +344,8 @@ export default function ConnectionsScreen() {
                     <Text className="font-sans text-sm font-semibold text-ink-dark">{name}</Text>
                     <Text className="mt-1 font-sans text-xs text-ink-dark/50" numberOfLines={1}>
                       {connection.location?.city
-                        ? `${connection.location.city} - ${connection.completedTrades || 0} razmena`
-                        : `${connection.completedTrades || 0} razmena`}
+                        ? `${connection.location.city} - ${connection.completedTrades ?? 0} razmena`
+                        : `${connection.completedTrades ?? 0} razmena`}
                     </Text>
                   </View>
                   {!connection.isSelf ? (
@@ -359,11 +382,11 @@ export default function ConnectionsScreen() {
                     </TouchableOpacity>
                   ) : null}
                 </TouchableOpacity>
-              )
+              );
             })}
           </View>
         )}
       </View>
     </ScrollView>
-  )
+  );
 }

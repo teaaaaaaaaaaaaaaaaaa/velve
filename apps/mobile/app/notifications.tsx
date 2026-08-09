@@ -1,64 +1,77 @@
-import { Ionicons } from '@expo/vector-icons'
-import { useRouter } from 'expo-router'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-import client from '@/api/client'
-import { BrandBackground } from '@/components/BrandBackground'
-import { EditorialEmptyState } from '@/components/EditorialEmptyState'
-import { RemoteImage } from '@/components/RemoteImage'
-import { colors } from '@/design/tokens'
-import { useI18n } from '@/i18n'
-import { getApiErrorMessage } from '@/lib/apiErrors'
-import { showVelveToast } from '@/lib/velveAlert'
+import client from '@/api/client';
+import { BrandBackground } from '@/components/BrandBackground';
+import { EditorialEmptyState } from '@/components/EditorialEmptyState';
+import { RemoteImage } from '@/components/RemoteImage';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
+import { getApiErrorMessage } from '@/lib/apiErrors';
+import { showVelveToast } from '@/lib/velveAlert';
 
 type NotificationRecord = {
-  _id: string
-  type: string
-  title: string
-  body?: string
-  readAt?: string | null
-  createdAt: string
-  actorUserId?: { _id: string; displayName?: string; photoURL?: string }
-  itemId?: { _id: string; title?: string; images?: string[]; imageClean?: string | null; primaryImage?: string | null }
-  tradeId?: string
-  chatId?: string
-  data?: Record<string, string>
-}
+  _id: string;
+  type: string;
+  title: string;
+  body?: string;
+  readAt?: string | null;
+  createdAt: string;
+  actorUserId?: { _id: string; displayName?: string; photoURL?: string };
+  itemId?: {
+    _id: string;
+    title?: string;
+    images?: string[];
+    imageClean?: string | null;
+    primaryImage?: string | null;
+  };
+  tradeId?: string;
+  chatId?: string;
+  data?: Record<string, string>;
+};
 
 function formatTime(dateStr: string, nowLabel: string) {
-  const diffMs = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diffMs / 60000)
-  if (mins < 1) return nowLabel
-  if (mins < 60) return `${mins}m`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h`
-  return `${Math.floor(hours / 24)}d`
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return nowLabel;
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
 }
 
 function isToday(dateStr: string) {
-  const date = new Date(dateStr)
-  const now = new Date()
-  return date.toDateString() === now.toDateString()
+  const date = new Date(dateStr);
+  const now = new Date();
+  return date.toDateString() === now.toDateString();
 }
 
 function getIcon(type: string): keyof typeof Ionicons.glyphMap {
-  if (type.includes('like')) return 'heart-outline'
-  if (type.includes('wishlist')) return 'bookmark-outline'
-  if (type.includes('follow')) return 'person-add-outline'
-  if (type.includes('chat')) return 'chatbubble-outline'
-  if (type.includes('trade')) return 'swap-horizontal-outline'
-  return 'sparkles-outline'
+  if (type.includes('like')) return 'heart-outline';
+  if (type.includes('wishlist')) return 'bookmark-outline';
+  if (type.includes('follow')) return 'person-add-outline';
+  if (type.includes('chat')) return 'chatbubble-outline';
+  if (type.includes('trade')) return 'swap-horizontal-outline';
+  return 'sparkles-outline';
 }
 
 export default function NotificationsScreen() {
-  const router = useRouter()
-  const { t } = useI18n()
-  const [notifications, setNotifications] = useState<NotificationRecord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
-  const [markingAllRead, setMarkingAllRead] = useState(false)
+  const router = useRouter();
+  const { t } = useI18n();
+  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [markingAllRead, setMarkingAllRead] = useState(false);
 
   const grouped = useMemo(
     () => ({
@@ -66,107 +79,108 @@ export default function NotificationsScreen() {
       earlier: notifications.filter((entry) => !isToday(entry.createdAt)),
     }),
     [notifications]
-  )
+  );
 
   const loadNotifications = useCallback(async () => {
     try {
-      const response = await client.get('/api/notifications')
+      const response = await client.get('/api/notifications');
       if (response.data.ok) {
-        setNotifications(response.data.data || [])
-        setErrorMessage('')
+        setNotifications(response.data.data || []);
+        setErrorMessage('');
       }
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, t('notifications.loadError')))
+      setErrorMessage(getApiErrorMessage(error, t('notifications.loadError')));
     }
-  }, [t])
+  }, [t]);
 
   useEffect(() => {
-    loadNotifications().finally(() => setLoading(false))
-  }, [loadNotifications])
+    loadNotifications().finally(() => setLoading(false));
+  }, [loadNotifications]);
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true)
-    await loadNotifications()
-    setRefreshing(false)
-  }, [loadNotifications])
+    setRefreshing(true);
+    await loadNotifications();
+    setRefreshing(false);
+  }, [loadNotifications]);
 
   const markAllRead = useCallback(async () => {
-    if (markingAllRead) return
+    if (markingAllRead) return;
 
-    const unreadCount = notifications.filter((entry) => !entry.readAt).length
+    const unreadCount = notifications.filter((entry) => !entry.readAt).length;
     if (unreadCount === 0) {
       showVelveToast({
         title: t('notifications.markReadIdleTitle'),
         message: t('notifications.markReadIdleDescription'),
         tone: 'info',
-      })
-      return
+      });
+      return;
     }
 
-    const readAt = new Date().toISOString()
-    const previousNotifications = notifications
+    const readAt = new Date().toISOString();
+    const previousNotifications = notifications;
 
-    setNotifications((prev) =>
-      prev.map((entry) => ({ ...entry, readAt: entry.readAt || readAt }))
-    )
+    setNotifications((prev) => prev.map((entry) => ({ ...entry, readAt: entry.readAt ?? readAt })));
 
     try {
-      setMarkingAllRead(true)
-      await client.put('/api/notifications/read')
+      setMarkingAllRead(true);
+      await client.put('/api/notifications/read');
       showVelveToast({
         title: t('notifications.markReadSuccessTitle'),
         message: t('notifications.markReadSuccessDescription', { count: unreadCount }),
         tone: 'success',
-      })
+      });
     } catch (error) {
-      setNotifications(previousNotifications)
+      setNotifications(previousNotifications);
       showVelveToast({
         title: t('notifications.markReadErrorTitle'),
         message: getApiErrorMessage(error, t('notifications.markReadErrorDescription')),
         tone: 'error',
-      })
+      });
     } finally {
-      setMarkingAllRead(false)
+      setMarkingAllRead(false);
     }
-  }, [markingAllRead, notifications, t])
+  }, [markingAllRead, notifications, t]);
 
   const openNotification = useCallback(
     async (notification: NotificationRecord) => {
-      client.put(`/api/notifications/${notification._id}/read`).catch(() => undefined)
+      client.put(`/api/notifications/${notification._id}/read`).catch(() => undefined);
       setNotifications((prev) =>
         prev.map((entry) =>
-          entry._id === notification._id ? { ...entry, readAt: entry.readAt || new Date().toISOString() } : entry
+          entry._id === notification._id
+            ? { ...entry, readAt: entry.readAt ?? new Date().toISOString() }
+            : entry
         )
-      )
+      );
 
-      const chatId = notification.chatId || notification.data?.chatId
-      const itemId = notification.itemId?._id || notification.data?.itemId
-      const actorId = notification.actorUserId?._id || notification.data?.userId || notification.data?.senderId
-      const tradeId = notification.tradeId || notification.data?.tradeId
+      const chatId = notification.chatId ?? notification.data?.chatId;
+      const itemId = notification.itemId?._id ?? notification.data?.itemId;
+      const actorId =
+        notification.actorUserId?._id ?? notification.data?.userId ?? notification.data?.senderId;
+      const tradeId = notification.tradeId ?? notification.data?.tradeId;
 
       if (notification.type === 'trade_complete' && tradeId) {
-        router.push({ pathname: '/rate-trade', params: { tradeId } })
+        router.push({ pathname: '/rate-trade', params: { tradeId } });
       } else if (chatId) {
-        router.push(`/(tabs)/chat/${chatId}`)
+        router.push(`/(tabs)/chat/${chatId}`);
       } else if (itemId) {
-        router.push(`/items/${itemId}`)
+        router.push(`/items/${itemId}`);
       } else if (notification.type === 'trade_rating' && tradeId) {
-        router.push('/trade-archive')
+        router.push('/trade-archive');
       } else if (actorId) {
-        router.push(`/users/${actorId}`)
+        router.push(`/users/${actorId}`);
       } else {
         showVelveToast({
           title: t('notifications.openFallbackTitle'),
           message: t('notifications.openFallbackDescription'),
           tone: 'info',
-        })
+        });
       }
     },
     [router, t]
-  )
+  );
 
   const renderGroup = (title: string, entries: NotificationRecord[]) => {
-    if (entries.length === 0) return null
+    if (entries.length === 0) return null;
 
     return (
       <View className="mt-5">
@@ -176,10 +190,10 @@ export default function NotificationsScreen() {
         <View className="gap-3">
           {entries.map((notification) => {
             const imageUri =
-              notification.actorUserId?.photoURL ||
-              notification.itemId?.primaryImage ||
-              notification.itemId?.imageClean ||
-              notification.itemId?.images?.[0]
+              notification.actorUserId?.photoURL ??
+              notification.itemId?.primaryImage ??
+              notification.itemId?.imageClean ??
+              notification.itemId?.images?.[0];
             return (
               <TouchableOpacity
                 key={notification._id}
@@ -191,7 +205,11 @@ export default function NotificationsScreen() {
                   {imageUri ? (
                     <RemoteImage uri={imageUri} className="h-full w-full" />
                   ) : (
-                    <Ionicons name={getIcon(notification.type)} size={20} color={colors.accentDeep} />
+                    <Ionicons
+                      name={getIcon(notification.type)}
+                      size={20}
+                      color={colors.accentDeep}
+                    />
                   )}
                 </View>
                 <View className="flex-1">
@@ -207,25 +225,28 @@ export default function NotificationsScreen() {
                     </Text>
                   </View>
                   {notification.body ? (
-                    <Text className="mt-1 font-sans text-sm leading-5 text-ink-dark/60" numberOfLines={2}>
+                    <Text
+                      className="mt-1 font-sans text-sm leading-5 text-ink-dark/60"
+                      numberOfLines={2}
+                    >
                       {notification.body}
                     </Text>
                   ) : null}
                 </View>
               </TouchableOpacity>
-            )
+            );
           })}
         </View>
       </View>
-    )
-  }
+    );
+  };
 
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-base-canvas">
         <ActivityIndicator color={colors.accentDeep} />
       </View>
-    )
+    );
   }
 
   return (
@@ -285,5 +306,5 @@ export default function NotificationsScreen() {
         )}
       </View>
     </ScrollView>
-  )
+  );
 }

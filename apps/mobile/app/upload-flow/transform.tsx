@@ -1,13 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Alert } from '@/lib/velveAlert';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Text, View } from 'react-native';
 
 import client from '@/api/client';
-import { BrandWordmark } from '@/components/BrandWordmark';
 import { BrandBackground } from '@/components/BrandBackground';
+import { BrandWordmark } from '@/components/BrandWordmark';
 import { useI18n } from '@/i18n';
 import { uploadImageUri } from '@/lib/imageRequests';
+import { Alert } from '@/lib/velveAlert';
 
 function useStepCycler(steps: string[], intervalMs = 3200) {
   const [index, setIndex] = useState(0);
@@ -135,8 +135,12 @@ export default function CleanCutTransformScreen() {
           });
         }
       })
-      .catch((error: any) => {
+      .catch((unknownError: unknown) => {
         if (!active) return;
+        const error = unknownError as {
+          message?: string;
+          response?: { data?: { error?: string } };
+        };
         Alert.alert(
           t('upload.transformFailedTitle'),
           error?.response?.data?.error || error?.message || t('upload.transformFailedDescription'),

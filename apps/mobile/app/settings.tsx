@@ -1,28 +1,35 @@
-import { Ionicons } from '@expo/vector-icons'
-import { Alert } from '@/lib/velveAlert'
-import { useRouter } from 'expo-router'
-import type { ReactNode } from 'react'
-import { useCallback, useEffect, useState } from 'react'
-import { ActivityIndicator, Linking, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import type { ReactNode } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Linking,
+  ScrollView,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-import client from '@/api/client'
-import { BrandBackground } from '@/components/BrandBackground'
-import { RemoteImage } from '@/components/RemoteImage'
-import { colors } from '@/design/tokens'
-import { useAuth } from '@/hooks/useAuth'
-import { useI18n } from '@/i18n'
-import { getApiErrorMessage } from '@/lib/apiErrors'
-import { showVelveToast } from '@/lib/velveAlert'
+import client from '@/api/client';
+import { BrandBackground } from '@/components/BrandBackground';
+import { RemoteImage } from '@/components/RemoteImage';
+import { colors } from '@/design/tokens';
+import { useAuth } from '@/hooks/useAuth';
+import { useI18n } from '@/i18n';
+import { getApiErrorMessage } from '@/lib/apiErrors';
+import { Alert, showVelveToast } from '@/lib/velveAlert';
 
 type NotificationPreferences = {
-  allPush: boolean
-  likes: boolean
-  follows: boolean
-  trades: boolean
-  messages: boolean
-  ratings: boolean
-  marketing: boolean
-}
+  allPush: boolean;
+  likes: boolean;
+  follows: boolean;
+  trades: boolean;
+  messages: boolean;
+  ratings: boolean;
+  marketing: boolean;
+};
 
 const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   allPush: true,
@@ -32,16 +39,16 @@ const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   messages: true,
   ratings: true,
   marketing: false,
-}
+};
 
 type SettingRowProps = {
-  icon: keyof typeof Ionicons.glyphMap
-  title: string
-  description?: string
-  onPress?: () => void
-  danger?: boolean
-  right?: ReactNode
-}
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  description?: string;
+  onPress?: () => void;
+  danger?: boolean;
+  right?: ReactNode;
+};
 
 function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -51,66 +58,79 @@ function SettingsSection({ title, children }: { title: string; children: ReactNo
       </Text>
       {children}
     </View>
-  )
+  );
 }
 
 function SettingRow({ icon, title, description, onPress, danger, right }: SettingRowProps) {
   const content = (
     <>
-      <View className={`h-10 w-10 items-center justify-center rounded-full ${danger ? 'bg-signal-danger/10' : 'bg-base-canvas'}`}>
+      <View
+        className={`h-10 w-10 items-center justify-center rounded-full ${danger ? 'bg-signal-danger/10' : 'bg-base-canvas'}`}
+      >
         <Ionicons name={icon} size={18} color={danger ? colors.danger : colors.accentDeep} />
       </View>
       <View className="ml-3 flex-1">
-        <Text className={`font-sans text-sm font-semibold ${danger ? 'text-signal-danger' : 'text-ink-dark'}`}>
+        <Text
+          className={`font-sans text-sm font-semibold ${danger ? 'text-signal-danger' : 'text-ink-dark'}`}
+        >
           {title}
         </Text>
         {description ? (
           <Text className="mt-1 font-sans text-xs leading-5 text-ink-dark/52">{description}</Text>
         ) : null}
       </View>
-      {right || (onPress ? <Ionicons name="chevron-forward" size={17} color={colors.mutedText} /> : null)}
+      {right ??
+        (onPress ? <Ionicons name="chevron-forward" size={17} color={colors.mutedText} /> : null)}
     </>
-  )
+  );
 
   if (onPress) {
     return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.86} className="mt-3 flex-row items-center rounded-[20px] px-2 py-2">
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.86}
+        className="mt-3 flex-row items-center rounded-[20px] px-2 py-2"
+      >
         {content}
       </TouchableOpacity>
-    )
+    );
   }
 
-  return <View className="mt-3 flex-row items-center rounded-[20px] px-2 py-2">{content}</View>
+  return <View className="mt-3 flex-row items-center rounded-[20px] px-2 py-2">{content}</View>;
 }
 
 export default function SettingsScreen() {
-  const router = useRouter()
-  const { dbUser, logout } = useAuth()
-  const { locale, localeLabels, locales, setLocale, t } = useI18n()
-  const [preferences, setPreferences] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES)
-  const [loadingPreferences, setLoadingPreferences] = useState(true)
-  const [savingPreference, setSavingPreference] = useState<keyof NotificationPreferences | null>(null)
-  const [savingLocale, setSavingLocale] = useState(false)
-  const [preferencesNotice, setPreferencesNotice] = useState('')
+  const router = useRouter();
+  const { dbUser, logout } = useAuth();
+  const { locale, localeLabels, locales, setLocale, t } = useI18n();
+  const [preferences, setPreferences] = useState<NotificationPreferences>(
+    DEFAULT_NOTIFICATION_PREFERENCES
+  );
+  const [loadingPreferences, setLoadingPreferences] = useState(true);
+  const [savingPreference, setSavingPreference] = useState<keyof NotificationPreferences | null>(
+    null
+  );
+  const [savingLocale, setSavingLocale] = useState(false);
+  const [preferencesNotice, setPreferencesNotice] = useState('');
 
   const loadPreferences = useCallback(async () => {
     try {
-      const response = await client.get('/api/users/me/notification-preferences')
+      const response = await client.get('/api/users/me/notification-preferences');
       if (response.data.ok) {
-        setPreferences({ ...DEFAULT_NOTIFICATION_PREFERENCES, ...(response.data.data || {}) })
-        setPreferencesNotice('')
+        setPreferences({ ...DEFAULT_NOTIFICATION_PREFERENCES, ...(response.data.data || {}) });
+        setPreferencesNotice('');
       }
     } catch (error) {
       // Keep local defaults if the API is temporarily unavailable.
-      setPreferencesNotice(getApiErrorMessage(error, t('settings.preferencesLoadError')))
+      setPreferencesNotice(getApiErrorMessage(error, t('settings.preferencesLoadError')));
     } finally {
-      setLoadingPreferences(false)
+      setLoadingPreferences(false);
     }
-  }, [t])
+  }, [t]);
 
   useEffect(() => {
-    loadPreferences()
-  }, [loadPreferences])
+    loadPreferences();
+  }, [loadPreferences]);
 
   const handleLogout = () => {
     Alert.alert(t('profile.logout'), t('profile.logoutConfirm'), [
@@ -120,46 +140,46 @@ export default function SettingsScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await logout()
-            router.replace('/(auth)/login')
+            await logout();
+            router.replace('/(auth)/login');
           } catch (error) {
             showVelveToast({
               title: t('common.error'),
               message: getApiErrorMessage(error, t('settings.logoutError')),
               tone: 'error',
-            })
+            });
           }
         },
       },
-    ])
-  }
+    ]);
+  };
 
   const updatePreference = useCallback(
     async (key: keyof NotificationPreferences, value: boolean) => {
-      const previous = preferences
-      const next = { ...preferences, [key]: value }
-      setPreferences(next)
-      setSavingPreference(key)
+      const previous = preferences;
+      const next = { ...preferences, [key]: value };
+      setPreferences(next);
+      setSavingPreference(key);
 
       try {
-        const response = await client.put('/api/users/me/notification-preferences', next)
+        const response = await client.put('/api/users/me/notification-preferences', next);
         if (response.data.ok) {
-          setPreferences({ ...DEFAULT_NOTIFICATION_PREFERENCES, ...(response.data.data || next) })
-          setPreferencesNotice('')
+          setPreferences({ ...DEFAULT_NOTIFICATION_PREFERENCES, ...(response.data.data || next) });
+          setPreferencesNotice('');
         }
       } catch (error) {
-        setPreferences(previous)
+        setPreferences(previous);
         showVelveToast({
           title: t('common.error'),
           message: getApiErrorMessage(error, t('settings.preferencesSaveError')),
           tone: 'error',
-        })
+        });
       } finally {
-        setSavingPreference(null)
+        setSavingPreference(null);
       }
     },
     [preferences, t]
-  )
+  );
 
   const openExternal = (url: string) => {
     Linking.openURL(url).catch((error) =>
@@ -168,33 +188,33 @@ export default function SettingsScreen() {
         message: getApiErrorMessage(error, t('settings.linkError')),
         tone: 'error',
       })
-    )
-  }
+    );
+  };
 
   const changeLocale = useCallback(
-    async (language: typeof locales[number]) => {
-      if (locale === language || savingLocale) return
+    async (language: (typeof locales)[number]) => {
+      if (locale === language || savingLocale) return;
 
       try {
-        setSavingLocale(true)
-        await setLocale(language)
+        setSavingLocale(true);
+        await setLocale(language);
         showVelveToast({
           title: t('settings.languageUpdatedTitle'),
           message: t('settings.languageUpdatedDescription', { language: localeLabels[language] }),
           tone: 'success',
-        })
+        });
       } catch (error) {
         showVelveToast({
           title: t('common.error'),
           message: getApiErrorMessage(error, t('settings.languageSaveError')),
           tone: 'error',
-        })
+        });
       } finally {
-        setSavingLocale(false)
+        setSavingLocale(false);
       }
     },
     [locale, savingLocale, setLocale, t]
-  )
+  );
 
   const switchProps = (key: keyof NotificationPreferences) => ({
     value: preferences[key],
@@ -202,7 +222,7 @@ export default function SettingsScreen() {
     onValueChange: (value: boolean) => updatePreference(key, value),
     trackColor: { false: '#D6D8CC', true: colors.accentLight },
     thumbColor: preferences[key] ? colors.accentDeep : colors.baseCanvas,
-  })
+  });
 
   return (
     <ScrollView className="flex-1 bg-base-canvas" contentContainerStyle={{ paddingBottom: 120 }}>
@@ -262,7 +282,7 @@ export default function SettingsScreen() {
           </Text>
           <View className="mt-4 flex-row gap-3">
             {locales.map((language) => {
-              const isActive = locale === language
+              const isActive = locale === language;
               return (
                 <TouchableOpacity
                   key={language}
@@ -272,11 +292,13 @@ export default function SettingsScreen() {
                   }`}
                   onPress={() => changeLocale(language)}
                 >
-                  <Text className={`font-sans text-sm font-semibold ${isActive ? 'text-base-canvas' : 'text-ink-dark'}`}>
+                  <Text
+                    className={`font-sans text-sm font-semibold ${isActive ? 'text-base-canvas' : 'text-ink-dark'}`}
+                  >
                     {localeLabels[language]}
                   </Text>
                 </TouchableOpacity>
-              )
+              );
             })}
           </View>
         </SettingsSection>
@@ -302,13 +324,46 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             </View>
           ) : null}
-          <SettingRow icon="notifications-outline" title={t('settings.allPush')} right={<Switch {...switchProps('allPush')} />} />
-          <SettingRow icon="chatbubble-outline" title={t('settings.messages')} description={t('settings.messagesDescription')} right={<Switch {...switchProps('messages')} />} />
-          <SettingRow icon="swap-horizontal-outline" title={t('settings.trades')} description={t('settings.tradesDescription')} right={<Switch {...switchProps('trades')} />} />
-          <SettingRow icon="heart-outline" title={t('settings.likes')} description={t('settings.likesDescription')} right={<Switch {...switchProps('likes')} />} />
-          <SettingRow icon="person-add-outline" title={t('settings.follows')} right={<Switch {...switchProps('follows')} />} />
-          <SettingRow icon="star-outline" title={t('settings.ratings')} description={t('settings.ratingsDescription')} right={<Switch {...switchProps('ratings')} />} />
-          <SettingRow icon="sparkles-outline" title={t('settings.marketing')} description={t('settings.marketingDescription')} right={<Switch {...switchProps('marketing')} />} />
+          <SettingRow
+            icon="notifications-outline"
+            title={t('settings.allPush')}
+            right={<Switch {...switchProps('allPush')} />}
+          />
+          <SettingRow
+            icon="chatbubble-outline"
+            title={t('settings.messages')}
+            description={t('settings.messagesDescription')}
+            right={<Switch {...switchProps('messages')} />}
+          />
+          <SettingRow
+            icon="swap-horizontal-outline"
+            title={t('settings.trades')}
+            description={t('settings.tradesDescription')}
+            right={<Switch {...switchProps('trades')} />}
+          />
+          <SettingRow
+            icon="heart-outline"
+            title={t('settings.likes')}
+            description={t('settings.likesDescription')}
+            right={<Switch {...switchProps('likes')} />}
+          />
+          <SettingRow
+            icon="person-add-outline"
+            title={t('settings.follows')}
+            right={<Switch {...switchProps('follows')} />}
+          />
+          <SettingRow
+            icon="star-outline"
+            title={t('settings.ratings')}
+            description={t('settings.ratingsDescription')}
+            right={<Switch {...switchProps('ratings')} />}
+          />
+          <SettingRow
+            icon="sparkles-outline"
+            title={t('settings.marketing')}
+            description={t('settings.marketingDescription')}
+            right={<Switch {...switchProps('marketing')} />}
+          />
         </SettingsSection>
 
         <SettingsSection title={t('settings.privacy')}>
@@ -319,7 +374,7 @@ export default function SettingsScreen() {
             onPress={() =>
               router.push({
                 pathname: '/connections',
-                params: { userId: dbUser?._id || '', tab: 'followers' },
+                params: { userId: dbUser?._id ?? '', tab: 'followers' },
               })
             }
           />
@@ -359,9 +414,11 @@ export default function SettingsScreen() {
           className="mt-6 items-center rounded-[24px] border border-signal-danger/20 bg-signal-danger/10 px-5 py-4"
           onPress={handleLogout}
         >
-          <Text className="font-sans text-sm font-semibold text-signal-danger">{t('profile.logout')}</Text>
+          <Text className="font-sans text-sm font-semibold text-signal-danger">
+            {t('profile.logout')}
+          </Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
-  )
+  );
 }

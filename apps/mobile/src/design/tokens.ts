@@ -1,54 +1,54 @@
-import { ImageSourcePropType, ViewStyle } from 'react-native'
+import { ImageSourcePropType, ViewStyle } from 'react-native';
 
-export const defaultLocale = 'en'
-export const supportedLocales = ['en', 'sr', 'ru'] as const
-export type SupportedLocale = (typeof supportedLocales)[number]
+export const defaultLocale = 'en';
+export const supportedLocales = ['en', 'sr', 'ru'] as const;
+export type SupportedLocale = (typeof supportedLocales)[number];
 
 export const localeLabels: Record<SupportedLocale, string> = {
   en: 'English',
   sr: 'Srpski',
   ru: 'Russian',
-}
+};
 
 export const colors = {
   accentDeep: '#431A43',
   accentLight: '#9DD3E4',
   highlight: '#CBDA63',
-  baseCanvas: '#F6F8ED',
+  baseCanvas: '#FFFFFF',
   inkDark: '#2B2A2B',
-  panel: '#FFFCF6',
+  panel: '#FFFFFF',
   soft: '#EEF4E5',
   tint: '#EEE7EE',
-  surfaceWhite: 'rgba(255,252,246,0.92)',
-  glassLight: 'rgba(246,248,237,0.72)',
+  surfaceWhite: 'rgba(255,255,255,0.92)',
+  glassLight: 'rgba(255,255,255,0.72)',
   glassDark: 'rgba(67,26,67,0.68)',
-  glassBorder: 'rgba(246,248,237,0.22)',
+  glassBorder: 'rgba(255,255,255,0.22)',
   mutedBorder: 'rgba(43,42,43,0.08)',
   mutedText: 'rgba(43,42,43,0.56)',
   mutedTextStrong: 'rgba(43,42,43,0.72)',
   overlay: 'rgba(16,8,16,0.26)',
   overlayStrong: 'rgba(16,8,16,0.52)',
   danger: '#C53B59',
-} as const
+} as const;
 
 export const fonts = {
   logo: 'Ballet',
   display: 'AlteHaasGrotesk-Bold',
   sans: 'Inter',
-} as const
+} as const;
 
 export const localeTags: Record<SupportedLocale, string> = {
   en: 'en-US',
   sr: 'sr-Latn-RS',
   ru: 'ru-RU',
-}
+};
 
 export const radii = {
   pill: 999,
   soft: 24,
   card: 30,
   editorial: 38,
-} as const
+} as const;
 
 export const shadows = {
   soft: {
@@ -72,16 +72,16 @@ export const shadows = {
     shadowOffset: { width: 0, height: 12 },
     elevation: 10,
   } satisfies ViewStyle,
-} as const
+} as const;
 
 export const assets = {
   wordmark: require('../../assets/brand/velve-wordmark.png') as ImageSourcePropType,
-}
+};
 
 export function detectLocaleFromDevice(): SupportedLocale {
-  const locale = Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase()
+  const locale = Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase();
 
-  if (locale.startsWith('sr')) return 'sr'
-  if (locale.startsWith('ru')) return 'ru'
-  return 'en'
+  if (locale.startsWith('sr')) return 'sr';
+  if (locale.startsWith('ru')) return 'ru';
+  return 'en';
 }

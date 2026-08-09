@@ -1,7 +1,6 @@
-import { Ionicons } from '@expo/vector-icons'
-import { Alert } from '@/lib/velveAlert'
-import { useRouter } from 'expo-router'
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Modal,
@@ -13,70 +12,73 @@ import {
   useWindowDimensions,
   View,
   ViewToken,
-} from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import client from '@/api/client'
-import { BrandedLoader, FeedSkeleton } from '@/components/BrandedLoader'
-import { EditorialEmptyState } from '@/components/EditorialEmptyState'
-import { BrandWordmark } from '@/components/BrandWordmark'
-import { ImmersiveFeedCard, ImmersiveFeedItem } from '@/components/ImmersiveFeedCard'
-import { VelveTextInput, type VelveTextInputRef } from '@/components/VelveTextInput'
-import { colors } from '@/design/tokens'
-import { useAuth } from '@/hooks/useAuth'
-import { useI18n } from '@/i18n'
-import { prefetchImageUri } from '@/lib/expoImage'
-import { getApiErrorMessage } from '@/lib/apiErrors'
-import { trackGuestEvent, type GuestEventType } from '@/lib/guestAnalytics'
-import { getPrimaryItemImage } from '@/lib/itemImages'
-import { normalizeImageUri } from '@/lib/images'
-import { showVelveToast } from '@/lib/velveAlert'
+import client from '@/api/client';
+import { BrandWordmark } from '@/components/BrandWordmark';
+import { BrandedLoader, FeedSkeleton } from '@/components/BrandedLoader';
+import { EditorialEmptyState } from '@/components/EditorialEmptyState';
+import { ImmersiveFeedCard, ImmersiveFeedItem } from '@/components/ImmersiveFeedCard';
+import { SendItemSheet } from '@/components/SendItemSheet';
+import { VelveTextInput, type VelveTextInputRef } from '@/components/VelveTextInput';
+import { colors } from '@/design/tokens';
+import { useAuth } from '@/hooks/useAuth';
+import { useI18n } from '@/i18n';
+import { getApiErrorMessage } from '@/lib/apiErrors';
+import { prefetchImageUri } from '@/lib/expoImage';
+import { trackGuestEvent, type GuestEventType } from '@/lib/guestAnalytics';
+import { normalizeImageUri } from '@/lib/images';
+import { getPrimaryItemImage } from '@/lib/itemImages';
+import { Alert, showVelveToast } from '@/lib/velveAlert';
 
-type FeedMode = 'for_you' | 'following'
+type FeedMode = 'for_you' | 'following';
 
 function dedupeItemsById(items: ImmersiveFeedItem[]) {
-  const seen = new Set<string>()
+  const seen = new Set<string>();
 
   return items.filter((item) => {
-    const itemId = String(item._id)
-    if (seen.has(itemId)) return false
-    seen.add(itemId)
-    return true
-  })
+    const itemId = String(item._id);
+    if (seen.has(itemId)) return false;
+    seen.add(itemId);
+    return true;
+  });
 }
 
 export default function FeedScreen() {
-  const router = useRouter()
-  const insets = useSafeAreaInsets()
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions()
-  const { locale, t } = useI18n()
-  const { currentUser, dbUser } = useAuth()
-  const isGuest = !currentUser && !dbUser
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const { locale, t } = useI18n();
+  const { currentUser, dbUser } = useAuth();
+  const isGuest = !currentUser && !dbUser;
 
-  const [items, setItems] = useState<ImmersiveFeedItem[]>([])
-  const [feedMode, setFeedMode] = useState<FeedMode>('for_you')
-  const [hasMore, setHasMore] = useState(true)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
-  const [actionItem, setActionItem] = useState<ImmersiveFeedItem | null>(null)
-  const [feedError, setFeedError] = useState('')
-  const feedInFlightKeysRef = useRef(new Set<string>())
-  const feedRequestVersionRef = useRef(0)
-  const feedModeRef = useRef(feedMode)
-  const firstTimeFeedRef = useRef(true)
-  feedModeRef.current = feedMode
+  const [items, setItems] = useState<ImmersiveFeedItem[]>([]);
+  const [feedMode, setFeedMode] = useState<FeedMode>('for_you');
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [actionItem, setActionItem] = useState<ImmersiveFeedItem | null>(null);
+  const [shareItem, setShareItem] = useState<ImmersiveFeedItem | null>(null);
+  const [sentItemIds, setSentItemIds] = useState<Set<string>>(new Set());
+  const [feedError, setFeedError] = useState('');
+  const feedInFlightKeysRef = useRef(new Set<string>());
+  const feedRequestVersionRef = useRef(0);
+  const feedModeRef = useRef(feedMode);
+  const firstTimeFeedRef = useRef(true);
+  feedModeRef.current = feedMode;
 
   // --- Inline search state ---
-  const [searchActive, setSearchActive] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchItems, setSearchItems] = useState<ImmersiveFeedItem[]>([])
-  const [searchLoading, setSearchLoading] = useState(false)
-  const [searchLoadingMore, setSearchLoadingMore] = useState(false)
-  const [searchError, setSearchError] = useState('')
-  const [searchNextCursor, setSearchNextCursor] = useState<string | null>(null)
-  const [searchHasMore, setSearchHasMore] = useState(false)
-  const searchInputRef = useRef<VelveTextInputRef>(null)
+  const [searchActive, setSearchActive] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchItems, setSearchItems] = useState<ImmersiveFeedItem[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchLoadingMore, setSearchLoadingMore] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [searchNextCursor, setSearchNextCursor] = useState<string | null>(null);
+  const [searchHasMore, setSearchHasMore] = useState(false);
+  const searchInputRef = useRef<VelveTextInputRef>(null);
 
   const requireSignIn = useCallback(
     (
@@ -90,390 +92,419 @@ export default function FeedScreen() {
           surface: options.surface,
           query: options.query,
         },
-      })
-      router.push('/(auth)/login')
+      });
+      router.push('/(auth)/login');
     },
     [router]
-  )
+  );
 
   const openSearch = useCallback(() => {
     if (isGuest) {
-      requireSignIn('guest_search_attempt', { surface: 'feed_search_button' })
-      return
+      requireSignIn('guest_search_attempt', { surface: 'feed_search_button' });
+      return;
     }
-    setSearchActive(true)
-    setSearchLoading(true)
-    setTimeout(() => searchInputRef.current?.focus(), 120)
-  }, [isGuest, requireSignIn])
+    setSearchActive(true);
+    setSearchLoading(true);
+    setTimeout(() => searchInputRef.current?.focus(), 120);
+  }, [isGuest, requireSignIn]);
 
   const finishCloseSearch = useCallback(() => {
-    setSearchActive(false)
-    setSearchQuery('')
-    setSearchItems([])
-    setSearchError('')
-    setSearchNextCursor(null)
-  }, [])
+    setSearchActive(false);
+    setSearchQuery('');
+    setSearchItems([]);
+    setSearchError('');
+    setSearchNextCursor(null);
+  }, []);
 
   const closeSearch = useCallback(() => {
-    searchInputRef.current?.blur()
-    finishCloseSearch()
-  }, [finishCloseSearch])
+    searchInputRef.current?.blur();
+    finishCloseSearch();
+  }, [finishCloseSearch]);
 
   // Search data fetching
   const loadSearchResults = useCallback(
     async (mode: 'replace' | 'append' = 'replace') => {
       try {
-        if (mode === 'replace') setSearchLoading(true)
-        else setSearchLoadingMore(true)
+        if (mode === 'replace') setSearchLoading(true);
+        else setSearchLoadingMore(true);
 
         const response = await client.get('/api/items', {
           params: {
             limit: 20,
             search: searchQuery.trim() || undefined,
-            cursor: mode === 'append' ? searchNextCursor || undefined : undefined,
+            cursor: mode === 'append' ? (searchNextCursor ?? undefined) : undefined,
           },
-        })
+        });
 
         if (response.data.ok) {
-          const nextItems = response.data.data as ImmersiveFeedItem[]
-          setSearchItems((prev) => (mode === 'append' ? [...prev, ...nextItems] : nextItems))
-          setSearchNextCursor(response.data.nextCursor ? String(response.data.nextCursor) : null)
-          setSearchHasMore(Boolean(response.data.hasMore))
-          setSearchError('')
-          return
+          const nextItems = response.data.data as ImmersiveFeedItem[];
+          setSearchItems((prev) => (mode === 'append' ? [...prev, ...nextItems] : nextItems));
+          setSearchNextCursor(response.data.nextCursor ? String(response.data.nextCursor) : null);
+          setSearchHasMore(Boolean(response.data.hasMore));
+          setSearchError('');
+          return;
         }
 
-        throw new Error('INVALID_SEARCH_RESPONSE')
+        throw new Error('INVALID_SEARCH_RESPONSE');
       } catch (error) {
         if (mode === 'replace') {
-          setSearchItems([])
-          setSearchError(getApiErrorMessage(error, t('search.loadError')))
+          setSearchItems([]);
+          setSearchError(getApiErrorMessage(error, t('search.loadError')));
         } else {
           showVelveToast({
             title: t('search.loadMoreErrorTitle'),
             message: getApiErrorMessage(error, t('search.loadMoreErrorDescription')),
             tone: 'error',
-          })
+          });
         }
       } finally {
-        setSearchLoading(false)
-        setSearchLoadingMore(false)
+        setSearchLoading(false);
+        setSearchLoadingMore(false);
       }
     },
     [searchNextCursor, searchQuery, t]
-  )
+  );
 
   // Debounced search trigger
   useEffect(() => {
-    if (!searchActive) return
-    const timeout = setTimeout(() => loadSearchResults('replace'), 250)
-    return () => clearTimeout(timeout)
-  }, [searchQuery, searchActive, loadSearchResults])
+    if (!searchActive) return;
+    const timeout = setTimeout(() => loadSearchResults('replace'), 250);
+    return () => clearTimeout(timeout);
+  }, [searchQuery, searchActive, loadSearchResults]);
 
   const onSearchLoadMore = useCallback(() => {
-    if (!searchHasMore || searchLoadingMore || !searchNextCursor) return
-    loadSearchResults('append')
-  }, [searchHasMore, loadSearchResults, searchLoadingMore, searchNextCursor])
+    if (!searchHasMore || searchLoadingMore || !searchNextCursor) return;
+    loadSearchResults('append');
+  }, [searchHasMore, loadSearchResults, searchLoadingMore, searchNextCursor]);
 
-  const pageHeight = Math.max(windowHeight, 1)
+  const pageHeight = Math.max(windowHeight, 1);
 
   const fetchFeed = useCallback(
-    async (
-      pageNum: number,
-      mode: 'replace' | 'append' = 'replace',
-      excludeIds: string[] = []
-    ) => {
-      const requestKey = `${feedMode}:${mode}:${pageNum}:${excludeIds.join('|')}`
+    async (pageNum: number, mode: 'replace' | 'append' = 'replace', excludeIds: string[] = []) => {
+      const requestKey = `${feedMode}:${mode}:${pageNum}:${excludeIds.join('|')}`;
 
       if (feedInFlightKeysRef.current.has(requestKey)) {
-        if (mode === 'replace') setRefreshing(false)
-        return
+        if (mode === 'replace') setRefreshing(false);
+        return;
       }
 
-      feedInFlightKeysRef.current.add(requestKey)
+      feedInFlightKeysRef.current.add(requestKey);
       const requestVersion =
-        mode === 'replace' ? ++feedRequestVersionRef.current : feedRequestVersionRef.current
+        mode === 'replace' ? ++feedRequestVersionRef.current : feedRequestVersionRef.current;
       const isCurrentRequest = () =>
-        feedModeRef.current === feedMode && requestVersion === feedRequestVersionRef.current
+        feedModeRef.current === feedMode && requestVersion === feedRequestVersionRef.current;
 
       try {
-        if (pageNum === 0 && mode === 'replace') setIsLoading(true)
-        else setIsLoadingMore(true)
+        if (pageNum === 0 && mode === 'replace') setIsLoading(true);
+        else setIsLoadingMore(true);
 
         if (isGuest) {
-          const response = await client.get('/api/feed/guest')
+          const response = await client.get('/api/feed/guest');
           if (response.data.ok && isCurrentRequest()) {
-            const nextItems = dedupeItemsById(response.data.data as ImmersiveFeedItem[])
-            setItems(nextItems)
-            setHasMore(false)
-            setFeedError('')
+            const nextItems = dedupeItemsById(response.data.data as ImmersiveFeedItem[]);
+            setItems(nextItems);
+            setHasMore(false);
+            setFeedError('');
             void trackGuestEvent('guest_feed_view', {
               route: '/(tabs)/feed',
               metadata: { count: nextItems.length },
-            })
+            });
           }
-          return
+          return;
         }
 
         const params: Record<string, string | number> = {
           limit: 10,
           page: mode === 'append' ? 0 : pageNum,
           mode: feedMode,
-        }
+        };
 
         if (feedMode === 'for_you' && pageNum === 0 && firstTimeFeedRef.current) {
-          params.firstTime = 'true'
+          params.firstTime = 'true';
         }
 
         if (mode === 'append' && excludeIds.length > 0) {
-          params.excludeIds = excludeIds.join(',')
+          params.excludeIds = excludeIds.join(',');
         }
 
-        const response = await client.get('/api/feed', { params })
+        const response = await client.get('/api/feed', { params });
 
         if (response.data.ok) {
           if (!isCurrentRequest()) {
-            return
+            return;
           }
 
-          const nextItems = dedupeItemsById(response.data.data as ImmersiveFeedItem[])
+          const nextItems = dedupeItemsById(response.data.data as ImmersiveFeedItem[]);
           setItems((prev) =>
             mode === 'append' ? dedupeItemsById([...prev, ...nextItems]) : nextItems
-          )
-          setHasMore(response.data.hasMore)
-          setFeedError('')
+          );
+          setHasMore(response.data.hasMore);
+          setFeedError('');
 
           if (pageNum === 0 && firstTimeFeedRef.current) {
-            firstTimeFeedRef.current = false
+            firstTimeFeedRef.current = false;
           }
         }
       } catch (error) {
         if (pageNum === 0 && isCurrentRequest()) {
-          setItems([])
-          setFeedError(getApiErrorMessage(error, t('feed.loadedErrorTitle')))
+          setItems([]);
+          setFeedError(getApiErrorMessage(error, t('feed.loadedErrorTitle')));
         }
       } finally {
-        feedInFlightKeysRef.current.delete(requestKey)
+        feedInFlightKeysRef.current.delete(requestKey);
         if (isCurrentRequest()) {
-          setIsLoading(false)
-          setIsLoadingMore(false)
-          setRefreshing(false)
+          setIsLoading(false);
+          setIsLoadingMore(false);
+          setRefreshing(false);
         }
       }
     },
     [feedMode, isGuest, t]
-  )
+  );
 
   useEffect(() => {
-    fetchFeed(0)
-  }, [fetchFeed])
+    fetchFeed(0);
+  }, [fetchFeed]);
 
   useEffect(() => {
     items.slice(0, 3).forEach((item) => {
-      const uri = normalizeImageUri(getPrimaryItemImage(item))
+      const uri = normalizeImageUri(getPrimaryItemImage(item));
       if (uri && !prefetchedRef.current.has(uri)) {
-        prefetchedRef.current.add(uri)
-        void prefetchImageUri(uri)
+        prefetchedRef.current.add(uri);
+        void prefetchImageUri(uri);
       }
-    })
-  }, [items])
+    });
+  }, [items]);
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true)
-    await fetchFeed(0)
-  }, [fetchFeed])
+    setRefreshing(true);
+    await fetchFeed(0);
+  }, [fetchFeed]);
 
   const handleLoadMore = useCallback(() => {
-    if (isGuest || isLoadingMore || !hasMore || items.length === 0) return
-    fetchFeed(0, 'append', items.map((item) => item._id))
-  }, [fetchFeed, hasMore, isGuest, isLoadingMore, items])
+    if (isGuest || isLoadingMore || !hasMore || items.length === 0) return;
+    fetchFeed(
+      0,
+      'append',
+      items.map((item) => item._id)
+    );
+  }, [fetchFeed, hasMore, isGuest, isLoadingMore, items]);
 
-  const updateItem = useCallback((itemId: string, updater: (item: ImmersiveFeedItem) => ImmersiveFeedItem) => {
-    setItems((prev) => prev.map((item) => (item._id === itemId ? updater(item) : item)))
-  }, [])
+  const updateItem = useCallback(
+    (itemId: string, updater: (item: ImmersiveFeedItem) => ImmersiveFeedItem) => {
+      setItems((prev) => prev.map((item) => (item._id === itemId ? updater(item) : item)));
+    },
+    []
+  );
 
   const handleLike = useCallback(
     async (itemId: string, isLiked: boolean) => {
       if (isGuest) {
-        const item = itemsRef.current.find((entry) => entry._id === itemId)
-        requireSignIn('guest_like_attempt', { item, surface: 'feed_like_button' })
-        return
+        const item = itemsRef.current.find((entry) => entry._id === itemId);
+        requireSignIn('guest_like_attempt', { item, surface: 'feed_like_button' });
+        return;
       }
 
-      const previousLiked = isLiked
-      let previousCount = 0
+      const previousLiked = isLiked;
+      let previousCount = 0;
 
       updateItem(itemId, (item) => {
-        previousCount = item.likesCount ?? 0
+        previousCount = item.likesCount ?? 0;
         return {
           ...item,
           isLiked: !isLiked,
           likesCount: (item.likesCount ?? 0) + (isLiked ? -1 : 1),
-        }
-      })
+        };
+      });
 
       try {
         const response = isLiked
           ? await client.delete(`/api/items/${itemId}/like`)
-          : await client.post(`/api/items/${itemId}/like`)
+          : await client.post(`/api/items/${itemId}/like`);
 
         if (!isLiked && response.data.ok) {
           updateItem(itemId, (item) => ({
             ...item,
             isLiked: response.data.isLiked,
             likesCount: response.data.likesCount,
-          }))
+          }));
         }
       } catch {
         updateItem(itemId, (item) => ({
           ...item,
           isLiked: previousLiked,
           likesCount: previousCount,
-        }))
+        }));
         showVelveToast({
           title: t('search.likeErrorTitle'),
           message: t('search.likeErrorDescription'),
           tone: 'error',
-        })
+        });
       }
     },
     [isGuest, requireSignIn, t, updateItem]
-  )
+  );
 
   const handleWishlist = useCallback(
     async (itemId: string, isWishlisted: boolean) => {
       if (isGuest) {
-        const item = itemsRef.current.find((entry) => entry._id === itemId)
-        requireSignIn('guest_wishlist_attempt', { item, surface: 'feed_save_button' })
-        return
+        const item = itemsRef.current.find((entry) => entry._id === itemId);
+        requireSignIn('guest_wishlist_attempt', { item, surface: 'feed_save_button' });
+        return;
       }
 
-      let previousCount = 0
+      let previousCount = 0;
 
       updateItem(itemId, (item) => {
-        previousCount = item.wishlistCount ?? 0
+        previousCount = item.wishlistCount ?? 0;
         return {
           ...item,
           isWishlisted: !isWishlisted,
           wishlistCount: (item.wishlistCount ?? 0) + (isWishlisted ? -1 : 1),
-        }
-      })
+        };
+      });
 
       try {
         if (isWishlisted) {
-          await client.delete(`/api/wishlist/${itemId}`)
+          await client.delete(`/api/wishlist/${itemId}`);
         } else {
-          await client.post(`/api/wishlist/${itemId}`)
+          await client.post(`/api/wishlist/${itemId}`);
         }
       } catch {
         updateItem(itemId, (item) => ({
           ...item,
           isWishlisted,
           wishlistCount: previousCount,
-        }))
+        }));
         showVelveToast({
           title: t('search.saveErrorTitle'),
           message: t('search.saveErrorDescription'),
           tone: 'error',
-        })
+        });
       }
     },
     [isGuest, requireSignIn, t, updateItem]
-  )
+  );
 
-  const handleHideItem = useCallback(async (item: ImmersiveFeedItem) => {
-    try {
-      await client.post(`/api/items/${item._id}/hide`, { reason: 'not_interested' })
-      setItems((prev) => prev.filter((entry) => entry._id !== item._id))
-      setActionItem(null)
-      showVelveToast({
-        title: t('feed.hideSuccessTitle'),
-        message: t('feed.hideSuccessDescription'),
-        tone: 'success',
-      })
-    } catch (error) {
-      Alert.alert(t('common.error'), getApiErrorMessage(error, t('feed.hideError')))
-    }
-  }, [t])
-
-  const handleReportItem = useCallback((item: ImmersiveFeedItem) => {
-    Alert.alert(t('feed.reportTitle'), t('feed.reportDescription'), [
-      {
-        text: t('feed.reportCta'),
-        onPress: async () => {
-          try {
-            await client.post(`/api/items/${item._id}/report`, { reason: 'community_report' })
-            setActionItem(null)
-            showVelveToast({
-              title: t('feed.reportSuccessTitle'),
-              message: t('feed.reportSuccessDescription'),
-              tone: 'success',
-            })
-          } catch (error) {
-            Alert.alert(t('common.error'), getApiErrorMessage(error, t('feed.reportError')))
-          }
-        },
-      },
-      { text: t('common.cancel'), style: 'cancel' },
-    ])
-  }, [t])
-
-  const handleBlockSeller = useCallback((item: ImmersiveFeedItem) => {
-    Alert.alert(t('feed.blockTitle'), t('feed.blockDescription', { name: item.userId.displayName }), [
-      {
-        text: t('feed.blockCta'),
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await client.post(`/api/users/${item.userId._id}/block`)
-            setItems((prev) => prev.filter((entry) => entry.userId._id !== item.userId._id))
-            setActionItem(null)
-            showVelveToast({
-              title: t('feed.blockSuccessTitle'),
-              message: t('feed.blockSuccessDescription', { name: item.userId.displayName }),
-              tone: 'success',
-            })
-          } catch (error) {
-            Alert.alert(t('common.error'), getApiErrorMessage(error, t('feed.blockError')))
-          }
-        },
-      },
-      { text: t('common.cancel'), style: 'cancel' },
-    ])
-  }, [t])
-
-  const prefetchedRef = useRef(new Set<string>())
-  const guestImpressionsRef = useRef(new Set<string>())
-  const itemsRef = useRef(items)
-  itemsRef.current = items
-
-  const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (viewableItems.length === 0 || viewableItems[0].index == null) return
-      const currentIndex = viewableItems[0].index
-      const currentItems = itemsRef.current
-      const visibleItem = currentItems[currentIndex]
-      if (visibleItem && isGuest && !guestImpressionsRef.current.has(visibleItem._id)) {
-        guestImpressionsRef.current.add(visibleItem._id)
-        void trackGuestEvent('guest_item_impression', {
-          itemId: visibleItem._id,
-          route: '/(tabs)/feed',
-          metadata: { index: currentIndex },
-        })
+  const handleHideItem = useCallback(
+    async (item: ImmersiveFeedItem) => {
+      try {
+        await client.post(`/api/items/${item._id}/hide`, { reason: 'not_interested' });
+        setItems((prev) => prev.filter((entry) => entry._id !== item._id));
+        setActionItem(null);
+        showVelveToast({
+          title: t('feed.hideSuccessTitle'),
+          message: t('feed.hideSuccessDescription'),
+          tone: 'success',
+        });
+      } catch (error) {
+        Alert.alert(t('common.error'), getApiErrorMessage(error, t('feed.hideError')));
       }
-      for (let i = 1; i <= 2; i++) {
-        const nextItem = currentItems[currentIndex + i]
-        if (!nextItem) continue
-        const uri = normalizeImageUri(getPrimaryItemImage(nextItem))
-        if (uri && !prefetchedRef.current.has(uri)) {
-          prefetchedRef.current.add(uri)
-          void prefetchImageUri(uri)
-        }
+    },
+    [t]
+  );
+
+  const handleReportItem = useCallback(
+    (item: ImmersiveFeedItem) => {
+      Alert.alert(t('feed.reportTitle'), t('feed.reportDescription'), [
+        {
+          text: t('feed.reportCta'),
+          onPress: async () => {
+            try {
+              await client.post(`/api/items/${item._id}/report`, { reason: 'community_report' });
+              setActionItem(null);
+              showVelveToast({
+                title: t('feed.reportSuccessTitle'),
+                message: t('feed.reportSuccessDescription'),
+                tone: 'success',
+              });
+            } catch (error) {
+              Alert.alert(t('common.error'), getApiErrorMessage(error, t('feed.reportError')));
+            }
+          },
+        },
+        { text: t('common.cancel'), style: 'cancel' },
+      ]);
+    },
+    [t]
+  );
+
+  const handleBlockSeller = useCallback(
+    (item: ImmersiveFeedItem) => {
+      Alert.alert(
+        t('feed.blockTitle'),
+        t('feed.blockDescription', { name: item.userId.displayName }),
+        [
+          {
+            text: t('feed.blockCta'),
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await client.post(`/api/users/${item.userId._id}/block`);
+                setItems((prev) => prev.filter((entry) => entry.userId._id !== item.userId._id));
+                setActionItem(null);
+                showVelveToast({
+                  title: t('feed.blockSuccessTitle'),
+                  message: t('feed.blockSuccessDescription', { name: item.userId.displayName }),
+                  tone: 'success',
+                });
+              } catch (error) {
+                Alert.alert(t('common.error'), getApiErrorMessage(error, t('feed.blockError')));
+              }
+            },
+          },
+          { text: t('common.cancel'), style: 'cancel' },
+        ]
+      );
+    },
+    [t]
+  );
+
+  const handleSendPress = useCallback(
+    (item: ImmersiveFeedItem) => {
+      if (isGuest) {
+        requireSignIn('guest_nav_attempt', { item, surface: 'feed_send_button' });
+        return;
+      }
+      setShareItem(item);
+    },
+    [isGuest, requireSignIn]
+  );
+
+  const handleItemSent = useCallback((itemId: string) => {
+    setSentItemIds((prev) => new Set(prev).add(itemId));
+  }, []);
+
+  const prefetchedRef = useRef(new Set<string>());
+  const guestImpressionsRef = useRef(new Set<string>());
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    if (viewableItems.length === 0 || viewableItems[0].index == null) return;
+    const currentIndex = viewableItems[0].index;
+    const currentItems = itemsRef.current;
+    const visibleItem = currentItems[currentIndex];
+    if (visibleItem && isGuest && !guestImpressionsRef.current.has(visibleItem._id)) {
+      guestImpressionsRef.current.add(visibleItem._id);
+      void trackGuestEvent('guest_item_impression', {
+        itemId: visibleItem._id,
+        route: '/(tabs)/feed',
+        metadata: { index: currentIndex },
+      });
+    }
+    for (let i = 1; i <= 2; i++) {
+      const nextItem = currentItems[currentIndex + i];
+      if (!nextItem) continue;
+      const uri = normalizeImageUri(getPrimaryItemImage(nextItem));
+      if (uri && !prefetchedRef.current.has(uri)) {
+        prefetchedRef.current.add(uri);
+        void prefetchImageUri(uri);
       }
     }
-  )
+  });
 
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 })
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 });
 
   const renderFeedItem = useCallback(
     ({ item }: { item: ImmersiveFeedItem }) => (
@@ -482,9 +513,10 @@ export default function FeedScreen() {
         height={pageHeight}
         locale={locale}
         topInset={insets.top}
-        bottomInset={insets.bottom}
         onLike={handleLike}
         onWishlist={handleWishlist}
+        onSend={handleSendPress}
+        sent={sentItemIds.has(item._id)}
         onMore={
           isGuest
             ? (pressedItem) =>
@@ -523,68 +555,91 @@ export default function FeedScreen() {
         }
       />
     ),
-    [handleLike, handleWishlist, insets.bottom, insets.top, isGuest, locale, pageHeight, requireSignIn]
-  )
+    [
+      handleLike,
+      handleSendPress,
+      handleWishlist,
+      insets.bottom,
+      insets.top,
+      isGuest,
+      locale,
+      pageHeight,
+      requireSignIn,
+      sentItemIds,
+    ]
+  );
 
   // Search-specific item updater + handlers
   const updateSearchItem = useCallback(
     (itemId: string, updater: (item: ImmersiveFeedItem) => ImmersiveFeedItem) => {
-      setSearchItems((prev) => prev.map((item) => (item._id === itemId ? updater(item) : item)))
+      setSearchItems((prev) => prev.map((item) => (item._id === itemId ? updater(item) : item)));
     },
     []
-  )
+  );
 
   const handleSearchLike = useCallback(
     async (itemId: string, isLiked: boolean) => {
-      let previousCount = 0
+      let previousCount = 0;
       updateSearchItem(itemId, (item) => {
-        previousCount = item.likesCount ?? 0
-        return { ...item, isLiked: !isLiked, likesCount: (item.likesCount ?? 0) + (isLiked ? -1 : 1) }
-      })
+        previousCount = item.likesCount ?? 0;
+        return {
+          ...item,
+          isLiked: !isLiked,
+          likesCount: (item.likesCount ?? 0) + (isLiked ? -1 : 1),
+        };
+      });
       try {
         const response = isLiked
           ? await client.delete(`/api/items/${itemId}/like`)
-          : await client.post(`/api/items/${itemId}/like`)
+          : await client.post(`/api/items/${itemId}/like`);
         if (!isLiked && response.data.ok) {
           updateSearchItem(itemId, (item) => ({
             ...item,
             isLiked: response.data.isLiked,
             likesCount: response.data.likesCount,
-          }))
+          }));
         }
       } catch {
-        updateSearchItem(itemId, (item) => ({ ...item, isLiked, likesCount: previousCount }))
+        updateSearchItem(itemId, (item) => ({ ...item, isLiked, likesCount: previousCount }));
         showVelveToast({
           title: t('search.likeErrorTitle'),
           message: t('search.likeErrorDescription'),
           tone: 'error',
-        })
+        });
       }
     },
     [t, updateSearchItem]
-  )
+  );
 
   const handleSearchWishlist = useCallback(
     async (itemId: string, isWishlisted: boolean) => {
-      let previousCount = 0
+      let previousCount = 0;
       updateSearchItem(itemId, (item) => {
-        previousCount = item.wishlistCount ?? 0
-        return { ...item, isWishlisted: !isWishlisted, wishlistCount: (item.wishlistCount ?? 0) + (isWishlisted ? -1 : 1) }
-      })
+        previousCount = item.wishlistCount ?? 0;
+        return {
+          ...item,
+          isWishlisted: !isWishlisted,
+          wishlistCount: (item.wishlistCount ?? 0) + (isWishlisted ? -1 : 1),
+        };
+      });
       try {
-        if (isWishlisted) await client.delete(`/api/wishlist/${itemId}`)
-        else await client.post(`/api/wishlist/${itemId}`)
+        if (isWishlisted) await client.delete(`/api/wishlist/${itemId}`);
+        else await client.post(`/api/wishlist/${itemId}`);
       } catch {
-        updateSearchItem(itemId, (item) => ({ ...item, isWishlisted, wishlistCount: previousCount }))
+        updateSearchItem(itemId, (item) => ({
+          ...item,
+          isWishlisted,
+          wishlistCount: previousCount,
+        }));
         showVelveToast({
           title: t('search.saveErrorTitle'),
           message: t('search.saveErrorDescription'),
           tone: 'error',
-        })
+        });
       }
     },
     [t, updateSearchItem]
-  )
+  );
 
   const renderSearchItem = useCallback(
     ({ item }: { item: ImmersiveFeedItem }) => (
@@ -593,18 +648,28 @@ export default function FeedScreen() {
         height={pageHeight}
         locale={locale}
         topInset={insets.top}
-        bottomInset={insets.bottom}
         onLike={handleSearchLike}
         onWishlist={handleSearchWishlist}
+        onSend={handleSendPress}
+        sent={sentItemIds.has(item._id)}
       />
     ),
-    [handleSearchLike, handleSearchWishlist, insets.bottom, insets.top, locale, pageHeight]
-  )
+    [
+      handleSearchLike,
+      handleSearchWishlist,
+      handleSendPress,
+      insets.bottom,
+      insets.top,
+      locale,
+      pageHeight,
+      sentItemIds,
+    ]
+  );
 
-  const searchViewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 })
+  const searchViewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 });
 
   if (isLoading) {
-    return <FeedSkeleton />
+    return <FeedSkeleton />;
   }
 
   return (
@@ -675,7 +740,9 @@ export default function FeedScreen() {
               searchLoadingMore ? (
                 <View className="py-8">
                   <View className="mx-auto rounded-full border border-ink-dark/8 bg-ink-dark/4 px-5 py-3">
-                    <Text className="font-sans text-sm text-ink-dark/62">{t('common.loadingMore')}</Text>
+                    <Text className="font-sans text-sm text-ink-dark/62">
+                      {t('common.loadingMore')}
+                    </Text>
                   </View>
                 </View>
               ) : null
@@ -696,9 +763,7 @@ export default function FeedScreen() {
         <View className="flex-1 justify-center bg-surface-panel px-4 pt-20">
           <EditorialEmptyState
             icon={feedMode === 'following' ? 'people-outline' : 'sparkles-outline'}
-            title={
-              feedMode === 'following' ? t('feed.followingEmptyTitle') : t('feed.emptyTitle')
-            }
+            title={feedMode === 'following' ? t('feed.followingEmptyTitle') : t('feed.emptyTitle')}
             description={
               feedMode === 'following'
                 ? t('feed.followingEmptyDescription')
@@ -707,10 +772,10 @@ export default function FeedScreen() {
             actionLabel={feedMode === 'following' ? t('feed.switchToForYou') : t('common.refresh')}
             onAction={() => {
               if (feedMode === 'following') {
-                setFeedMode('for_you')
-                return
+                setFeedMode('for_you');
+                return;
               }
-              fetchFeed(0)
+              fetchFeed(0);
             }}
           />
         </View>
@@ -751,14 +816,16 @@ export default function FeedScreen() {
                   void trackGuestEvent('guest_signup_cta_click', {
                     route: '/(tabs)/feed',
                     metadata: { surface: 'feed_end_card' },
-                  })
-                  router.push('/(auth)/login')
+                  });
+                  router.push('/(auth)/login');
                 }}
               />
             ) : isLoadingMore ? (
               <View className="py-8">
                 <View className="mx-auto rounded-full border border-ink-dark/8 bg-ink-dark/4 px-5 py-3">
-                  <Text className="font-sans text-sm text-ink-dark/62">{t('common.loadingMore')}</Text>
+                  <Text className="font-sans text-sm text-ink-dark/62">
+                    {t('common.loadingMore')}
+                  </Text>
                 </View>
               </View>
             ) : null
@@ -812,10 +879,10 @@ export default function FeedScreen() {
                       if (isGuest) {
                         requireSignIn('guest_nav_attempt', {
                           surface: `feed_mode_${mode}`,
-                        })
-                        return
+                        });
+                        return;
                       }
-                      setFeedMode(mode)
+                      setFeedMode(mode);
                     }}
                   />
                 </View>
@@ -830,7 +897,16 @@ export default function FeedScreen() {
             </>
           )}
         </View>
+        <View className="mt-1.5 h-px bg-ink-dark/10" />
       </View>
+
+      <SendItemSheet
+        visible={!!shareItem}
+        itemId={shareItem?._id ?? null}
+        currentUserId={dbUser?._id}
+        onClose={() => setShareItem(null)}
+        onSent={handleItemSent}
+      />
 
       <Modal
         visible={!!actionItem}
@@ -838,7 +914,10 @@ export default function FeedScreen() {
         animationType="fade"
         onRequestClose={() => setActionItem(null)}
       >
-        <Pressable className="flex-1 justify-end bg-black/55 px-4 py-4" onPress={() => setActionItem(null)}>
+        <Pressable
+          className="flex-1 justify-end bg-black/55 px-4 py-4"
+          onPress={() => setActionItem(null)}
+        >
           <Pressable className="rounded-[34px] bg-surface-panel px-5 py-5">
             <Text className="font-display text-[28px] text-ink-dark">
               {actionItem ? `@${actionItem.userId.displayName}` : t('feed.details')}
@@ -861,9 +940,9 @@ export default function FeedScreen() {
               label={t('feed.viewProfile')}
               icon="person-outline"
               onPress={() => {
-                if (!actionItem) return
-                router.push({ pathname: '/users/[id]', params: { id: actionItem.userId._id } })
-                setActionItem(null)
+                if (!actionItem) return;
+                router.push({ pathname: '/users/[id]', params: { id: actionItem.userId._id } });
+                setActionItem(null);
               }}
             />
             <SheetButton
@@ -886,13 +965,13 @@ export default function FeedScreen() {
         </Pressable>
       </Modal>
     </View>
-  )
+  );
 }
 
 const FEED_TABS = [
   { key: 'following' as const, label: 'Following' },
   { key: 'for_you' as const, label: 'For You' },
-]
+];
 
 function GuestSignupCard({
   height,
@@ -900,17 +979,17 @@ function GuestSignupCard({
   bottomInset,
   onPrimary,
 }: {
-  height: number
-  topInset: number
-  bottomInset: number
-  onPrimary: () => void
+  height: number;
+  topInset: number;
+  bottomInset: number;
+  onPrimary: () => void;
 }) {
   useEffect(() => {
     void trackGuestEvent('guest_signup_wall_view', {
       route: '/(tabs)/feed',
       metadata: { surface: 'feed_end_card' },
-    })
-  }, [])
+    });
+  }, []);
 
   return (
     <View
@@ -925,8 +1004,8 @@ function GuestSignupCard({
           Ovo je samo jedan deo.
         </Text>
         <Text className="mt-4 font-sans text-[15px] leading-7 text-ink-dark/68">
-          Napravi profil da Velve pocne da prikazuje komade konkretnije po tvom
-          ukusu, sacuva favorite i pomogne ti da pronadjes stvar koju stvarno zelis.
+          Napravi profil da Velve pocne da prikazuje komade konkretnije po tvom ukusu, sacuva
+          favorite i pomogne ti da pronadjes stvar koju stvarno zelis.
         </Text>
         <TouchableOpacity
           className="mt-7 items-center rounded-full bg-brand-accent-deep px-5 py-4"
@@ -942,20 +1021,20 @@ function GuestSignupCard({
         </Text>
       </View>
     </View>
-  )
+  );
 }
 
 function FeedModeToggle({
   feedMode,
   onChangeMode,
 }: {
-  feedMode: FeedMode
-  onChangeMode: (mode: FeedMode) => void
+  feedMode: FeedMode;
+  onChangeMode: (mode: FeedMode) => void;
 }) {
   return (
     <View className="flex-row items-center rounded-full bg-ink-dark/6 p-1">
-      {FEED_TABS.map((tab, index) => {
-        const active = feedMode === tab.key
+      {FEED_TABS.map((tab) => {
+        const active = feedMode === tab.key;
         return (
           <TouchableOpacity
             key={tab.key}
@@ -971,10 +1050,10 @@ function FeedModeToggle({
               {tab.label}
             </Text>
           </TouchableOpacity>
-        )
+        );
       })}
     </View>
-  )
+  );
 }
 
 const SheetButton = memo(function SheetButton({
@@ -983,10 +1062,10 @@ const SheetButton = memo(function SheetButton({
   destructive,
   onPress,
 }: {
-  label: string
-  icon: keyof typeof Ionicons.glyphMap
-  destructive?: boolean
-  onPress: () => void
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  destructive?: boolean;
+  onPress: () => void;
 }) {
   return (
     <TouchableOpacity
@@ -999,11 +1078,7 @@ const SheetButton = memo(function SheetButton({
           destructive ? 'bg-signal-danger/10' : 'bg-brand-accent-deep/8'
         }`}
       >
-        <Ionicons
-          name={icon}
-          size={18}
-          color={destructive ? colors.danger : colors.accentDeep}
-        />
+        <Ionicons name={icon} size={18} color={destructive ? colors.danger : colors.accentDeep} />
       </View>
       <Text
         className="ml-3 font-sans text-sm font-semibold"
@@ -1012,5 +1087,5 @@ const SheetButton = memo(function SheetButton({
         {label}
       </Text>
     </TouchableOpacity>
-  )
-})
+  );
+});

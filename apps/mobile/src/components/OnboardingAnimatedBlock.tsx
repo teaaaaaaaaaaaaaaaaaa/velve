@@ -1,11 +1,11 @@
-import { ReactNode } from 'react'
-import Animated, { FadeInUp } from 'react-native-reanimated'
+import { ReactNode } from 'react';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 
 type OnboardingAnimatedBlockProps = {
-  children: ReactNode
-  delay?: number
-  className?: string
-}
+  children: ReactNode;
+  delay?: number;
+  className?: string;
+};
 
 export function OnboardingAnimatedBlock({
   children,
@@ -16,5 +16,5 @@ export function OnboardingAnimatedBlock({
     <Animated.View entering={FadeInUp.delay(delay).duration(420)} className={className}>
       {children}
     </Animated.View>
-  )
+  );
 }

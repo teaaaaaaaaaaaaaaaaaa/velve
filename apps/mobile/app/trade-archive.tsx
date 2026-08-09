@@ -1,6 +1,6 @@
-import { Ionicons } from '@expo/vector-icons'
-import { useRouter } from 'expo-router'
-import { useCallback, useEffect, useState } from 'react'
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -8,90 +8,90 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native'
+} from 'react-native';
 
-import client from '@/api/client'
-import { BrandBackground } from '@/components/BrandBackground'
-import { EditorialEmptyState } from '@/components/EditorialEmptyState'
-import { RemoteImage } from '@/components/RemoteImage'
-import { colors } from '@/design/tokens'
+import client from '@/api/client';
+import { BrandBackground } from '@/components/BrandBackground';
+import { EditorialEmptyState } from '@/components/EditorialEmptyState';
+import { RemoteImage } from '@/components/RemoteImage';
+import { colors } from '@/design/tokens';
 
 type TradeUser = {
-  _id: string
-  displayName: string
-  photoURL?: string
-}
+  _id: string;
+  displayName: string;
+  photoURL?: string;
+};
 
 type TradeItem = {
-  _id: string
-  title: string
-  primaryImage?: string
-  images?: string[]
-}
+  _id: string;
+  title: string;
+  primaryImage?: string;
+  images?: string[];
+};
 
 type TradeRecord = {
-  _id: string
-  kind: 'trade' | 'buy'
-  userRole: 'sender' | 'receiver'
-  status: 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'expired'
-  bucket: 'pending' | 'active' | 'history'
-  counterpart: TradeUser
-  offeredItemId?: TradeItem | null
-  requestedItemId?: TradeItem | null
-  offeredPrice?: number | null
-  updatedAt: string
-  createdAt: string
-  completedAt?: string
-  canRate?: boolean
-}
+  _id: string;
+  kind: 'trade' | 'buy';
+  userRole: 'sender' | 'receiver';
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'expired';
+  bucket: 'pending' | 'active' | 'history';
+  counterpart: TradeUser;
+  offeredItemId?: TradeItem | null;
+  requestedItemId?: TradeItem | null;
+  offeredPrice?: number | null;
+  updatedAt: string;
+  createdAt: string;
+  completedAt?: string;
+  canRate?: boolean;
+};
 
 function getTradeItemImage(item?: TradeItem | null) {
-  return item?.primaryImage || item?.images?.[0] || undefined
+  return item?.primaryImage ?? item?.images?.[0] ?? undefined;
 }
 
 function getStatusLabel(status: TradeRecord['status'], completedAt?: string) {
-  if (completedAt) return 'Zavrseno'
-  if (status === 'rejected') return 'Odbijeno'
-  if (status === 'cancelled') return 'Otkazano'
-  if (status === 'expired') return 'Isteklo'
-  if (status === 'accepted') return 'Prihvaceno'
-  return 'Istorija'
+  if (completedAt) return 'Zavrseno';
+  if (status === 'rejected') return 'Odbijeno';
+  if (status === 'cancelled') return 'Otkazano';
+  if (status === 'expired') return 'Isteklo';
+  if (status === 'accepted') return 'Prihvaceno';
+  return 'Istorija';
 }
 
 export default function TradeArchiveScreen() {
-  const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [trades, setTrades] = useState<TradeRecord[]>([])
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [trades, setTrades] = useState<TradeRecord[]>([]);
 
   const loadTrades = useCallback(async () => {
-    const response = await client.get('/api/trades/history')
+    const response = await client.get('/api/trades/history');
     if (response.data.ok) {
-      setTrades(response.data.data || [])
+      setTrades(response.data.data || []);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
     loadTrades()
       .catch(() => undefined)
-      .finally(() => setLoading(false))
-  }, [loadTrades])
+      .finally(() => setLoading(false));
+  }, [loadTrades]);
 
   const onRefresh = useCallback(async () => {
     try {
-      setRefreshing(true)
-      await loadTrades()
+      setRefreshing(true);
+      await loadTrades();
     } finally {
-      setRefreshing(false)
+      setRefreshing(false);
     }
-  }, [loadTrades])
+  }, [loadTrades]);
 
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-base-canvas">
         <ActivityIndicator color={colors.accentDeep} />
       </View>
-    )
+    );
   }
 
   return (
@@ -131,7 +131,10 @@ export default function TradeArchiveScreen() {
                 <View className="flex-row items-center justify-between">
                   <View className="flex-row items-center">
                     {trade.counterpart?.photoURL ? (
-                      <RemoteImage uri={trade.counterpart.photoURL} className="h-11 w-11 rounded-full" />
+                      <RemoteImage
+                        uri={trade.counterpart.photoURL}
+                        className="h-11 w-11 rounded-full"
+                      />
                     ) : (
                       <View className="h-11 w-11 items-center justify-center rounded-full bg-brand-accent-light/40">
                         <Text className="font-display text-xl text-brand-accent-deep">
@@ -174,7 +177,10 @@ export default function TradeArchiveScreen() {
                           </View>
                         )}
                       </View>
-                      <Text className="mt-2 font-sans text-sm font-semibold text-ink-dark" numberOfLines={2}>
+                      <Text
+                        className="mt-2 font-sans text-sm font-semibold text-ink-dark"
+                        numberOfLines={2}
+                      >
                         {trade.offeredItemId.title}
                       </Text>
                     </View>
@@ -196,7 +202,10 @@ export default function TradeArchiveScreen() {
                         </View>
                       )}
                     </View>
-                    <Text className="mt-2 font-sans text-sm font-semibold text-ink-dark" numberOfLines={2}>
+                    <Text
+                      className="mt-2 font-sans text-sm font-semibold text-ink-dark"
+                      numberOfLines={2}
+                    >
                       {trade.requestedItemId?.title || 'Predmet'}
                     </Text>
                   </View>
@@ -221,5 +230,5 @@ export default function TradeArchiveScreen() {
         )}
       </View>
     </ScrollView>
-  )
+  );
 }

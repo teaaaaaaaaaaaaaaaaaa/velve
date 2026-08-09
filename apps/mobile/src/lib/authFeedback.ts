@@ -9,6 +9,12 @@ export type InlineAuthFeedback = {
   recovery?: string;
 };
 
+export type FirebaseErrorLike = {
+  code?: string;
+  message?: string;
+  nativeErrorCode?: string;
+};
+
 const EXPECTED_AUTH_ERROR_CODES = new Set([
   'auth/user-not-found',
   'auth/wrong-password',
@@ -25,7 +31,7 @@ const EXPECTED_AUTH_ERROR_CODES = new Set([
 
 function getErrorCode(error: unknown) {
   const value = error as { code?: string; nativeErrorCode?: string };
-  return value?.code || value?.nativeErrorCode || '';
+  return value?.code ?? value?.nativeErrorCode ?? '';
 }
 
 function isNetworkError(error: unknown) {

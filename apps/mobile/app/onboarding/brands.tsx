@@ -1,22 +1,16 @@
-import { useMemo, useState } from 'react'
-import {
-  ScrollView,
-  StatusBar,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { ScrollView, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 
-import { BrandBackground } from '@/components/BrandBackground'
-import { GlassSurface } from '@/components/GlassSurface'
-import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen'
-import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock'
-import { OnboardingProgressHeader } from '@/components/OnboardingProgressHeader'
-import { VelveTextInput } from '@/components/VelveTextInput'
-import { colors } from '@/design/tokens'
-import { useI18n } from '@/i18n'
+import { BrandBackground } from '@/components/BrandBackground';
+import { GlassSurface } from '@/components/GlassSurface';
+import { KeyboardAwareScreen } from '@/components/KeyboardAwareScreen';
+import { OnboardingAnimatedBlock } from '@/components/OnboardingAnimatedBlock';
+import { OnboardingProgressHeader } from '@/components/OnboardingProgressHeader';
+import { VelveTextInput } from '@/components/VelveTextInput';
+import { colors } from '@/design/tokens';
+import { useI18n } from '@/i18n';
 
 const SUGGESTED_BRANDS = [
   'Nike',
@@ -31,7 +25,7 @@ const SUGGESTED_BRANDS = [
   'COS',
   'Arket',
   'Diesel',
-] as const
+] as const;
 
 const COPY = {
   sr: {
@@ -67,35 +61,37 @@ const COPY = {
     suggested: 'Предложенные бренды',
     cta: 'Продолжить',
   },
-} as const
+} as const;
 
 export default function BrandsScreen() {
-  const router = useRouter()
-  const params = useLocalSearchParams()
-  const { locale } = useI18n()
-  const [selectedBrands, setSelectedBrands] = useState<string[]>([])
-  const [customBrand, setCustomBrand] = useState('')
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const { locale } = useI18n();
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [customBrand, setCustomBrand] = useState('');
 
-  const copy = COPY[locale]
-  const unlockLabel = locale === 'sr' ? 'Otkljucan brand signal' : 'Brand signal unlocked'
+  const copy = COPY[locale];
+  const unlockLabel = locale === 'sr' ? 'Otkljucan brand signal' : 'Brand signal unlocked';
   const availableBrands = useMemo(
     () => SUGGESTED_BRANDS.filter((brand) => !selectedBrands.includes(brand)),
     [selectedBrands]
-  )
+  );
 
   const toggleBrand = (brand: string) => {
     setSelectedBrands((prev) =>
-      prev.includes(brand) ? prev.filter((currentBrand) => currentBrand !== brand) : [...prev, brand]
-    )
-  }
+      prev.includes(brand)
+        ? prev.filter((currentBrand) => currentBrand !== brand)
+        : [...prev, brand]
+    );
+  };
 
   const addCustomBrand = () => {
-    const trimmedBrand = customBrand.trim()
-    if (!trimmedBrand || selectedBrands.includes(trimmedBrand)) return
+    const trimmedBrand = customBrand.trim();
+    if (!trimmedBrand || selectedBrands.includes(trimmedBrand)) return;
 
-    setSelectedBrands((prev) => [...prev, trimmedBrand])
-    setCustomBrand('')
-  }
+    setSelectedBrands((prev) => [...prev, trimmedBrand]);
+    setCustomBrand('');
+  };
 
   return (
     <KeyboardAwareScreen className="bg-base-canvas">
@@ -128,35 +124,35 @@ export default function BrandsScreen() {
         </OnboardingAnimatedBlock>
 
         <OnboardingAnimatedBlock delay={90}>
-        <GlassSurface className="mt-6 px-5 py-5">
-          <Text className="font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/44">
-            Velve edit
-          </Text>
-          <View className="mt-3 flex-row items-center rounded-pill bg-base-canvas px-4 py-3">
-            <VelveTextInput
-              value={customBrand}
-              onChangeText={setCustomBrand}
-              onSubmitEditing={addCustomBrand}
-              placeholder={copy.inputPlaceholder}
-              className="flex-1 font-sans text-sm text-ink-dark"
-              returnKeyType="done"
-            />
-
-            <TouchableOpacity
-              onPress={addCustomBrand}
-              disabled={!customBrand.trim()}
-              className={`ml-3 h-10 w-10 items-center justify-center rounded-full ${
-                customBrand.trim() ? 'bg-brand-highlight' : 'bg-ink-dark/12'
-              }`}
-            >
-              <Ionicons
-                name="add"
-                size={20}
-                color={customBrand.trim() ? colors.inkDark : 'rgba(43,42,43,0.32)'}
+          <GlassSurface className="mt-6 px-5 py-5">
+            <Text className="font-sans text-xs uppercase tracking-[1.1px] text-ink-dark/44">
+              Velve edit
+            </Text>
+            <View className="mt-3 flex-row items-center rounded-pill bg-base-canvas px-4 py-3">
+              <VelveTextInput
+                value={customBrand}
+                onChangeText={setCustomBrand}
+                onSubmitEditing={addCustomBrand}
+                placeholder={copy.inputPlaceholder}
+                className="flex-1 font-sans text-sm text-ink-dark"
+                returnKeyType="done"
               />
-            </TouchableOpacity>
-          </View>
-        </GlassSurface>
+
+              <TouchableOpacity
+                onPress={addCustomBrand}
+                disabled={!customBrand.trim()}
+                className={`ml-3 h-10 w-10 items-center justify-center rounded-full ${
+                  customBrand.trim() ? 'bg-brand-highlight' : 'bg-ink-dark/12'
+                }`}
+              >
+                <Ionicons
+                  name="add"
+                  size={20}
+                  color={customBrand.trim() ? colors.inkDark : 'rgba(43,42,43,0.32)'}
+                />
+              </TouchableOpacity>
+            </View>
+          </GlassSurface>
         </OnboardingAnimatedBlock>
 
         {selectedBrands.length ? (
@@ -226,5 +222,5 @@ export default function BrandsScreen() {
         </TouchableOpacity>
       </View>
     </KeyboardAwareScreen>
-  )
+  );
 }

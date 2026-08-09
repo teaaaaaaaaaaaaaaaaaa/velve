@@ -9,6 +9,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 import { isDesignPreviewMode } from '@/config/designPreview';
+import { logger } from '@/lib/logger';
 import { getStorage } from '@/lib/storage';
 
 type AuthProviderInfo = {
@@ -25,7 +26,6 @@ export type AuthUser = {
 
 type AuthStateListener = (user: AuthUser | null) => void;
 type AuthCredential = unknown;
-type AuthResult = { user: AuthUser };
 
 const isExpoGo = Constants.appOwnership === 'expo';
 const shouldUseFirebaseWebSdk = isExpoGo || Platform.OS === 'web' || isDesignPreviewMode;
@@ -114,11 +114,9 @@ if (shouldUseFirebaseWebSdk) {
   createGoogleCredentialInternal = (idToken) =>
     firebaseAuthModule.GoogleAuthProvider.credential(idToken);
 
-  console.log(
-    '[Firebase] Initialized Firebase web auth fallback with persistent storage'
-  );
+  logger.debug('[Firebase] Initialized Firebase web auth fallback with persistent storage');
   if (firebaseWebConfigError) {
-    console.warn(`[Firebase] WARNING: ${firebaseWebConfigError}`);
+    logger.warn(`[Firebase] WARNING: ${firebaseWebConfigError}`);
   }
 } else {
   const firebaseAppModule =
@@ -141,18 +139,18 @@ if (shouldUseFirebaseWebSdk) {
   createGoogleCredentialInternal = (idToken) =>
     firebaseAuthModule.GoogleAuthProvider.credential(idToken);
 
-  console.log('[Firebase] React Native Firebase initialized');
+  logger.debug('[Firebase] React Native Firebase initialized');
 }
 
-console.log('[Firebase] Initial currentUser:', auth.currentUser ? auth.currentUser.uid : 'none');
+logger.debug('[Firebase] Initial currentUser:', auth.currentUser ? auth.currentUser.uid : 'none');
 
 if (googleOAuthConfigError) {
-  console.warn(`[Firebase] WARNING: ${googleOAuthConfigError}`);
+  logger.warn(`[Firebase] WARNING: ${googleOAuthConfigError}`);
 } else {
-  console.log('[Firebase] Google OAuth config validated successfully');
+  logger.debug('[Firebase] Google OAuth config validated successfully');
 }
 
-console.log('[Firebase] Auth module ready');
+logger.debug('[Firebase] Auth module ready');
 
 async function getAuthToken(user: AuthUser, forceRefresh = false) {
   const requestKey = `${user.uid}:${forceRefresh ? 'refresh' : 'cached'}`;
@@ -161,14 +159,14 @@ async function getAuthToken(user: AuthUser, forceRefresh = false) {
     return existingRequest;
   }
 
-  console.log('[Firebase] getAuthToken:start', {
+  logger.debug('[Firebase] getAuthToken:start', {
     uid: user.uid,
     forceRefresh,
   });
 
   const request = getAuthTokenInternal(user, forceRefresh)
     .then((token) => {
-      console.log('[Firebase] getAuthToken:success', {
+      logger.debug('[Firebase] getAuthToken:success', {
         uid: user.uid,
         tokenLength: token.length,
       });

@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Alert } from '@/lib/velveAlert';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -17,6 +16,7 @@ import { RemoteImage } from '@/components/RemoteImage';
 import { colors } from '@/design/tokens';
 import { useI18n } from '@/i18n';
 import { analyzeLocalImage } from '@/lib/imageRequests';
+import { Alert } from '@/lib/velveAlert';
 
 type AnalysisPayload = {
   ready: boolean;

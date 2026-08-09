@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Alert } from '@/lib/velveAlert';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
@@ -13,6 +12,7 @@ import { GlassSurface } from '@/components/GlassSurface';
 import { RemoteImage } from '@/components/RemoteImage';
 import { colors } from '@/design/tokens';
 import { useI18n } from '@/i18n';
+import { Alert } from '@/lib/velveAlert';
 
 type ImagesPayload = {
   imageOriginal: string | null;
@@ -117,7 +117,7 @@ export default function CleanCutReviewScreen() {
                 {t('upload.original')}
               </Text>
               <RemoteImage
-                uri={payload?.imageOriginal || undefined}
+                uri={payload?.imageOriginal ?? undefined}
                 className="aspect-[3/4] w-full rounded-[22px]"
                 contentFit="contain"
               />
@@ -139,7 +139,7 @@ export default function CleanCutReviewScreen() {
                 {t('upload.cleaned')}
               </Text>
               <RemoteImage
-                uri={payload?.imageClean || undefined}
+                uri={payload?.imageClean ?? undefined}
                 className="aspect-[3/4] w-full rounded-[22px]"
                 contentFit="contain"
               />
@@ -186,7 +186,7 @@ export default function CleanCutReviewScreen() {
 
       <FullscreenImageModal
         visible={!!fullscreenTarget}
-        title={fullscreenTarget?.title || ''}
+        title={fullscreenTarget?.title ?? ''}
         imageUri={fullscreenTarget?.imageUri}
         onClose={() => setFullscreenTarget(null)}
       />

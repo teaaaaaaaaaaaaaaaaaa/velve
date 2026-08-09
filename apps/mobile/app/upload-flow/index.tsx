@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Alert } from '@/lib/velveAlert';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { Text, TouchableOpacity, View } from 'react-native';
@@ -8,6 +7,7 @@ import { BrandBackground } from '@/components/BrandBackground';
 import { GlassSurface } from '@/components/GlassSurface';
 import { colors } from '@/design/tokens';
 import { useI18n } from '@/i18n';
+import { Alert } from '@/lib/velveAlert';
 
 export default function CleanCutStartScreen() {
   const router = useRouter();
@@ -32,6 +32,9 @@ export default function CleanCutStartScreen() {
         const result = await ImagePicker.launchCameraAsync({
           mediaTypes: ['images'],
           quality: 0.9,
+          // Rear camera by default — non-mirrored output, which is the
+          // standard behavior (iOS + stock Android) for photographing items.
+          cameraType: ImagePicker.CameraType.back,
         });
 
         if (!result.canceled && result.assets[0]?.uri) {

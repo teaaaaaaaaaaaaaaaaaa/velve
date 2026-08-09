@@ -1,5 +1,5 @@
-import { Ionicons } from '@expo/vector-icons'
-import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Ionicons } from '@expo/vector-icons';
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -8,23 +8,23 @@ import {
   type AlertButton,
   type AlertOptions,
   View,
-} from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, shadows } from '@/design/tokens'
+import { colors, shadows } from '@/design/tokens';
 import {
   registerVelveAlertHandler,
   registerVelveToastHandler,
   type VelveToastPayload,
   type VelveToastTone,
-} from '@/lib/velveAlert'
+} from '@/lib/velveAlert';
 
 type DialogRequest = {
-  title: string
-  message?: string
-  buttons: AlertButton[]
-  options?: AlertOptions
-}
+  title: string;
+  message?: string;
+  buttons: AlertButton[];
+  options?: AlertOptions;
+};
 
 const SUCCESS_TITLES = [
   'hvala',
@@ -35,92 +35,92 @@ const SUCCESS_TITLES = [
   'korisnik blokiran',
   'razmena arhivirana',
   'velve',
-]
+];
 
-const ERROR_TITLES = ['greska', 'greška', 'nije moguce', 'nije moguće', 'try-on nije uspeo']
+const ERROR_TITLES = ['greska', 'greška', 'nije moguce', 'nije moguće', 'try-on nije uspeo'];
 
 function normalizeTitle(value: string) {
-  return value.trim().toLowerCase()
+  return value.trim().toLowerCase();
 }
 
 function inferToastTone(title: string): VelveToastTone {
-  const normalized = normalizeTitle(title)
-  if (ERROR_TITLES.some((entry) => normalized.includes(entry))) return 'error'
-  if (SUCCESS_TITLES.some((entry) => normalized.includes(entry))) return 'success'
-  return 'info'
+  const normalized = normalizeTitle(title);
+  if (ERROR_TITLES.some((entry) => normalized.includes(entry))) return 'error';
+  if (SUCCESS_TITLES.some((entry) => normalized.includes(entry))) return 'success';
+  return 'info';
 }
 
 function shouldUseToast(title: string, buttons?: AlertButton[]) {
-  const meaningfulButtons = buttons?.filter((button) => button.text && button.text !== 'OK') ?? []
-  if (meaningfulButtons.length > 0) return false
+  const meaningfulButtons = buttons?.filter((button) => button.text && button.text !== 'OK') ?? [];
+  if (meaningfulButtons.length > 0) return false;
 
-  const normalized = normalizeTitle(title)
+  const normalized = normalizeTitle(title);
   return (
     SUCCESS_TITLES.some((entry) => normalized.includes(entry)) ||
     ERROR_TITLES.some((entry) => normalized.includes(entry))
-  )
+  );
 }
 
 function normalizeButtons(buttons?: AlertButton[]) {
-  if (buttons?.length) return buttons
-  return [{ text: 'OK', style: 'cancel' }] satisfies AlertButton[]
+  if (buttons?.length) return buttons;
+  return [{ text: 'OK', style: 'cancel' }] satisfies AlertButton[];
 }
 
 function getIconName(tone: VelveToastTone) {
-  if (tone === 'success') return 'checkmark-circle'
-  if (tone === 'error') return 'alert-circle'
-  return 'information-circle'
+  if (tone === 'success') return 'checkmark-circle';
+  if (tone === 'error') return 'alert-circle';
+  return 'information-circle';
 }
 
 function getDialogTone(dialog: DialogRequest) {
-  return dialog.buttons.some((button) => button.style === 'destructive') ? 'danger' : 'default'
+  return dialog.buttons.some((button) => button.style === 'destructive') ? 'danger' : 'default';
 }
 
 export function VelveFeedbackProvider({ children }: { children: ReactNode }) {
-  const insets = useSafeAreaInsets()
-  const [dialog, setDialog] = useState<DialogRequest | null>(null)
-  const dialogQueue = useRef<DialogRequest[]>([])
-  const [toast, setToast] = useState<VelveToastPayload | null>(null)
-  const toastQueue = useRef<VelveToastPayload[]>([])
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const insets = useSafeAreaInsets();
+  const [dialog, setDialog] = useState<DialogRequest | null>(null);
+  const dialogQueue = useRef<DialogRequest[]>([]);
+  const [toast, setToast] = useState<VelveToastPayload | null>(null);
+  const toastQueue = useRef<VelveToastPayload[]>([]);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showNextDialog = useCallback(() => {
-    const next = dialogQueue.current.shift() ?? null
-    setDialog(next)
-  }, [])
+    const next = dialogQueue.current.shift() ?? null;
+    setDialog(next);
+  }, []);
 
   const showToast = useCallback((payload: VelveToastPayload) => {
     const nextPayload = {
       tone: 'info' as VelveToastTone,
       durationMs: 2000,
       ...payload,
-    }
+    };
 
     if (toastTimer.current) {
-      toastQueue.current.push(nextPayload)
-      return
+      toastQueue.current.push(nextPayload);
+      return;
     }
 
-    setToast(nextPayload)
+    setToast(nextPayload);
     toastTimer.current = setTimeout(() => {
-      setToast(null)
-      toastTimer.current = null
-      const next = toastQueue.current.shift()
-      if (next) showToast(next)
-    }, nextPayload.durationMs)
-  }, [])
+      setToast(null);
+      toastTimer.current = null;
+      const next = toastQueue.current.shift();
+      if (next) showToast(next);
+    }, nextPayload.durationMs);
+  }, []);
 
   useEffect(() => {
     return () => {
-      if (toastTimer.current) clearTimeout(toastTimer.current)
-    }
-  }, [])
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     const unregisterAlert = registerVelveAlertHandler((title, message, buttons, options) => {
       if (shouldUseToast(title, buttons)) {
-        showToast({ title, message, tone: inferToastTone(title), durationMs: 2000 })
-        return
+        showToast({ title, message, tone: inferToastTone(title), durationMs: 2000 });
+        return;
       }
 
       const nextDialog = {
@@ -128,45 +128,45 @@ export function VelveFeedbackProvider({ children }: { children: ReactNode }) {
         message,
         buttons: normalizeButtons(buttons),
         options,
-      }
+      };
 
       setDialog((current) => {
         if (current) {
-          dialogQueue.current.push(nextDialog)
-          return current
+          dialogQueue.current.push(nextDialog);
+          return current;
         }
-        return nextDialog
-      })
-    })
+        return nextDialog;
+      });
+    });
 
-    const unregisterToast = registerVelveToastHandler(showToast)
+    const unregisterToast = registerVelveToastHandler(showToast);
 
     return () => {
-      unregisterAlert()
-      unregisterToast()
-    }
-  }, [showToast])
+      unregisterAlert();
+      unregisterToast();
+    };
+  }, [showToast]);
 
   const orderedButtons = useMemo(() => {
-    if (!dialog) return []
-    const cancelButtons = dialog.buttons.filter((button) => button.style === 'cancel')
-    const actionButtons = dialog.buttons.filter((button) => button.style !== 'cancel')
-    return [...actionButtons, ...cancelButtons]
-  }, [dialog])
+    if (!dialog) return [];
+    const cancelButtons = dialog.buttons.filter((button) => button.style === 'cancel');
+    const actionButtons = dialog.buttons.filter((button) => button.style !== 'cancel');
+    return [...actionButtons, ...cancelButtons];
+  }, [dialog]);
 
   const closeDialog = useCallback(
     (button?: AlertButton) => {
-      setDialog(null)
+      setDialog(null);
       requestAnimationFrame(() => {
-        button?.onPress?.()
-        showNextDialog()
-      })
+        button?.onPress?.();
+        showNextDialog();
+      });
     },
     [showNextDialog]
-  )
+  );
 
-  const dialogTone = dialog ? getDialogTone(dialog) : 'default'
-  const toastTone = toast?.tone ?? 'info'
+  const dialogTone = dialog ? getDialogTone(dialog) : 'default';
+  const toastTone = toast?.tone ?? 'info';
 
   return (
     <View className="flex-1">
@@ -178,18 +178,18 @@ export function VelveFeedbackProvider({ children }: { children: ReactNode }) {
         animationType="fade"
         statusBarTranslucent
         onRequestClose={() => {
-          if (dialog?.options?.cancelable === false) return
-          const cancelButton = dialog?.buttons.find((button) => button.style === 'cancel')
-          closeDialog(cancelButton)
+          if (dialog?.options?.cancelable === false) return;
+          const cancelButton = dialog?.buttons.find((button) => button.style === 'cancel');
+          closeDialog(cancelButton);
         }}
       >
         <View className="flex-1 justify-end bg-ink-dark/45 px-4 pb-4">
           <Pressable
             className="absolute inset-0"
             onPress={() => {
-              if (dialog?.options?.cancelable === false) return
-              const cancelButton = dialog?.buttons.find((button) => button.style === 'cancel')
-              closeDialog(cancelButton)
+              if (dialog?.options?.cancelable === false) return;
+              const cancelButton = dialog?.buttons.find((button) => button.style === 'cancel');
+              closeDialog(cancelButton);
             }}
           />
 
@@ -224,8 +224,8 @@ export function VelveFeedbackProvider({ children }: { children: ReactNode }) {
 
               <View className="gap-2">
                 {orderedButtons.map((button, index) => {
-                  const isCancel = button.style === 'cancel'
-                  const isDestructive = button.style === 'destructive'
+                  const isCancel = button.style === 'cancel';
+                  const isDestructive = button.style === 'destructive';
 
                   return (
                     <TouchableOpacity
@@ -248,7 +248,7 @@ export function VelveFeedbackProvider({ children }: { children: ReactNode }) {
                         {button.text ?? 'OK'}
                       </Text>
                     </TouchableOpacity>
-                  )
+                  );
                 })}
               </View>
             </View>
@@ -289,5 +289,5 @@ export function VelveFeedbackProvider({ children }: { children: ReactNode }) {
         </View>
       ) : null}
     </View>
-  )
+  );
 }

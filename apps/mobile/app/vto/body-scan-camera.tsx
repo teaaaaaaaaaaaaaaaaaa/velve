@@ -58,7 +58,8 @@ export default function BodyScanCameraScreen() {
       if (!result.canceled && result.assets?.[0]?.uri) {
         setPhotoUri(result.assets[0].uri);
       }
-    } catch (error: any) {
+    } catch (unknownError: unknown) {
+      const error = unknownError as { message?: string };
       Alert.alert('Kamera nije otvorena', error?.message || 'Pokusaj ponovo.');
     } finally {
       setPickingSource(null);
@@ -87,7 +88,8 @@ export default function BodyScanCameraScreen() {
       if (!result.canceled && result.assets?.[0]?.uri) {
         setPhotoUri(result.assets[0].uri);
       }
-    } catch (error: any) {
+    } catch (unknownError: unknown) {
+      const error = unknownError as { message?: string };
       Alert.alert('Fotografija nije izabrana', error?.message || 'Pokusaj ponovo.');
     } finally {
       setPickingSource(null);
@@ -109,7 +111,11 @@ export default function BodyScanCameraScreen() {
           ...(mode ? { mode } : {}),
         },
       });
-    } catch (error: any) {
+    } catch (unknownError: unknown) {
+      const error = unknownError as {
+        message?: string;
+        response?: { data?: { error?: string } };
+      };
       Alert.alert(
         'Body scan nije sacuvan',
         error?.response?.data?.error ||

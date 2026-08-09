@@ -1,6 +1,5 @@
 ﻿import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Alert } from '@/lib/velveAlert';
 import { useEffect, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
@@ -12,6 +11,7 @@ import { RemoteImage } from '@/components/RemoteImage';
 import { colors } from '@/design/tokens';
 import { useI18n } from '@/i18n';
 import { getApiErrorMessage } from '@/lib/apiErrors';
+import { Alert } from '@/lib/velveAlert';
 
 type PublicUser = {
   _id: string;
@@ -58,7 +58,7 @@ export default function PublicProfileScreen() {
         const userData = userResponse.data.data as PublicUser;
         setUser(userData);
         setIsFollowing(Boolean(userData.isFollowing));
-        setFollowersCount(userData.followersCount || 0);
+        setFollowersCount(userData.followersCount ?? 0);
       }
 
       if (itemsResponse.data.ok) {
@@ -311,7 +311,7 @@ export default function PublicProfileScreen() {
               }
             >
               <Text className="font-display text-2xl text-ink-dark">
-                {user.followingCount || 0}
+                {user.followingCount ?? 0}
               </Text>
               <Text className="font-sans text-xs text-ink-dark/50">{t('profile.following')}</Text>
             </TouchableOpacity>

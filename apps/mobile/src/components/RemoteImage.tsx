@@ -1,6 +1,6 @@
-import { Ionicons } from '@expo/vector-icons'
-import type { ImageProps as ExpoImageProps } from 'expo-image'
-import { memo, ReactNode, useMemo } from 'react'
+import { Ionicons } from '@expo/vector-icons';
+import type { ImageProps as ExpoImageProps } from 'expo-image';
+import { memo, ReactNode, useMemo } from 'react';
 import {
   Image as RNImage,
   ImageProps as RNImageProps,
@@ -9,35 +9,33 @@ import {
   StyleSheet,
   View,
   ViewStyle,
-} from 'react-native'
+} from 'react-native';
 
-import { colors } from '@/design/tokens'
-import { getExpoImageComponent } from '@/lib/expoImage'
-import { getRemoteImageSource, normalizeImageUri } from '@/lib/images'
+import { colors } from '@/design/tokens';
+import { getExpoImageComponent } from '@/lib/expoImage';
+import { getRemoteImageSource, normalizeImageUri } from '@/lib/images';
 
 type RemoteImageProps = Omit<ExpoImageProps, 'source' | 'style'> & {
-  uri?: string | null
-  className?: string
-  style?: StyleProp<ViewStyle>
-  imageStyle?: StyleProp<ImageStyle>
-  fallback?: ReactNode
-  loaderColor?: string
-}
+  uri?: string | null;
+  className?: string;
+  style?: StyleProp<ViewStyle>;
+  imageStyle?: StyleProp<ImageStyle>;
+  fallback?: ReactNode;
+  loaderColor?: string;
+};
 
-function toResizeMode(
-  contentFit: ExpoImageProps['contentFit']
-): RNImageProps['resizeMode'] {
+function toResizeMode(contentFit: ExpoImageProps['contentFit']): RNImageProps['resizeMode'] {
   switch (contentFit) {
     case 'contain':
     case 'scale-down':
-      return 'contain'
+      return 'contain';
     case 'fill':
-      return 'stretch'
+      return 'stretch';
     case 'none':
-      return 'center'
+      return 'center';
     case 'cover':
     default:
-      return 'cover'
+      return 'cover';
   }
 }
 
@@ -51,8 +49,8 @@ export const RemoteImage = memo(function RemoteImage({
   transition = 200,
   ...imageProps
 }: RemoteImageProps) {
-  const normalizedUri = useMemo(() => normalizeImageUri(uri), [uri])
-  const ExpoImage = getExpoImageComponent()
+  const normalizedUri = useMemo(() => normalizeImageUri(uri), [uri]);
+  const ExpoImage = getExpoImageComponent();
 
   if (!normalizedUri) {
     return (
@@ -63,7 +61,7 @@ export const RemoteImage = memo(function RemoteImage({
           </View>
         )}
       </View>
-    )
+    );
   }
 
   if (ExpoImage) {
@@ -79,7 +77,7 @@ export const RemoteImage = memo(function RemoteImage({
           cachePolicy="memory-disk"
         />
       </View>
-    )
+    );
   }
 
   return (
@@ -101,8 +99,8 @@ export const RemoteImage = memo(function RemoteImage({
         testID={imageProps.testID}
       />
     </View>
-  )
-})
+  );
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -118,4 +116,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.accentDeep,
   },
-})
+});
